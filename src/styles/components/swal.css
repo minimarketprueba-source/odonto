@@ -1,0 +1,14 @@
+.swal2-container.swal2-overflow-auto {
+  overflow-y: auto !important;
+  align-items: flex-start !important;
+  padding-top: 2.5rem !important;
+  z-index: 9999 !important;
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: auto !important;
+}
+
+.swal2-popup.swal2-scroll-body {
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+}

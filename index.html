@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- CSP para la app Electron empaquetada (sin headers HTTP); en web se suma a la de vercel.json -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' data:; frame-src 'self' https://*.supabase.co;"
+    />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sistema de Gestión Antropométrica para control de peso y medidas de cadetes policiales" />
+    <title>Sanidad ISEPOL - Citas Médicas</title>
+    <script>
+      // Prevenir flash de contenido sin estilo - aplicar tema antes de que cargue React
+      (function() {
+        try {
+          // Detectar si está corriendo en Electron
+          const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+          
+          // En Electron, usar tema claro por defecto para mejor compatibilidad
+          if (isElectron) {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.classList.add(theme === 'dark' ? 'dark' : 'light');
+            return;
+          }
+          
+          const theme = localStorage.getItem('theme') || 'system';
+          const root = document.documentElement;
+
+          if (theme === 'dark') {
+            root.classList.add('dark');
+          } else if (theme === 'light') {
+            root.classList.add('light');
+          } else {
+            // system
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.classList.add(systemTheme);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
