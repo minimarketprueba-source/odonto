@@ -78,12 +78,14 @@ export const queryKeys = {
   citas: {
     all: ['citas'] as const,
     porDia: (fecha: string) => [...queryKeys.citas.all, 'dia', fecha] as const,
+    rango: (desde: string, hasta: string) => [...queryKeys.citas.all, 'rango', desde, hasta] as const,
   },
   // Médicos (catálogo para la agenda)
   medicos: {
     all: ['medicos'] as const,
     list: () => [...queryKeys.medicos.all, 'list'] as const,
     mio: (userId: string) => [...queryKeys.medicos.all, 'mio', userId] as const,
+    admin: () => [...queryKeys.medicos.all, 'admin'] as const,
   },
   // Consultas (historia clínica)
   consultas: {
@@ -94,5 +96,21 @@ export const queryKeys = {
   cie10: {
     all: ['cie10'] as const,
     search: (q: string) => [...queryKeys.cie10.all, 'search', q] as const,
+    count: () => [...queryKeys.cie10.all, 'count'] as const,
+  },
+  // Lista de espera
+  listaEspera: {
+    all: ['listaEspera'] as const,
+    list: () => [...queryKeys.listaEspera.all, 'list'] as const,
+  },
+  // Recetas
+  recetas: {
+    all: ['recetas'] as const,
+    porPaciente: (pacienteId: number) => [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
+  },
+  // Especialidades
+  especialidades: {
+    all: ['especialidades'] as const,
+    list: () => [...queryKeys.especialidades.all, 'list'] as const,
   },
 } as const;

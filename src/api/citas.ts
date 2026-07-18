@@ -80,6 +80,26 @@ export async function fetchCitasDelDia(fecha: string): Promise<Cita[]> {
   return (data as unknown as Cita[]) || [];
 }
 
+export async function fetchCitasRango(desde: string, hasta: string): Promise<Cita[]> {
+  const { data, error } = await supabase
+    .from("citas")
+    .select(CITA_SELECT)
+    .gte("fecha", desde)
+    .lte("fecha", hasta)
+    .order("fecha", { ascending: true })
+    .limit(5000);
+  if (error) throw new Error(`Error al cargar las citas del rango: ${error.message}`);
+  return (data as unknown as Cita[]) || [];
+}
+
+export function useCitasRango(desde: string, hasta: string) {
+  return useQuery({
+    queryKey: queryKeys.citas.rango(desde, hasta),
+    queryFn: () => fetchCitasRango(desde, hasta),
+    enabled: !!desde && !!hasta,
+  });
+}
+
 export async function createCita(input: CreateCitaInput): Promise<Cita> {
   const { data, error } = await supabase
     .from("citas")

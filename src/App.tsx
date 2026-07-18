@@ -33,6 +33,9 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 const Pacientes = lazy(() => import('./pages/Pacientes'))
 const Citas = lazy(() => import('./pages/Citas'))
+const ListaEspera = lazy(() => import('./pages/ListaEspera'))
+const Reportes = lazy(() => import('./pages/Reportes'))
+const Mantenimiento = lazy(() => import('./pages/Mantenimiento'))
 const Usuarios = lazy(() => import('./pages/Usuarios'))
 const ConfirmarCorreo = lazy(() => import('./pages/ConfirmarCorreo'))
 const ConfigurarSupabase = lazy(() => import('./pages/ConfigurarSupabase'))
@@ -97,6 +100,9 @@ function App() {
           <Route path="/auth/reset-password" element={<AuthRedirect><ResetPassword /></AuthRedirect>} />
           <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
           <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
+          <Route path="/lista-espera" element={<ProtectedRoute moduleKey="lista_espera"><ListaEspera /></ProtectedRoute>} />
+          <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
+          <Route path="/mantenimiento" element={<ProtectedRoute moduleKey="mantenimiento"><Mantenimiento /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute moduleKey="usuarios"><Usuarios /></ProtectedRoute>} />
           <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
