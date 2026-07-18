@@ -81,12 +81,24 @@ export async function createConsulta(input: CreateConsultaInput): Promise<Consul
 }
 
 export async function searchCie10(q: string): Promise<Cie10[]> {
-  const { data, error } = await supabase
+  // Una sola palabra busca en código y descripción; varias palabras deben
+  // aparecer todas en la descripción ("fractura tibia" → "Fractura de la
+  // diáfisis de la tibia"), sin exigir la frase exacta.
+  const palabras = q.trim().split(/\s+/).filter(Boolean);
+  let query = supabase
     .from("cie10")
     .select("id, codigo, descripcion")
-    .or(`codigo.ilike.%${q}%,descripcion.ilike.%${q}%`)
     .eq("activo", true)
+    .order("codigo")
     .limit(15);
+  if (palabras.length <= 1) {
+    query = query.or(`codigo.ilike.%${palabras[0] ?? q}%,descripcion.ilike.%${palabras[0] ?? q}%`);
+  } else {
+    for (const palabra of palabras) {
+      query = query.ilike("descripcion", `%${palabra}%`);
+    }
+  }
+  const { data, error } = await query;
   if (error) throw new Error(`Error al buscar en CIE-10: ${error.message}`);
   return data || [];
 }
