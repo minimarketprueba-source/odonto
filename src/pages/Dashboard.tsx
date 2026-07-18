@@ -1,31 +1,42 @@
+import { Link } from "react-router-dom"
 import { AppLayout } from "@/components/layout/app-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, Users, Stethoscope, HeartPulse } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { usePacientes } from "@/api/pacientes"
+import { useCitasDelDia, fechaHoyISO } from "@/api/citas"
 
-// Fase 0: pantalla de bienvenida. En Fase 1 este dashboard mostrará las citas
-// del día y los contadores reales (pacientes, citas pendientes, atendidas).
 export default function Dashboard() {
   const { user } = useAuth()
+  const { data: pacientes = [] } = usePacientes()
+  const { data: citasHoy = [] } = useCitasDelDia(fechaHoyISO())
+
+  const stats = [
+    { valor: pacientes.filter((p) => p.activo).length, etiqueta: "pacientes activos" },
+    { valor: citasHoy.length, etiqueta: "citas hoy" },
+    { valor: citasHoy.filter((c) => c.estado === "pendiente" || c.estado === "confirmada").length, etiqueta: "por atender hoy" },
+    { valor: citasHoy.filter((c) => c.estado === "atendida").length, etiqueta: "atendidas hoy" },
+  ]
 
   const modulos = [
     {
       nombre: "Pacientes",
       descripcion: "Padrón de pacientes de la Sanidad (cadetes, oficiales, personal y familiares).",
       icon: Users,
-      fase: "Fase 1",
+      href: "/pacientes",
     },
     {
       nombre: "Agenda de citas",
       descripcion: "Agendar, confirmar, atender y cancelar citas médicas.",
       icon: CalendarDays,
-      fase: "Fase 1",
+      href: "/citas",
     },
     {
       nombre: "Consultas",
       descripcion: "Historia clínica: motivo, diagnóstico CIE-10 y tratamiento.",
       icon: Stethoscope,
+      href: null,
       fase: "Fase 2",
     },
   ]
@@ -37,38 +48,44 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <HeartPulse className="w-6 h-6 text-primary" />
-              Bienvenido a Sanidad ISEPOL
+              Sanidad ISEPOL — Citas Médicas
             </CardTitle>
-            <CardDescription>
-              Sistema de citas médicas de la Sanidad Policial. Sesión iniciada como {user?.email ?? "—"}.
-            </CardDescription>
+            <CardDescription>Sesión iniciada como {user?.email ?? "—"}.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              El sistema se está construyendo por fases sobre la base de datos ya operativa
-              (750 pacientes vinculados a control de peso). Los módulos se habilitarán aquí a
-              medida que estén listos.
-            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {stats.map((s) => (
+                <div key={s.etiqueta} className="p-3 rounded-lg border bg-muted/30 text-center">
+                  <div className="text-2xl font-bold">{s.valor}</div>
+                  <div className="text-xs text-muted-foreground">{s.etiqueta}</div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {modulos.map((m) => (
-            <Card key={m.nombre} className="opacity-80">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base">
-                  <span className="flex items-center gap-2">
-                    <m.icon className="w-5 h-5 text-primary" />
-                    {m.nombre}
-                  </span>
-                  <Badge variant="outline">{m.fase}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{m.descripcion}</p>
-              </CardContent>
-            </Card>
-          ))}
+          {modulos.map((m) => {
+            const tarjeta = (
+              <Card key={m.nombre} className={m.href ? "hover:border-primary/60 transition-colors h-full" : "opacity-70 h-full"}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-base">
+                    <span className="flex items-center gap-2">
+                      <m.icon className="w-5 h-5 text-primary" />
+                      {m.nombre}
+                    </span>
+                    {m.fase && <Badge variant="outline">{m.fase}</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{m.descripcion}</p>
+                </CardContent>
+              </Card>
+            )
+            return m.href
+              ? <Link key={m.nombre} to={m.href} className="block">{tarjeta}</Link>
+              : tarjeta
+          })}
         </div>
       </div>
     </AppLayout>

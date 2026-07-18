@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
-import { Menu, X, Home, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react"
+import { Menu, X, Home, LogOut, Users, CalendarDays, Shield, ChevronLeft, ChevronRight } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
 
 // Helper para obtener la ruta correcta del logo
@@ -23,10 +23,12 @@ export function Sidebar() {
   const { isOpen, setIsOpen, isCollapsed, setIsCollapsed } = useSidebar()
   const { canView } = usePermissions()
 
-  // Fase 1 agrega Pacientes y Citas; Fase 2, Consultas.
+  // Fase 2 agrega Consultas (historia clínica).
   const navigation = [
     { name: "Dashboard", href: "/", icon: Home, badge: null as number | null },
-    { name: "Usuarios", href: "/usuarios", icon: Users, badge: null as number | null, moduleKey: "usuarios" },
+    { name: "Pacientes", href: "/pacientes", icon: Users, badge: null as number | null, moduleKey: "pacientes" },
+    { name: "Citas", href: "/citas", icon: CalendarDays, badge: null as number | null, moduleKey: "citas" },
+    { name: "Usuarios", href: "/usuarios", icon: Shield, badge: null as number | null, moduleKey: "usuarios" },
   ]
 
   const visibleNavigation = navigation.filter(item => {

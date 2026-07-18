@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Search, User, Clock, Home, Users } from "lucide-react"
+import { Search, User, Clock, Home, Users, CalendarDays, Shield } from "lucide-react"
 import { usePageTitle } from "@/hooks/use-page-title"
 import {
   CommandDialog,
@@ -86,8 +86,16 @@ export function Header() {
                 <Home className="mr-2 h-4 w-4" />
                 Dashboard
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => navigate("/usuarios"))}>
+              <CommandItem onSelect={() => runCommand(() => navigate("/pacientes"))}>
                 <Users className="mr-2 h-4 w-4" />
+                Pacientes
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => navigate("/citas"))}>
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Citas
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => navigate("/usuarios"))}>
+                <Shield className="mr-2 h-4 w-4" />
                 Usuarios
               </CommandItem>
             </CommandGroup>

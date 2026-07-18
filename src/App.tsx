@@ -31,6 +31,8 @@ const SignUpSuccess = lazy(() => import('./pages/SignUpSuccess'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
+const Pacientes = lazy(() => import('./pages/Pacientes'))
+const Citas = lazy(() => import('./pages/Citas'))
 const Usuarios = lazy(() => import('./pages/Usuarios'))
 const ConfirmarCorreo = lazy(() => import('./pages/ConfirmarCorreo'))
 const ConfigurarSupabase = lazy(() => import('./pages/ConfigurarSupabase'))
@@ -93,6 +95,8 @@ function App() {
           <Route path="/auth/sign-up-success" element={<AuthRedirect><SignUpSuccess /></AuthRedirect>} />
           <Route path="/auth/forgot-password" element={<AuthRedirect><ForgotPassword /></AuthRedirect>} />
           <Route path="/auth/reset-password" element={<AuthRedirect><ResetPassword /></AuthRedirect>} />
+          <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
+          <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute moduleKey="usuarios"><Usuarios /></ProtectedRoute>} />
           <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

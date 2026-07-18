@@ -69,10 +69,19 @@ export const queryKeys = {
     porDia: (dia: string) => [...queryKeys.diasLibres.all, dia] as const,
     porOficial: (oficialId: string) => [...queryKeys.diasLibres.all, 'oficial', oficialId] as const,
   },
-  // Sanidad (consultas del sistema de citas médicas, solo lectura)
-  sanidad: {
-    all: ['sanidad'] as const,
-    resumen: (cadeteId: string) => [...queryKeys.sanidad.all, 'resumen', cadeteId] as const,
-    historial: (cadeteId: string) => [...queryKeys.sanidad.all, 'historial', cadeteId] as const,
+  // Pacientes de la Sanidad
+  pacientes: {
+    all: ['pacientes'] as const,
+    list: () => [...queryKeys.pacientes.all, 'list'] as const,
+  },
+  // Agenda de citas
+  citas: {
+    all: ['citas'] as const,
+    porDia: (fecha: string) => [...queryKeys.citas.all, 'dia', fecha] as const,
+  },
+  // Médicos (catálogo para la agenda)
+  medicos: {
+    all: ['medicos'] as const,
+    list: () => [...queryKeys.medicos.all, 'list'] as const,
   },
 } as const;
