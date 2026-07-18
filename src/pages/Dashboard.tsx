@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom"
 import { AppLayout } from "@/components/layout/app-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { CalendarDays, Users, Stethoscope, HeartPulse } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { usePacientes } from "@/api/pacientes"
@@ -34,10 +33,9 @@ export default function Dashboard() {
     },
     {
       nombre: "Consultas",
-      descripcion: "Historia clínica: motivo, diagnóstico CIE-10 y tratamiento.",
+      descripcion: "Se registran al atender una cita, o desde la historia clínica del paciente.",
       icon: Stethoscope,
-      href: null,
-      fase: "Fase 2",
+      href: "/pacientes",
     },
   ]
 
@@ -69,12 +67,9 @@ export default function Dashboard() {
             const tarjeta = (
               <Card key={m.nombre} className={m.href ? "hover:border-primary/60 transition-colors h-full" : "opacity-70 h-full"}>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <span className="flex items-center gap-2">
-                      <m.icon className="w-5 h-5 text-primary" />
-                      {m.nombre}
-                    </span>
-                    {m.fase && <Badge variant="outline">{m.fase}</Badge>}
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <m.icon className="w-5 h-5 text-primary" />
+                    {m.nombre}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

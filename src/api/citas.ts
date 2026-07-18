@@ -48,6 +48,7 @@ export interface Medico {
   nombres: string;
   apellidos: string;
   activo: boolean;
+  user_id?: string | null;
   especialidad: { id: number; nombre: string; color: string | null } | null;
 }
 
@@ -109,6 +110,17 @@ export async function fetchMedicosActivos(): Promise<Medico[]> {
   return (data as unknown as Medico[]) || [];
 }
 
+/** Ficha de médico vinculada a la cuenta logueada (medicos.user_id), si existe. */
+export async function fetchMiMedico(userId: string): Promise<Medico | null> {
+  const { data, error } = await supabase
+    .from("medicos")
+    .select("id, nombres, apellidos, activo, user_id, especialidad:especialidades(id, nombre, color)")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Error al buscar la ficha del médico: ${error.message}`);
+  return (data as unknown as Medico) || null;
+}
+
 // ---------------------------------------------------------------------------
 // Hooks React Query
 // ---------------------------------------------------------------------------
@@ -125,6 +137,14 @@ export function useMedicosActivos() {
   return useQuery({
     queryKey: queryKeys.medicos.list(),
     queryFn: fetchMedicosActivos,
+  });
+}
+
+export function useMiMedico(userId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.medicos.mio(userId || ""),
+    queryFn: () => fetchMiMedico(userId!),
+    enabled: !!userId,
   });
 }
 

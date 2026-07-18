@@ -6,9 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, CheckCircle2, Stethoscope, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/context/auth-context";
 import { CitaForm } from "@/components/citas/cita-form";
+import { ConsultaForm } from "@/components/consultas/consulta-form";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
-  ESTADOS_CITA, fechaHoyISO, useCambiarEstadoCita, useCitasDelDia,
+  ESTADOS_CITA, fechaHoyISO, useCambiarEstadoCita, useCitasDelDia, useMiMedico,
   type Cita, type EstadoCita,
 } from "@/api/citas";
 
@@ -32,14 +36,23 @@ function tituloFecha(fecha: string): string {
 }
 
 export default function Citas() {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isMedico } = usePermissions();
+  const { user } = useAuth();
   const canEdit = hasPermission("citas", "editar");
+  const atiendeConsultas = hasPermission("consultas", "editar");
 
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [formOpen, setFormOpen] = useState(false);
+  const [consultaCita, setConsultaCita] = useState<Cita | null>(null);
+  const [soloMias, setSoloMias] = useState(isMedico);
 
-  const { data: citas = [], isLoading } = useCitasDelDia(fecha);
+  const { data: todasLasCitas = [], isLoading } = useCitasDelDia(fecha);
+  const { data: miMedico } = useMiMedico(user?.id);
   const cambiarEstado = useCambiarEstadoCita();
+
+  const citas = soloMias && miMedico
+    ? todasLasCitas.filter((c) => c.medico_id === miMedico.id)
+    : todasLasCitas;
 
   const handleEstado = async (cita: Cita, estado: EstadoCita) => {
     try {
@@ -81,6 +94,12 @@ export default function Citas() {
             <ChevronRight className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setFecha(fechaHoyISO())}>Hoy</Button>
+          {miMedico && (
+            <div className="flex items-center gap-2 ml-auto">
+              <Switch id="solo-mias" checked={soloMias} onCheckedChange={setSoloMias} />
+              <Label htmlFor="solo-mias" className="text-sm">Solo mis citas</Label>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -128,8 +147,12 @@ export default function Citas() {
                   )}
                   {canEdit && (c.estado === "pendiente" || c.estado === "confirmada") && (
                     <>
-                      <Button variant="outline" size="sm" className="gap-1" onClick={() => handleEstado(c, "atendida")}>
-                        <Stethoscope className="w-3.5 h-3.5" /> Atendida
+                      <Button
+                        variant="outline" size="sm" className="gap-1"
+                        onClick={() => atiendeConsultas ? setConsultaCita(c) : handleEstado(c, "atendida")}
+                        title={atiendeConsultas ? "Registrar consulta y marcar atendida" : "Marcar atendida"}
+                      >
+                        <Stethoscope className="w-3.5 h-3.5" /> Atender
                       </Button>
                       <Button
                         variant="ghost" size="sm"
@@ -148,6 +171,13 @@ export default function Citas() {
       </div>
 
       <CitaForm open={formOpen} onOpenChange={setFormOpen} fechaInicial={fecha} />
+      <ConsultaForm
+        open={!!consultaCita}
+        onOpenChange={(abierto) => { if (!abierto) setConsultaCita(null); }}
+        pacienteId={consultaCita?.paciente_id ?? null}
+        pacienteNombre={consultaCita?.paciente ? `${consultaCita.paciente.apellidos}, ${consultaCita.paciente.nombres}` : ""}
+        cita={consultaCita}
+      />
     </AppLayout>
   );
 }

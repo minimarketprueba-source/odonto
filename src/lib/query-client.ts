@@ -83,5 +83,16 @@ export const queryKeys = {
   medicos: {
     all: ['medicos'] as const,
     list: () => [...queryKeys.medicos.all, 'list'] as const,
+    mio: (userId: string) => [...queryKeys.medicos.all, 'mio', userId] as const,
+  },
+  // Consultas (historia clínica)
+  consultas: {
+    all: ['consultas'] as const,
+    porPaciente: (pacienteId: number) => [...queryKeys.consultas.all, 'paciente', pacienteId] as const,
+  },
+  // Catálogo CIE-10
+  cie10: {
+    all: ['cie10'] as const,
+    search: (q: string) => [...queryKeys.cie10.all, 'search', q] as const,
   },
 } as const;

@@ -8,13 +8,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield,
+  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
 import { normalizeText } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
+import { HistoriaClinicaDialog } from "@/components/consultas/historia-clinica-dialog";
 import {
   TIPOS_PACIENTE, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
@@ -28,8 +29,9 @@ function fmtFecha(f: string | null): string {
 }
 
 export default function Pacientes() {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canView } = usePermissions();
   const canEdit = hasPermission("pacientes", "editar");
+  const veHistoria = canView("consultas");
 
   const { data: pacientes = [], isLoading } = usePacientes();
   const cambiarEstado = useCambiarEstadoPaciente();
@@ -40,6 +42,8 @@ export default function Pacientes() {
   const [pagina, setPagina] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [seleccionado, setSeleccionado] = useState<Paciente | null>(null);
+  const [historiaOpen, setHistoriaOpen] = useState(false);
+  const [pacienteHistoria, setPacienteHistoria] = useState<Paciente | null>(null);
 
   const busquedaDebounced = useDebounce(busqueda, 300);
 
@@ -152,21 +156,33 @@ export default function Pacientes() {
                     {[p.promocion && `Curso: ${p.promocion}`, p.unidad && `Sección: ${p.unidad}`, p.fecha_nacimiento && `Nac.: ${fmtFecha(p.fecha_nacimiento)}`]
                       .filter(Boolean).join(" · ") || "Sin datos adicionales"}
                   </p>
-                  {canEdit && (
+                  {(canEdit || veHistoria) && (
                     <div className="flex items-center gap-1 pt-2 border-t">
-                      <Button
-                        variant="ghost" size="sm" title="Editar paciente"
-                        onClick={() => { setSeleccionado(p); setFormOpen(true); }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="sm"
-                        title={p.activo ? "Desactivar" : "Reactivar"}
-                        onClick={() => handleToggleActivo(p)}
-                      >
-                        {p.activo ? <Minus className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                      </Button>
+                      {veHistoria && (
+                        <Button
+                          variant="ghost" size="sm" title="Historia clínica"
+                          onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
+                        >
+                          <Stethoscope className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {canEdit && (
+                        <>
+                          <Button
+                            variant="ghost" size="sm" title="Editar paciente"
+                            onClick={() => { setSeleccionado(p); setFormOpen(true); }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="sm"
+                            title={p.activo ? "Desactivar" : "Reactivar"}
+                            onClick={() => handleToggleActivo(p)}
+                          >
+                            {p.activo ? <Minus className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -189,6 +205,7 @@ export default function Pacientes() {
       </div>
 
       <PacienteForm open={formOpen} onOpenChange={setFormOpen} paciente={seleccionado} />
+      <HistoriaClinicaDialog open={historiaOpen} onOpenChange={setHistoriaOpen} paciente={pacienteHistoria} />
     </AppLayout>
   );
 }
