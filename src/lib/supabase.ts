@@ -2,18 +2,27 @@ import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from './logger';
 
-// Función para obtener URL de Supabase (localStorage tiene prioridad sobre .env)
+// Proyecto Supabase de la Sanidad (compartido con control de peso). Se usa como
+// valor por defecto para que la app se conecte sola sin depender de variables de
+// entorno en Vercel ni de configuración manual por navegador. La anon key es
+// PÚBLICA por diseño (viaja en el bundle del navegador); los datos los protege el
+// RLS, no esta clave. localStorage y las env vars siguen teniendo prioridad, por
+// si se quiere apuntar a otro proyecto.
+const DEFAULT_SUPABASE_URL = 'https://vnkstlvqzkhdfeoqskcf.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZua3N0bHZxemtoZGZlb3Fza2NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2NDcxNzksImV4cCI6MjA3OTIyMzE3OX0.payZHPyk610p86m_a202oV_g-CqQB6hceNymLgkP-2Q';
+
+// Función para obtener URL de Supabase (localStorage > .env > valor por defecto)
 const getSupabaseUrl = (): string => {
   const storedUrl = typeof window !== 'undefined' ? localStorage.getItem("supabase_url") : null;
   if (storedUrl) return storedUrl;
-  return import.meta.env.VITE_SUPABASE_URL || '';
+  return import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
 };
 
-// Función para obtener la clave anónima (localStorage tiene prioridad sobre .env)
+// Función para obtener la clave anónima (localStorage > .env > valor por defecto)
 const getSupabaseAnonKey = (): string => {
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem("supabase_anon_key") : null;
   if (storedKey) return storedKey;
-  return import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  return import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 };
 
 const supabaseUrl = getSupabaseUrl();
