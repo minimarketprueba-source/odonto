@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { sanitizePlainText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
-import { useCreateConsulta, useSearchCie10, type Cie10 } from "@/api/consultas";
+import { useCreateConsulta, useSearchCie10, type Cie10, type ReposoTipo } from "@/api/consultas";
 
 interface ConsultaFormProps {
   open: boolean;
@@ -38,6 +38,8 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   const [tratamiento, setTratamiento] = useState("");
   const [cieBusqueda, setCieBusqueda] = useState("");
   const [cieSel, setCieSel] = useState<Cie10 | null>(null);
+  const [reposoTipo, setReposoTipo] = useState<"none" | ReposoTipo>("none");
+  const [reposoHasta, setReposoHasta] = useState("");
 
   const cieDebounced = useDebounce(cieBusqueda, 300);
   const { data: cieOpciones = [] } = useSearchCie10(cieSel ? "" : cieDebounced);
@@ -52,6 +54,8 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       setTratamiento("");
       setCieBusqueda("");
       setCieSel(null);
+      setReposoTipo("none");
+      setReposoHasta("");
     }
   }, [open, cita]);
 
@@ -60,6 +64,10 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
     if (!medicoId) { toast.error("Selecciona el médico que atendió."); return; }
     if (!diagnostico.trim() && !motivo.trim()) {
       toast.error("Registra al menos el motivo o el diagnóstico.");
+      return;
+    }
+    if (reposoTipo !== "none" && reposoHasta && reposoHasta < fecha) {
+      toast.error("La fecha 'hasta' del reposo no puede ser anterior a la consulta.");
       return;
     }
     try {
@@ -73,6 +81,9 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
         cie10_id: cieSel?.id ?? null,
         diagnostico: sanitizePlainText(diagnostico) || null,
         tratamiento: sanitizePlainText(tratamiento) || null,
+        reposo_tipo: reposoTipo === "none" ? null : reposoTipo,
+        reposo_desde: reposoTipo === "none" ? null : fecha,
+        reposo_hasta: reposoTipo === "none" ? null : reposoHasta || null,
       });
       toast.success(cita ? "Consulta registrada y cita atendida." : "Consulta registrada.");
       onOpenChange(false);
@@ -173,6 +184,41 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           <div className="space-y-1">
             <Label htmlFor="co-tratamiento">Tratamiento / indicaciones</Label>
             <Textarea id="co-tratamiento" rows={3} value={tratamiento} onChange={(e) => setTratamiento(e.target.value)} />
+          </div>
+
+          <div className="rounded-md border p-3 space-y-3 bg-muted/20">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="co-reposo">Reposo (actividad física)</Label>
+                <Select value={reposoTipo} onValueChange={(v) => setReposoTipo(v as "none" | ReposoTipo)}>
+                  <SelectTrigger id="co-reposo"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin reposo (apto)</SelectItem>
+                    <SelectItem value="local">Enfermo local (en la unidad)</SelectItem>
+                    <SelectItem value="domiciliario">Reposo domiciliario</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {reposoTipo !== "none" && (
+                <div className="space-y-1">
+                  <Label htmlFor="co-reposo-hasta">Reposo hasta (inclusive)</Label>
+                  <Input
+                    id="co-reposo-hasta"
+                    type="date"
+                    min={fecha}
+                    value={reposoHasta}
+                    onChange={(e) => setReposoHasta(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Vacío = hasta nueva orden médica.</p>
+                </div>
+              )}
+            </div>
+            {reposoTipo !== "none" && (
+              <p className="text-xs text-muted-foreground">
+                El cadete aparecerá como <strong>no apto para actividad física</strong> en Control de Peso
+                desde el {fecha.split("-").reverse().join("/")}{reposoHasta ? ` hasta el ${reposoHasta.split("-").reverse().join("/")}` : " hasta nueva orden"}.
+              </p>
+            )}
           </div>
 
           <Button onClick={handleGuardar} disabled={crear.isPending} className="w-full">

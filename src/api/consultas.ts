@@ -11,6 +11,8 @@ import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
 import { cambiarEstadoCita } from "./citas";
 
+export type ReposoTipo = "local" | "domiciliario";
+
 export interface Consulta {
   id: number;
   clinica_id: number;
@@ -23,6 +25,9 @@ export interface Consulta {
   cie10_id: number | null;
   diagnostico: string | null;
   tratamiento: string | null;
+  reposo_tipo: ReposoTipo | null;   // null = sin reposo
+  reposo_desde: string | null;      // yyyy-mm-dd (por defecto la fecha de la consulta)
+  reposo_hasta: string | null;      // yyyy-mm-dd inclusive; null = hasta nueva orden
   created_at?: string;
   medico?: {
     id: number;
@@ -49,6 +54,9 @@ export interface CreateConsultaInput {
   cie10_id?: number | null;
   diagnostico?: string | null;
   tratamiento?: string | null;
+  reposo_tipo?: ReposoTipo | null;
+  reposo_desde?: string | null;
+  reposo_hasta?: string | null;
 }
 
 const CONSULTA_SELECT =

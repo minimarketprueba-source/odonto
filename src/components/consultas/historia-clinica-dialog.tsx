@@ -80,6 +80,12 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                         </Badge>
                       )}
                       {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
+                      {c.reposo_tipo && (
+                        <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
+                          {c.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
+                          {c.reposo_hasta ? ` hasta ${fmtFecha(c.reposo_hasta)}` : " (hasta nueva orden)"}
+                        </Badge>
+                      )}
                     </div>
                     {c.motivo_consulta && (
                       <p className="text-sm mt-1"><span className="text-muted-foreground">Motivo: </span>{c.motivo_consulta}</p>
