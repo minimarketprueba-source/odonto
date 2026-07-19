@@ -46,3 +46,5 @@ Herramientas locales confirmadas: Node v24, npm 11, git 2.53, VS Code 1.121.
 ## Relación con Control-Peso
 
 Ambas apps comparten la misma base Supabase. Las consultas que registra un médico aquí alimentan la pestaña **Sanidad** en la ficha del cadete de Control-Peso (vistas `sanidad_resumen_cadete` y `sanidad_historial_cadete`, solo visibles a admins por RLS). No comparten código, solo datos.
+
+Además (2026-07-18): el formulario de consulta permite indicar **reposo** (`consultas.reposo_tipo` 'local'|'domiciliario' + `reposo_desde`/`reposo_hasta`; NULL = sin reposo). Eso alimenta la página **Actividad Física** de Control-Peso vía la vista `sanidad_reposos_cadete` (solo admins). Migración en `..\Control-Peso\supabase\migrations\20260718_reposos_actividad_fisica.sql` (aplicada).
