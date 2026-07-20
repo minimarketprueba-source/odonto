@@ -33,6 +33,8 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 const Pacientes = lazy(() => import('./pages/Pacientes'))
 const Citas = lazy(() => import('./pages/Citas'))
+const Horarios = lazy(() => import('./pages/Horarios'))
+const PerfilUsuario = lazy(() => import('./pages/PerfilUsuario'))
 const ListaEspera = lazy(() => import('./pages/ListaEspera'))
 const Reportes = lazy(() => import('./pages/Reportes'))
 const Mantenimiento = lazy(() => import('./pages/Mantenimiento'))
@@ -100,6 +102,8 @@ function App() {
           <Route path="/auth/reset-password" element={<AuthRedirect><ResetPassword /></AuthRedirect>} />
           <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
           <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
+          <Route path="/horarios" element={<ProtectedRoute moduleKey="citas"><Horarios /></ProtectedRoute>} />
+          <Route path="/perfil" element={<ProtectedRoute><PerfilUsuario /></ProtectedRoute>} />
           <Route path="/lista-espera" element={<ProtectedRoute moduleKey="lista_espera"><ListaEspera /></ProtectedRoute>} />
           <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
           <Route path="/mantenimiento" element={<ProtectedRoute moduleKey="mantenimiento"><Mantenimiento /></ProtectedRoute>} />

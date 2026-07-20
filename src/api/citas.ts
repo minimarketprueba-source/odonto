@@ -12,11 +12,20 @@ import { CLINICA_ID } from "./pacientes";
 export const ESTADOS_CITA = [
   { value: "pendiente", label: "Pendiente" },
   { value: "confirmada", label: "Confirmada" },
+  { value: "admitida", label: "Admitida" },
   { value: "atendida", label: "Atendida" },
   { value: "cancelada", label: "Cancelada" },
 ] as const;
 
 export type EstadoCita = (typeof ESTADOS_CITA)[number]["value"];
+
+/** Turno según la hora de la cita (estilo PY HIS). */
+export function turnoDeHora(hora: string): "Mañana" | "Tarde" | "Noche" {
+  const h = Number((hora || "0").slice(0, 2));
+  if (h < 12) return "Mañana";
+  if (h < 17) return "Tarde";
+  return "Noche";
+}
 
 export interface Cita {
   id: number;
@@ -28,6 +37,9 @@ export interface Cita {
   estado: EstadoCita | string;
   motivo: string | null;
   notas: string | null;
+  agendado_por: string | null; // email de quien agendó (registro estilo PY HIS)
+  admitida_at: string | null; // cuándo llegó el paciente (check-in)
+  orden_llegada: number | null; // nº de orden del día para el médico
   paciente?: {
     id: number;
     nombres: string;
@@ -59,6 +71,7 @@ export interface CreateCitaInput {
   hora: string;
   motivo?: string | null;
   notas?: string | null;
+  agendado_por?: string | null;
 }
 
 const CITA_SELECT =
@@ -116,8 +129,34 @@ export async function cambiarEstadoCita(id: number, estado: EstadoCita): Promise
 }
 
 export async function reprogramarCita(id: number, fecha: string, hora: string): Promise<void> {
-  const { error } = await supabase.from("citas").update({ fecha, hora, estado: "pendiente" }).eq("id", id);
+  const { error } = await supabase
+    .from("citas")
+    .update({ fecha, hora, estado: "pendiente", admitida_at: null, orden_llegada: null })
+    .eq("id", id);
   if (error) throw new Error(`No se pudo reprogramar la cita: ${error.message}`);
+}
+
+/**
+ * Check-in del paciente (botón «Admitir» estilo PY HIS): asigna el número de
+ * orden del día para ese médico y deja la cita lista para ser atendida.
+ */
+export async function admitirCita(cita: Cita): Promise<void> {
+  const { data, error: errMax } = await supabase
+    .from("citas")
+    .select("orden_llegada")
+    .eq("fecha", cita.fecha)
+    .eq("medico_id", cita.medico_id)
+    .not("orden_llegada", "is", null)
+    .order("orden_llegada", { ascending: false })
+    .limit(1);
+  if (errMax) throw new Error(`No se pudo calcular el orden de llegada: ${errMax.message}`);
+  const siguiente = ((data?.[0]?.orden_llegada as number | undefined) ?? 0) + 1;
+
+  const { error } = await supabase
+    .from("citas")
+    .update({ estado: "admitida", admitida_at: new Date().toISOString(), orden_llegada: siguiente })
+    .eq("id", cita.id);
+  if (error) throw new Error(`No se pudo admitir al paciente: ${error.message}`);
 }
 
 export async function fetchMedicosActivos(): Promise<Medico[]> {
@@ -180,6 +219,23 @@ export function useCambiarEstadoCita() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, estado }: { id: number; estado: EstadoCita }) => cambiarEstadoCita(id, estado),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.citas.all }),
+  });
+}
+
+export function useAdmitirCita() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: admitirCita,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.citas.all }),
+  });
+}
+
+export function useReprogramarCita() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fecha, hora }: { id: number; fecha: string; hora: string }) =>
+      reprogramarCita(id, fecha, hora),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.citas.all }),
   });
 }

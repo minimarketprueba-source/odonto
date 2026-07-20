@@ -103,6 +103,16 @@ export const queryKeys = {
     all: ['listaEspera'] as const,
     list: () => [...queryKeys.listaEspera.all, 'list'] as const,
   },
+  // Horarios de atención de los profesionales
+  horarios: {
+    all: ['horarios'] as const,
+    list: () => [...queryKeys.horarios.all, 'list'] as const,
+  },
+  // Ausencias de los profesionales
+  ausencias: {
+    all: ['ausencias'] as const,
+    list: () => [...queryKeys.ausencias.all, 'list'] as const,
+  },
   // Recetas
   recetas: {
     all: ['recetas'] as const,

@@ -168,3 +168,24 @@
 
 @layer utilities {
 }
+
+/* Impresión de la agenda: solo se imprime el bloque #agenda-imprimible */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #agenda-imprimible,
+  #agenda-imprimible * {
+    visibility: visible;
+  }
+  #agenda-imprimible {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 1rem;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

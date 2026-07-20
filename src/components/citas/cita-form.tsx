@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Search } from "lucide-react";
+import { AlertTriangle, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { normalizeText } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
+import { useAuth } from "@/context/auth-context";
 import { usePacientes, type Paciente } from "@/api/pacientes";
 import { useMedicosActivos, useCreateCita, fechaHoyISO } from "@/api/citas";
+import { useAusencias, useHorarios, evaluarDisponibilidad } from "@/api/horarios";
 
 interface CitaFormProps {
   open: boolean;
@@ -22,8 +24,11 @@ interface CitaFormProps {
 }
 
 export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
+  const { user } = useAuth();
   const { data: pacientes = [] } = usePacientes();
   const { data: medicos = [] } = useMedicosActivos();
+  const { data: horarios = [] } = useHorarios();
+  const { data: ausencias = [] } = useAusencias();
   const crear = useCreateCita();
 
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
@@ -56,6 +61,11 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
       .slice(0, 6);
   }, [pacientes, busquedaPaciente]);
 
+  const disponibilidad = useMemo(() => {
+    if (!medicoId || !fecha || !hora) return null;
+    return evaluarDisponibilidad(Number(medicoId), fecha, hora, horarios, ausencias);
+  }, [medicoId, fecha, hora, horarios, ausencias]);
+
   const handleAgendar = async () => {
     if (!paciente) { toast.error("Selecciona el paciente."); return; }
     if (!medicoId) { toast.error("Selecciona el médico."); return; }
@@ -67,6 +77,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
         fecha,
         hora,
         motivo: sanitizePlainText(motivo) || null,
+        agendado_por: user?.email ?? null,
       });
       toast.success("Cita agendada.");
       onOpenChange(false);
@@ -150,6 +161,19 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
               <Input id="c-hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
             </div>
           </div>
+
+          {disponibilidad?.ausencia && (
+            <div className="flex items-start gap-2 p-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/40 text-sm text-red-700 dark:text-red-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>El profesional está ausente en esa fecha ({disponibilidad.ausencia}). Puede agendar igual, pero verifique.</span>
+            </div>
+          )}
+          {!disponibilidad?.ausencia && disponibilidad?.fueraDeHorario && (
+            <div className="flex items-start gap-2 p-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-sm text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>Esa fecha/hora cae fuera del horario de atención del profesional. Puede agendar igual, pero verifique.</span>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label htmlFor="c-motivo">Motivo</Label>
