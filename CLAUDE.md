@@ -20,8 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Pendientes (lo que sigue)
 
-0. **EJECUTAR MIGRACIÓN**: el usuario debe pegar `Escritorio\Actualizar_Base_Mejoras.txt` en el SQL Editor (verificación esperada: 3 | 2 | 8 | 1). Hasta entonces, agendar citas en producción falla (columna `agendado_por` no existe) y marcar «No acudió» falla (check de estado). Quitar este punto al confirmarse.
-0b. Ideas PY HIS aún no hechas (decidir con el usuario): PDF de consulta/historial, estudios solicitados, procedimientos con historial, preconsulta (signos vitales), historial de medicamentos prescriptos.
+0. Ideas PY HIS aún no hechas (decidir con el usuario): PDF de consulta/historial, estudios solicitados, procedimientos con historial, preconsulta (signos vitales), historial de medicamentos prescriptos. (Migración de agenda EJECUTADA y verificada end-to-end el 2026-07-20: cita+admisión+no_acudio+horarios probados en producción con cuenta de enfermería.)
 
 1. **Correos reales**: cuando los profesionales tengan correo real, renombrar las cuentas `@sanidad-citas.local` (hoy no pueden recuperar contraseña por email; si alguien la olvida, resetearla por API admin).
 2. **Guard en Control-Peso**: que roles medico/recepcion no entren a su Dashboard (su auth-context asigna 'analyst' por defecto solo si no hay rol; los médicos tienen rol, verificar ProtectedRoute).
