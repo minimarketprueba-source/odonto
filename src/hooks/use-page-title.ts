@@ -6,16 +6,14 @@ export function usePageTitle() {
 
   const pageTitles: Record<string, string> = {
     "/": "Dashboard",
-    "/cadetes": "Cadetes",
-    "/historial-peso": "Historial Peso",
-    "/seguimiento": "Seguimiento",
-    "/ergometria": "Ergometría",
-    "/oficiales": "Oficiales",
-    "/informes": "Informes",
-    "/notificaciones": "Notificaciones",
+    "/pacientes": "Pacientes",
+    "/citas": "Agenda de citas",
+    "/horarios": "Horarios de atención",
+    "/lista-espera": "Lista de espera",
+    "/reportes": "Reportes",
+    "/mantenimiento": "Mantenimiento",
     "/usuarios": "Usuarios",
-    "/respaldo": "Respaldo",
-    "/configuracion": "Configuración",
+    "/perfil": "Mi perfil",
   }
 
   return pageTitles[pathname] || "Dashboard"

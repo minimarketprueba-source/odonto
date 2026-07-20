@@ -94,6 +94,14 @@ export function Header() {
                 <CalendarDays className="mr-2 h-4 w-4" />
                 Citas
               </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => navigate("/horarios"))}>
+                <Clock className="mr-2 h-4 w-4" />
+                Horarios
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => navigate("/perfil"))}>
+                <User className="mr-2 h-4 w-4" />
+                Mi perfil
+              </CommandItem>
               <CommandItem onSelect={() => runCommand(() => navigate("/usuarios"))}>
                 <Shield className="mr-2 h-4 w-4" />
                 Usuarios
