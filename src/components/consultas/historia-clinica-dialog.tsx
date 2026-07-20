@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Stethoscope, FileText } from "lucide-react";
@@ -34,8 +37,24 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const { data: recetas = [] } = useRecetasPaciente(open && veRecetas ? (paciente?.id ?? null) : null);
   const [formOpen, setFormOpen] = useState(false);
   const [recetaOpen, setRecetaOpen] = useState(false);
+  const [servicioFiltro, setServicioFiltro] = useState("todos");
 
   const nombre = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : "";
+
+  // Historial por servicio (estilo PY HIS): filtro por especialidad de la consulta.
+  const servicios = useMemo(() => {
+    const conteo = new Map<string, number>();
+    for (const c of consultas) {
+      const s = c.medico?.especialidad?.nombre;
+      if (s) conteo.set(s, (conteo.get(s) || 0) + 1);
+    }
+    return [...conteo.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [consultas]);
+
+  const consultasFiltradas =
+    servicioFiltro === "todos"
+      ? consultas
+      : consultas.filter((c) => c.medico?.especialidad?.nombre === servicioFiltro);
 
   return (
     <>
@@ -63,14 +82,28 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                   <Plus className="w-4 h-4" /> Registrar consulta (sin cita)
                 </Button>
               )}
+              {servicios.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground flex-shrink-0">Servicio:</span>
+                  <Select value={servicioFiltro} onValueChange={setServicioFiltro}>
+                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos ({consultas.length})</SelectItem>
+                      {servicios.map(([s, n]) => (
+                        <SelectItem key={s} value={s}>{s} ({n})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {isLoading ? (
                 <p className="text-center text-sm text-muted-foreground py-6">Cargando historia clínica...</p>
-              ) : consultas.length === 0 ? (
+              ) : consultasFiltradas.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-6">
                   Sin consultas registradas todavía.
                 </p>
               ) : (
-                consultas.map((c) => (
+                consultasFiltradas.map((c) => (
                   <div key={c.id} className="p-3 rounded-lg border">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{fmtFecha(c.fecha)}</span>

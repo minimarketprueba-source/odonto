@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ClipboardCheck,
-  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, XCircle, CalendarClock,
+  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { normalizeText } from "@/lib/utils";
@@ -27,6 +27,7 @@ const COLOR_ESTADO: Record<string, string> = {
   confirmada: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200",
   admitida: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200",
   atendida: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200",
+  no_acudio: "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   cancelada: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
 };
 
@@ -145,6 +146,16 @@ export default function Citas() {
           <Button variant="outline" size="sm" className="gap-1" onClick={() => setReagendarCita(c)}>
             <CalendarClock className="w-3.5 h-3.5" /> Reagendar
           </Button>
+          {(c.estado === "pendiente" || c.estado === "confirmada") && (
+            <Button
+              variant="ghost" size="sm"
+              className="text-gray-500 hover:text-gray-700 gap-1"
+              onClick={() => handleEstado(c, "no_acudio")}
+              title="El paciente no acudió a la cita"
+            >
+              <UserX className="w-3.5 h-3.5" />
+            </Button>
+          )}
           <Button
             variant="ghost" size="sm"
             className="text-red-500 hover:text-red-600 gap-1"
@@ -276,7 +287,7 @@ export default function Citas() {
 
         {vista === "dia" && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 no-print">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 no-print">
               {resumen.map((e) => (
                 <div key={e.value} className="p-2 rounded-lg border bg-muted/30 text-center">
                   <div className="text-xl font-bold">{e.total}</div>

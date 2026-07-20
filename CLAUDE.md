@@ -16,9 +16,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Mejoras de agenda estilo PY HIS** (2026-07-20, pedidas por las enfermeras mostrando el sistema del MSPBS `hdl.mspbs.gov.py`; fotos en `Downloads\WhatsApp Image 2026-07-20*.jpeg`): flujo Admitir (check-in con `orden_llegada` por médico/día, `admitida_at`), estado nuevo `admitida`, `citas.agendado_por` (email), Reagendar, turno derivado de la hora (Mañana/Tarde/Noche), vista Día/Mes con buscador, imprimir (`#agenda-imprimible` + `.no-print` en globals.css), sala de espera por orden de llegada, panel "Mi día" en Dashboard, página Horarios (`horarios_medicos`/`ausencias_medicos`, aviso al agendar fuera de horario o en ausencia), página Mi perfil (cambio de contraseña + teléfono de ficha propia, requiere policy `sanidad_medicos_update_propio`).
 
+- **Feedback de la Dra. Lopez Irala** (2026-07-20, fotos `Downloads\WhatsApp Image 2026-07-20 at 11.*.jpeg`, chat de WhatsApp): estado de cita `no_acudio` (botón UserX en agenda — evita el truco PY HIS de consulta Z71.9 para ausentes), CIE-10 **obligatorio** en consulta-form, reposo con **cantidad de días** calculada/editable (días↔fecha sincronizados, ambos inclusive), filtro **por servicio** (especialidad) en la historia clínica.
+
 ## Pendientes (lo que sigue)
 
-0. **EJECUTAR MIGRACIÓN**: el usuario debe pegar `Escritorio\Actualizar_Base_Mejoras.txt` en el SQL Editor (verificación esperada: 3 | 2 | 8 | 1). Hasta entonces, agendar citas en producción falla (columna `agendado_por` no existe). Quitar este punto al confirmarse.
+0. **EJECUTAR MIGRACIÓN**: el usuario debe pegar `Escritorio\Actualizar_Base_Mejoras.txt` en el SQL Editor (verificación esperada: 3 | 2 | 8 | 1). Hasta entonces, agendar citas en producción falla (columna `agendado_por` no existe) y marcar «No acudió» falla (check de estado). Quitar este punto al confirmarse.
+0b. Ideas PY HIS aún no hechas (decidir con el usuario): PDF de consulta/historial, estudios solicitados, procedimientos con historial, preconsulta (signos vitales), historial de medicamentos prescriptos.
 
 1. **Correos reales**: cuando los profesionales tengan correo real, renombrar las cuentas `@sanidad-citas.local` (hoy no pueden recuperar contraseña por email; si alguien la olvida, resetearla por API admin).
 2. **Guard en Control-Peso**: que roles medico/recepcion no entren a su Dashboard (su auth-context asigna 'analyst' por defecto solo si no hay rol; los médicos tienen rol, verificar ProtectedRoute).

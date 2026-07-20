@@ -14,6 +14,7 @@ export const ESTADOS_CITA = [
   { value: "confirmada", label: "Confirmada" },
   { value: "admitida", label: "Admitida" },
   { value: "atendida", label: "Atendida" },
+  { value: "no_acudio", label: "No acudió" },
   { value: "cancelada", label: "Cancelada" },
 ] as const;
 

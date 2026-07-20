@@ -17,6 +17,19 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
 import { useCreateConsulta, useSearchCie10, type Cie10, type ReposoTipo } from "@/api/consultas";
 
+function sumarDiasISO(fecha: string, dias: number): string {
+  const d = new Date(`${fecha}T00:00:00`);
+  d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Cantidad de días de reposo contando ambos extremos (desde y hasta inclusive).
+function diasEntre(desde: string, hasta: string): number {
+  const a = new Date(`${desde}T00:00:00`).getTime();
+  const b = new Date(`${hasta}T00:00:00`).getTime();
+  return Math.round((b - a) / 86400000) + 1;
+}
+
 interface ConsultaFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,6 +53,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   const [cieSel, setCieSel] = useState<Cie10 | null>(null);
   const [reposoTipo, setReposoTipo] = useState<"none" | ReposoTipo>("none");
   const [reposoHasta, setReposoHasta] = useState("");
+  const [reposoDias, setReposoDias] = useState("");
 
   const cieDebounced = useDebounce(cieBusqueda, 300);
   const { data: cieOpciones = [] } = useSearchCie10(cieSel ? "" : cieDebounced);
@@ -56,6 +70,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       setCieSel(null);
       setReposoTipo("none");
       setReposoHasta("");
+      setReposoDias("");
     }
   }, [open, cita]);
 
@@ -64,6 +79,10 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
     if (!medicoId) { toast.error("Selecciona el médico que atendió."); return; }
     if (!diagnostico.trim() && !motivo.trim()) {
       toast.error("Registra al menos el motivo o el diagnóstico.");
+      return;
+    }
+    if (!cieSel) {
+      toast.error("Selecciona el diagnóstico CIE-10 (es obligatorio para guardar).");
       return;
     }
     if (reposoTipo !== "none" && reposoHasta && reposoHasta < fecha) {
@@ -136,7 +155,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="co-cie">Código CIE-10 (opcional)</Label>
+            <Label htmlFor="co-cie">Diagnóstico CIE-10 *</Label>
             {cieSel ? (
               <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
                 <span className="text-sm">
@@ -187,7 +206,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           </div>
 
           <div className="rounded-md border p-3 space-y-3 bg-muted/20">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="co-reposo">Reposo (actividad física)</Label>
                 <Select value={reposoTipo} onValueChange={(v) => setReposoTipo(v as "none" | ReposoTipo)}>
@@ -200,19 +219,50 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
                 </Select>
               </div>
               {reposoTipo !== "none" && (
-                <div className="space-y-1">
-                  <Label htmlFor="co-reposo-hasta">Reposo hasta (inclusive)</Label>
-                  <Input
-                    id="co-reposo-hasta"
-                    type="date"
-                    min={fecha}
-                    value={reposoHasta}
-                    onChange={(e) => setReposoHasta(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">Vacío = hasta nueva orden médica.</p>
-                </div>
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="co-reposo-dias">Cantidad de días</Label>
+                    <Input
+                      id="co-reposo-dias"
+                      type="number"
+                      min={1}
+                      placeholder="Ej: 3"
+                      value={reposoDias}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setReposoDias(v);
+                        const n = Number(v);
+                        if (v && Number.isInteger(n) && n >= 1) {
+                          setReposoHasta(sumarDiasISO(fecha, n - 1));
+                        } else if (!v) {
+                          setReposoHasta("");
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="co-reposo-hasta">Reposo hasta (inclusive)</Label>
+                    <Input
+                      id="co-reposo-hasta"
+                      type="date"
+                      min={fecha}
+                      value={reposoHasta}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setReposoHasta(v);
+                        setReposoDias(v && v >= fecha ? String(diasEntre(fecha, v)) : "");
+                      }}
+                    />
+                  </div>
+                </>
               )}
             </div>
+            {reposoTipo !== "none" && (
+              <p className="text-xs text-muted-foreground">
+                Cargue los días y el sistema calcula la fecha (o al revés); ambos son editables.
+                Vacío = hasta nueva orden médica.
+              </p>
+            )}
             {reposoTipo !== "none" && (
               <p className="text-xs text-muted-foreground">
                 El cadete aparecerá como <strong>no apto para actividad física</strong> en Control de Peso
