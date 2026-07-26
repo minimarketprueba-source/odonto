@@ -97,7 +97,7 @@ export function Sidebar() {
               </div>
               {!isCollapsed && (
                 <div className="transition-all duration-300 overflow-hidden w-auto opacity-100">
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent whitespace-nowrap">
+                  <h3 className="text-base font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent whitespace-nowrap">
                     Sección Sanidad
                   </h3>
                   <p className="text-xs text-muted-foreground font-medium leading-tight">
