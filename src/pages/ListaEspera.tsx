@@ -10,12 +10,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ClipboardList, Plus, Search, Megaphone, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { ClipboardList, Plus, Search, Megaphone, CheckCircle2, XCircle, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { usePermissions } from "@/hooks/use-permissions";
-import { usePacientes, type Paciente } from "@/api/pacientes";
+import { PacienteForm } from "@/components/pacientes/paciente-form";
+import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import { useEspecialidades } from "@/api/mantenimiento";
 import {
   PRIORIDADES, ESTADOS_ESPERA, useListaEspera, useCreateRegistroEspera, useCambiarEstadoEspera,
@@ -32,6 +33,7 @@ const COLOR_PRIORIDAD: Record<string, string> = {
 export default function ListaEspera() {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission("lista_espera", "editar");
+  const puedeCrearPaciente = hasPermission("pacientes", "editar");
 
   const { data: registros = [], isLoading } = useListaEspera();
   const { data: pacientes = [] } = usePacientes();
@@ -41,6 +43,7 @@ export default function ListaEspera() {
 
   const [estadoSel, setEstadoSel] = useState("activos");
   const [altaOpen, setAltaOpen] = useState(false);
+  const [altaPacienteOpen, setAltaPacienteOpen] = useState(false);
 
   // Alta
   const [busqueda, setBusqueda] = useState("");
@@ -200,9 +203,25 @@ export default function ListaEspera() {
                       {sugerencias.map((p) => (
                         <button key={p.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                           onClick={() => setPaciente(p)}>
-                          {p.apellidos}, {p.nombres} <span className="text-muted-foreground">· CI {p.documento}</span>
+                          {p.apellidos}, {p.nombres}
+                          <span className="text-muted-foreground">
+                            {" "}· CI {p.documento || "sin cédula"} · {labelTipoPaciente(p.tipo)}
+                          </span>
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {busqueda.trim().length >= 2 && sugerencias.length === 0 && (
+                    <div className="rounded-md border border-dashed p-3 text-center space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        No hay ningún paciente con «{busqueda.trim()}».
+                      </p>
+                      {puedeCrearPaciente && (
+                        <Button variant="outline" size="sm" className="gap-1.5"
+                          onClick={() => setAltaPacienteOpen(true)}>
+                          <UserPlus className="w-4 h-4" /> Registrar paciente nuevo
+                        </Button>
+                      )}
                     </div>
                   )}
                 </>
@@ -243,6 +262,14 @@ export default function ListaEspera() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Alta rápida de un paciente que todavía no está en el padrón. */}
+      <PacienteForm
+        open={altaPacienteOpen}
+        onOpenChange={setAltaPacienteOpen}
+        busquedaInicial={busqueda}
+        onCreated={(nuevo) => { setPaciente(nuevo); setBusqueda(""); }}
+      />
     </AppLayout>
   );
 }

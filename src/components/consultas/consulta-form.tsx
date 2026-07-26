@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -17,15 +18,8 @@ import { matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
-import { useCreateConsulta, useSearchCie10, type Cie10, type ReposoTipo, type Consulta } from "@/api/consultas";
-
-function cleanQrText(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ñ/g, "n")
-    .replace(/Ñ/g, "N");
-}
+import { useCreateConsulta, useSearchCie10, type Cie10, type ReposoTipo } from "@/api/consultas";
+import { imprimirCertificadoReposo, cleanQrText } from "@/lib/imprimir";
 
 function sumarDiasISO(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T00:00:00`);
@@ -66,7 +60,6 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   const [reposoTipo, setReposoTipo] = useState<"none" | ReposoTipo>("none");
   const [reposoHasta, setReposoHasta] = useState("");
   const [reposoDias, setReposoDias] = useState("");
-  const [printConsulta, setPrintConsulta] = useState<Consulta | null>(null);
 
   const cieDebounced = useDebounce(cieBusqueda, 300);
   const { data: cieOpciones = [] } = useSearchCie10(cieSel ? "" : cieDebounced);
@@ -86,7 +79,6 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       setReposoTipo("none");
       setReposoHasta("");
       setReposoDias("");
-      setPrintConsulta(null);
     }
   }, [open, cita]);
 
@@ -135,29 +127,42 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       });
 
       if (opts?.eImprimirReposo && reposoTipo !== "none") {
-        const fullConsulta: Consulta = {
-          ...res,
-          cie10: cieSel,
-          medico: medicoSeleccionado ? {
-            id: medicoSeleccionado.id,
-            nombres: medicoSeleccionado.nombres,
-            apellidos: medicoSeleccionado.apellidos,
-            especialidad: medicoSeleccionado.especialidad
-          } : null,
-        };
-        setPrintConsulta(fullConsulta);
-        setTimeout(() => {
-          document.body.classList.add("printing-reposo");
-          window.print();
-          document.body.classList.remove("printing-reposo");
-          setPrintConsulta(null);
-          onOpenChange(false);
-        }, 200);
+        const qrSvgHtml = renderToStaticMarkup(
+          <QRCodeSVG
+            value={cleanQrText([
+              "SANIDAD POLICIAL - ACADEMIA NACIONAL DE POLICIA",
+              `DOCUMENTO: ${reposoTipo === "domiciliario" ? "CERTIFICADO DE REPOSO DOMICILIARIO" : "CONSTANCIA DE ENFERMO LOCAL"}`,
+              `Paciente: ${pacienteNombre}`,
+              `Desde: ${fecha.split("-").reverse().join("/")} Hasta: ${reposoHasta ? reposoHasta.split("-").reverse().join("/") : "Nueva orden"}`,
+              `Dx: ${cieSel?.codigo || ""} ${cieSel?.descripcion || ""}`,
+              `Medico: Dr(a). ${medicoSeleccionado?.apellidos || ""} ${medicoSeleccionado?.nombres || ""}`,
+            ].join("\n"))}
+            size={105}
+            level="M"
+          />
+        );
+
+        imprimirCertificadoReposo({
+          pacienteNombre,
+          pacienteDocumento: String(pacienteId),
+          tipoReposo: reposoTipo as "domiciliario" | "local",
+          fechaDesde: fecha.split("-").reverse().join("/"),
+          fechaHasta: reposoHasta ? reposoHasta.split("-").reverse().join("/") : null,
+          cieCodigo: cieSel?.codigo,
+          cieDescripcion: cieSel?.descripcion,
+          diagnosticoDetalle: diagnostico,
+          tratamiento,
+          medicoNombre: medicoSeleccionado ? `Dr(a). ${medicoSeleccionado.apellidos}, ${medicoSeleccionado.nombres}` : "Profesional Médico",
+          consultaId: res.id,
+          qrSvgHtml,
+        });
+
         toast.success(
           reposoTipo === "domiciliario"
             ? "Consulta registrada y Certificado de Reposo Domiciliario emitido."
             : "Consulta registrada y Constancia de Enfermo Local emitida."
         );
+        onOpenChange(false);
       } else {
         toast.success(cita ? "Consulta registrada y cita atendida." : "Consulta registrada.");
         onOpenChange(false);
@@ -441,116 +446,6 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Vista de Impresión Directa de Reposo con QR */}
-      <div id="consulta-reposo-print">
-        {printConsulta && (
-          <div className="p-4 font-sans text-black max-w-3xl mx-auto">
-            <div className="text-center border-b-2 border-black pb-3 mb-4">
-              <h1 className="text-xl font-bold uppercase tracking-wider">SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
-              <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide mt-0.5">Gral. José E. Díaz</p>
-              <h2 className="text-base font-bold text-gray-900 mt-2 tracking-wide uppercase">
-                {reposoTipo === "domiciliario" ? "CERTIFICADO DE REPOSO DOMICILIARIO" : "CONSTANCIA DE ENFERMO LOCAL"}
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Impreso el {new Date().toLocaleDateString("es-PY")} a las {new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs
-              </p>
-            </div>
-
-            <div className="bg-gray-50 p-3 rounded border border-gray-300 mb-5 text-sm grid grid-cols-2 gap-2">
-              <div>
-                <p><strong>Paciente:</strong> {pacienteNombre}</p>
-              </div>
-              <div>
-                <p><strong>Fecha de Emisión:</strong> {fecha.split("-").reverse().join("/")}</p>
-              </div>
-            </div>
-
-            <div className="border-2 border-red-600 p-5 rounded space-y-4 text-sm bg-white">
-              <div className="flex justify-between font-bold border-b border-red-300 pb-2 text-base text-red-900">
-                <span>REF: {reposoTipo === "domiciliario" ? "REP-DOM" : "ENF-LOC"}-{printConsulta.id}</span>
-                <span>FECHA: {fecha.split("-").reverse().join("/")}</span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="bg-red-50 border border-red-200 p-3 rounded">
-                  <p className="font-bold text-red-900 text-base">TIPO DE CONDICIÓN MÉDICA:</p>
-                  <p className="text-lg font-extrabold text-red-700 mt-1 uppercase">
-                    {reposoTipo === "domiciliario"
-                      ? "• REPOSO DOMICILIARIO (FUERA DE LA UNIDAD)"
-                      : "• ENFERMO LOCAL (PERMANECE EN LA UNIDAD)"}
-                  </p>
-                  <p className="text-xs text-red-800 mt-1 font-medium">
-                    {reposoTipo === "domiciliario"
-                      ? "El cadete debe cumplir reposo en su domicilio particular eximido de toda actividad."
-                      : "El cadete permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200">
-                  <div>
-                    <p className="font-bold text-gray-700">FECHA DE INICIO:</p>
-                    <p className="text-base font-semibold">{fecha.split("-").reverse().join("/")}</p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-700">HASTA (INCLUSIVE):</p>
-                    <p className="text-base font-semibold">
-                      {reposoHasta ? reposoHasta.split("-").reverse().join("/") : "Hasta nueva orden médica"}
-                    </p>
-                  </div>
-                </div>
-
-                {cieSel && (
-                  <div>
-                    <p className="font-bold text-gray-800">DIAGNÓSTICO MÉDICO:</p>
-                    <p className="pl-2 pt-0.5">
-                      {diagnostico ? `${diagnostico} ` : ""}
-                      [{cieSel.codigo} - {cieSel.descripcion}]
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="font-bold text-gray-800">INDICACIONES / RESTRICCIONES:</p>
-                  <p className="pl-2 pt-0.5">
-                    {tratamiento || "Se indica suspensión total de actividades físicas, instrucción y ejercicios durante el periodo indicado."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-10 mt-8 flex justify-between items-end border-t border-gray-300">
-                <div className="flex items-center gap-3">
-                  <div className="p-1.5 border border-gray-400 bg-white rounded">
-                    <QRCodeSVG
-                      value={cleanQrText([
-                        "SANIDAD POLICIAL - ACADEMIA NACIONAL DE POLICIA",
-                        `DOCUMENTO: ${reposoTipo === "domiciliario" ? "CERTIFICADO DE REPOSO DOMICILIARIO" : "CONSTANCIA DE ENFERMO LOCAL"}`,
-                        `Paciente: ${pacienteNombre}`,
-                        `Desde: ${fecha.split("-").reverse().join("/")} Hasta: ${reposoHasta ? reposoHasta.split("-").reverse().join("/") : "Nueva orden"}`,
-                        `Dx: ${cieSel?.codigo || ""} ${cieSel?.descripcion || ""}`,
-                        `Medico: Dr(a). ${medicoSeleccionado?.apellidos || ""} ${medicoSeleccionado?.nombres || ""}`,
-                      ].join("\n"))}
-                      size={105}
-                      level="M"
-                    />
-                  </div>
-                  <div className="text-xs space-y-0.5">
-                    <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL QR</p>
-                    <p className="text-gray-600">Sanidad ANP — Documento Oficial</p>
-                    <p className="font-mono text-[10px] text-gray-500">ID: REP-{printConsulta.id}</p>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="w-52 border-b border-black mb-1 mx-auto"></div>
-                  <p className="font-bold text-sm">Dr(a). {medicoSeleccionado?.apellidos}, {medicoSeleccionado?.nombres}</p>
-                  <p className="text-xs text-gray-600">Firma y Sello del Profesional Médico</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
     </>
   );
 }

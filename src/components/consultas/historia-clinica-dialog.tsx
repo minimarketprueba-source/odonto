@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -16,6 +17,7 @@ import { useRecetasPaciente } from "@/api/recetas";
 import type { Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
+import { imprimirCertificadoReposo, imprimirHistoriaClinicaHTML } from "@/lib/imprimir";
 
 interface HistoriaClinicaDialogProps {
   open: boolean;
@@ -113,12 +115,48 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const nombre = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : "";
 
   const handleImprimir = (target: PrintTarget) => {
-    setPrintTarget(target);
-    setTimeout(() => {
-      document.body.classList.add("printing-historia");
-      window.print();
-      document.body.classList.remove("printing-historia");
-    }, 150);
+    if (!paciente || !target) return;
+
+    if (target.type === "reposo" && target.consulta) {
+      const c = target.consulta;
+      const qrSvgHtml = renderToStaticMarkup(
+        <QRCodeSVG
+          value={getQrPayload(c, paciente, "reposo")}
+          size={105}
+          level="M"
+        />
+      );
+
+      imprimirCertificadoReposo({
+        pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
+        pacienteDocumento: paciente.documento,
+        pacienteTipo: paciente.tipo,
+        pacienteGrado: paciente.grado,
+        pacienteUnidad: paciente.unidad || "ANP",
+        tipoReposo: c.reposo_tipo === "domiciliario" ? "domiciliario" : "local",
+        fechaDesde: fmtFecha(c.fecha),
+        fechaHasta: c.reposo_hasta ? fmtFecha(c.reposo_hasta) : null,
+        cieCodigo: c.cie10?.codigo,
+        cieDescripcion: c.cie10?.descripcion,
+        diagnosticoDetalle: c.diagnostico,
+        tratamiento: c.tratamiento,
+        medicoNombre: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : "Profesional Médico",
+        consultaId: c.id,
+        qrSvgHtml,
+      });
+    } else {
+      setPrintTarget(target);
+      setTimeout(() => {
+        const printElem = document.getElementById("historia-print");
+        if (printElem) {
+          imprimirHistoriaClinicaHTML(
+            `${paciente.apellidos}, ${paciente.nombres}`,
+            paciente.documento || "",
+            printElem.innerHTML
+          );
+        }
+      }, 150);
+    }
   };
 
   // Historial por servicio (estilo PY HIS): filtro por especialidad de la consulta.

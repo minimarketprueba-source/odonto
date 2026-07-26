@@ -18,7 +18,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
 import { HistoriaClinicaDialog } from "@/components/consultas/historia-clinica-dialog";
 import {
-  TIPOS_PACIENTE, usePacientes, useCambiarEstadoPaciente, type Paciente,
+  TIPOS_PACIENTE, labelTipoPaciente, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
 import { useUltimasAtenciones } from "@/api/consultas";
 
@@ -47,8 +47,10 @@ function fechaHaceDias(dias: number): string {
 }
 
 export default function Pacientes() {
-  const { hasPermission, canView } = usePermissions();
+  const { hasPermission, canView, canDelete } = usePermissions();
   const canEdit = hasPermission("pacientes", "editar");
+  // Dar de baja es una decisión de padrón (afecta a control de peso): solo admin.
+  const puedeDarDeBaja = canDelete("pacientes");
   const veHistoria = canView("consultas");
 
   const { data: pacientes = [], isLoading } = usePacientes();
@@ -101,8 +103,19 @@ export default function Pacientes() {
   const paginaActual = Math.min(pagina, totalPaginas);
   const visibles = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
 
-  const tipoLabel = (tipo: string) =>
-    TIPOS_PACIENTE.find((t) => t.value === tipo)?.label ?? tipo;
+  /** Datos secundarios de la tarjeta, según de qué tipo de paciente se trate. */
+  const detalle = (p: Paciente): string => {
+    const partes =
+      p.tipo === "familiar"
+        ? [p.familiar_de && `Familiar de: ${p.familiar_de}`, p.telefono && `Tel.: ${p.telefono}`]
+        : p.tipo === "civil"
+          ? [p.telefono && `Tel.: ${p.telefono}`, p.direccion && p.direccion]
+          : p.tipo === "policia"
+            ? [p.grado && `Grado: ${p.grado}`, p.unidad && `Dependencia: ${p.unidad}`]
+            : [p.promocion && `Curso: ${p.promocion}`, p.unidad && `Sección: ${p.unidad}`];
+    return [...partes, p.fecha_nacimiento && `Nac.: ${fmtFecha(p.fecha_nacimiento)}`]
+      .filter(Boolean).join(" · ") || "Sin datos adicionales";
+  };
 
   const handleToggleActivo = async (p: Paciente) => {
     try {
@@ -125,7 +138,7 @@ export default function Pacientes() {
               </span>
             </h2>
             <p className="text-sm text-muted-foreground">
-              Padrón de la Sanidad — cadetes, oficiales, personal y familiares.
+              Padrón de la Sanidad — cadetes, policías, familiares y civiles.
             </p>
           </div>
           {canEdit && (
@@ -140,7 +153,7 @@ export default function Pacientes() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder="Buscar por nombre, documento o unidad..."
+              placeholder="Buscar por nombre, cédula, unidad o dependencia..."
               value={busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
             />
@@ -177,7 +190,19 @@ export default function Pacientes() {
         ) : visibles.length === 0 ? (
           <div className="text-center py-12">
             <User className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">No se encontraron pacientes con esos filtros.</p>
+            <p className="text-muted-foreground">
+              {busquedaDebounced
+                ? `No se encontró ningún paciente con «${busquedaDebounced}».`
+                : "No se encontraron pacientes con esos filtros."}
+            </p>
+            {canEdit && (
+              <Button
+                className="gap-2 mt-4"
+                onClick={() => { setSeleccionado(null); setFormOpen(true); }}
+              >
+                <Plus className="w-4 h-4" /> Registrar paciente nuevo
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -187,11 +212,11 @@ export default function Pacientes() {
                   <CardTitle className="text-base leading-tight">
                     {p.apellidos}, {p.nombres}
                   </CardTitle>
-                  <CardDescription>CI: {p.documento}</CardDescription>
+                  <CardDescription>CI: {p.documento || "sin cédula"}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline">{tipoLabel(p.tipo)}</Badge>
+                    <Badge variant="outline">{labelTipoPaciente(p.tipo)}</Badge>
                     {p.sexo && <Badge variant="outline">{p.sexo === "F" ? "Femenino" : "Masculino"}</Badge>}
                     {!p.activo && <Badge variant="destructive">Inactivo</Badge>}
                     {atencionSel !== "todos" && ultimasAtenciones[p.id] && (
@@ -200,11 +225,8 @@ export default function Pacientes() {
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {[p.promocion && `Curso: ${p.promocion}`, p.unidad && `Sección: ${p.unidad}`, p.fecha_nacimiento && `Nac.: ${fmtFecha(p.fecha_nacimiento)}`]
-                      .filter(Boolean).join(" · ") || "Sin datos adicionales"}
-                  </p>
-                  {(canEdit || veHistoria) && (
+                  <p className="text-xs text-muted-foreground">{detalle(p)}</p>
+                  {(canEdit || veHistoria || puedeDarDeBaja) && (
                     <div className="flex items-center gap-1 pt-2 border-t">
                       {veHistoria && (
                         <Button
@@ -215,21 +237,21 @@ export default function Pacientes() {
                         </Button>
                       )}
                       {canEdit && (
-                        <>
-                          <Button
-                            variant="ghost" size="sm" title="Editar paciente"
-                            onClick={() => { setSeleccionado(p); setFormOpen(true); }}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost" size="sm"
-                            title={p.activo ? "Desactivar" : "Reactivar"}
-                            onClick={() => handleToggleActivo(p)}
-                          >
-                            {p.activo ? <Minus className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost" size="sm" title="Editar paciente"
+                          onClick={() => { setSeleccionado(p); setFormOpen(true); }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {puedeDarDeBaja && (
+                        <Button
+                          variant="ghost" size="sm"
+                          title={p.activo ? "Dar de baja" : "Reactivar"}
+                          onClick={() => handleToggleActivo(p)}
+                        >
+                          {p.activo ? <Minus className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                        </Button>
                       )}
                     </div>
                   )}
@@ -252,7 +274,17 @@ export default function Pacientes() {
         )}
       </div>
 
-      <PacienteForm open={formOpen} onOpenChange={setFormOpen} paciente={seleccionado} />
+      <PacienteForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        paciente={seleccionado}
+        busquedaInicial={seleccionado ? undefined : busquedaDebounced}
+        onCreated={(nuevo) => {
+          // Recién registrado: se abre su historia clínica para atenderlo enseguida.
+          setBusqueda("");
+          if (veHistoria) { setPacienteHistoria(nuevo); setHistoriaOpen(true); }
+        }}
+      />
       <HistoriaClinicaDialog open={historiaOpen} onOpenChange={setHistoriaOpen} paciente={pacienteHistoria} />
     </AppLayout>
   );

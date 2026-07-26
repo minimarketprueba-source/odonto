@@ -39,6 +39,17 @@ export function normalizeText(text: string): string {
 }
 
 /**
+ * Normaliza un documento (CI/pasaporte) para poder compararlo: sin puntos,
+ * espacios ni guiones y en may\u00fasculas, para que "1.234.567" y "1234567" sean
+ * el mismo documento. Debe coincidir con la expresi\u00f3n del \u00edndice \u00fanico
+ * `pacientes_documento_unico` en la base de datos.
+ */
+export function normalizeDocumento(documento?: string | null): string {
+  if (!documento) return "";
+  return documento.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+}
+
+/**
  * Realiza una búsqueda flexible donde cada palabra ingresada en `query`
  * debe encontrarse en alguna parte de `targetText` (ignora tildes, puntuación y orden de palabras).
  */

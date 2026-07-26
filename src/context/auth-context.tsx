@@ -25,7 +25,7 @@ export const ROLES_SANIDAD = ["admin", "medico", "recepcion"]
 // Permisos por defecto cuando user_roles.permissions viene vacío.
 const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
   medico: {
-    pacientes: ["ver"],
+    pacientes: ["ver", "editar"],
     citas: ["ver", "editar"],
     consultas: ["ver", "editar"],
     recetas: ["ver", "editar"],
