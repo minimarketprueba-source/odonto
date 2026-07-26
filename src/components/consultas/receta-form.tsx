@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useMedicosActivos, fechaHoyISO } from "@/api/citas";
 import { useCreateReceta, type RecetaItem } from "@/api/recetas";
@@ -29,6 +28,8 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
   const crear = useCreateReceta();
 
   const [medicoId, setMedicoId] = useState("");
+  const [busquedaMedico, setBusquedaMedico] = useState("");
+  const [mostrarListaMedicos, setMostrarListaMedicos] = useState(false);
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [diagnostico, setDiagnostico] = useState("");
   const [indicaciones, setIndicaciones] = useState("");
@@ -37,12 +38,27 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
   useEffect(() => {
     if (open) {
       setMedicoId("");
+      setBusquedaMedico("");
+      setMostrarListaMedicos(false);
       setFecha(fechaHoyISO());
       setDiagnostico("");
       setIndicaciones("");
       setItems([{ ...ITEM_VACIO }]);
     }
   }, [open]);
+
+  const medicosFiltrados = useMemo(() => {
+    if (!busquedaMedico.trim()) return medicos;
+    return medicos.filter((m) => {
+      const target = `${m.apellidos} ${m.nombres} ${m.especialidad?.nombre || ""}`;
+      return matchTexto(target, busquedaMedico);
+    });
+  }, [medicos, busquedaMedico]);
+
+  const medicoSeleccionado = useMemo(
+    () => medicos.find((m) => String(m.id) === medicoId) || null,
+    [medicos, medicoId]
+  );
 
   const setItem = (i: number, campo: keyof RecetaItem, valor: string) =>
     setItems((prev) => prev.map((item, idx) => (idx === i ? { ...item, [campo]: valor } : item)));
@@ -76,7 +92,7 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nueva receta — {pacienteNombre}</DialogTitle>
           <DialogDescription>Se numera automáticamente (R-00001, R-00002, ...).</DialogDescription>
@@ -84,18 +100,75 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
 
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
+            <div className="space-y-1 relative">
               <Label htmlFor="rc-medico">Médico *</Label>
-              <Select value={medicoId} onValueChange={setMedicoId}>
-                <SelectTrigger id="rc-medico"><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                <SelectContent>
-                  {medicos.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.apellidos}, {m.nombres}{m.especialidad ? ` — ${m.especialidad.nombre}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {medicoSeleccionado ? (
+                <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
+                  <span className="text-sm font-medium">
+                    {medicoSeleccionado.apellidos}, {medicoSeleccionado.nombres}
+                    {medicoSeleccionado.especialidad && (
+                      <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200">
+                        {medicoSeleccionado.especialidad.nombre}
+                      </Badge>
+                    )}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setMedicoId("");
+                      setBusquedaMedico("");
+                      setMostrarListaMedicos(true);
+                    }}
+                  >
+                    Cambiar
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="rc-medico"
+                    className="pl-9"
+                    placeholder="Buscar por nombre o especialidad..."
+                    value={busquedaMedico}
+                    onChange={(e) => {
+                      setBusquedaMedico(e.target.value);
+                      setMostrarListaMedicos(true);
+                    }}
+                    onFocus={() => setMostrarListaMedicos(true)}
+                    onBlur={() => setTimeout(() => setMostrarListaMedicos(false), 200)}
+                  />
+                  {mostrarListaMedicos && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-48 overflow-y-auto divide-y">
+                      {medicosFiltrados.length === 0 ? (
+                        <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron médicos</p>
+                      ) : (
+                        medicosFiltrados.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                            onClick={() => {
+                              setMedicoId(String(m.id));
+                              setMostrarListaMedicos(false);
+                            }}
+                          >
+                            <span className="font-medium">{m.apellidos}, {m.nombres}</span>
+                            {m.especialidad && (
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {m.especialidad.nombre}
+                              </Badge>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="rc-fecha">Fecha *</Label>

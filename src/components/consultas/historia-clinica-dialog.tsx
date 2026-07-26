@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -8,9 +9,9 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText } from "lucide-react";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useConsultasPaciente } from "@/api/consultas";
+import { useConsultasPaciente, type Consulta } from "@/api/consultas";
 import { useRecetasPaciente } from "@/api/recetas";
 import type { Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
@@ -21,6 +22,12 @@ interface HistoriaClinicaDialogProps {
   onOpenChange: (open: boolean) => void;
   paciente: Paciente | null;
 }
+
+type PrintTarget =
+  | { type: "consulta"; consulta: Consulta }
+  | { type: "reposo"; consulta: Consulta }
+  | { type: "todas" }
+  | null;
 
 function fmtFecha(f: string | null): string {
   if (!f) return "—";
@@ -41,6 +48,56 @@ function fmtHora(created_at?: string | null, citaHora?: string | null): string |
   return null;
 }
 
+function cleanQrText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ñ/g, "n")
+    .replace(/Ñ/g, "N");
+}
+
+function getQrPayload(c: Consulta | null, paciente: Paciente | null, tipo: "consulta" | "reposo" | "todas"): string {
+  if (!paciente) return "";
+  const inst = "SANIDAD POLICIAL - ACADEMIA NACIONAL DE POLICIA";
+
+  let raw = "";
+
+  if (tipo === "reposo" && c) {
+    raw = [
+      inst,
+      `DOCUMENTO: CERTIFICADO DE REPOSO MEDICO`,
+      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${paciente.documento})`,
+      `Tipo Reposo: ${c.reposo_tipo === "domiciliario" ? "DOMICILIARIO" : "ENFERMO LOCAL"}`,
+      `Desde: ${fmtFecha(c.fecha)} Hasta: ${c.reposo_hasta ? fmtFecha(c.reposo_hasta) : "Nueva orden"}`,
+      `Dx CIE-10: ${c.cie10?.codigo || "N/A"} - ${c.cie10?.descripcion || c.diagnostico || ""}`,
+      `Medico: Dr(a). ${c.medico?.apellidos || ""}, ${c.medico?.nombres || ""}`,
+      `ID Verificacion: REP-${paciente.documento}-${c.id}`,
+    ].join("\n");
+  } else if (tipo === "consulta" && c) {
+    raw = [
+      inst,
+      `DOCUMENTO: INFORME DE CONSULTA MEDICA`,
+      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${paciente.documento})`,
+      `Fecha: ${fmtFecha(c.fecha)}`,
+      `Especialidad: ${c.medico?.especialidad?.nombre || "Consulta"}`,
+      `Dx CIE-10: ${c.cie10?.codigo || "N/A"} - ${c.diagnostico || ""}`,
+      `Medico: Dr(a). ${c.medico?.apellidos || ""}, ${c.medico?.nombres || ""}`,
+      `ID Verificacion: CON-${paciente.documento}-${c.id}`,
+    ].join("\n");
+  } else {
+    raw = [
+      inst,
+      `DOCUMENTO: HISTORIA CLINICA GENERAL`,
+      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${paciente.documento})`,
+      `Tipo/Unidad: ${paciente.tipo} - ${paciente.unidad || "ANP"}`,
+      `Emision: ${new Date().toLocaleDateString("es-PY")}`,
+      `ID Verificacion: HC-${paciente.documento}`,
+    ].join("\n");
+  }
+
+  return cleanQrText(raw);
+}
+
 export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: HistoriaClinicaDialogProps) {
   const { hasPermission, canView } = usePermissions();
   const puedeRegistrar = hasPermission("consultas", "editar");
@@ -51,8 +108,18 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const [formOpen, setFormOpen] = useState(false);
   const [recetaOpen, setRecetaOpen] = useState(false);
   const [servicioFiltro, setServicioFiltro] = useState("todos");
+  const [printTarget, setPrintTarget] = useState<PrintTarget>(null);
 
   const nombre = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : "";
+
+  const handleImprimir = (target: PrintTarget) => {
+    setPrintTarget(target);
+    setTimeout(() => {
+      document.body.classList.add("printing-historia");
+      window.print();
+      document.body.classList.remove("printing-historia");
+    }, 150);
+  };
 
   // Historial por servicio (estilo PY HIS): filtro por especialidad de la consulta.
   const servicios = useMemo(() => {
@@ -72,15 +139,30 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[88vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-primary" />
-              Historia clínica — {nombre}
-            </DialogTitle>
-            <DialogDescription>
-              CI {paciente?.documento} · {consultas.length} consulta{consultas.length !== 1 ? "s" : ""} registrada{consultas.length !== 1 ? "s" : ""}
-            </DialogDescription>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <Stethoscope className="w-5 h-5 text-primary" />
+                  Historia clínica — {nombre}
+                </DialogTitle>
+                <DialogDescription>
+                  CI {paciente?.documento} · {consultas.length} consulta{consultas.length !== 1 ? "s" : ""} registrada{consultas.length !== 1 ? "s" : ""}
+                </DialogDescription>
+              </div>
+              {consultas.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 flex-shrink-0"
+                  onClick={() => handleImprimir({ type: "todas" })}
+                  title="Imprimir o guardar en PDF toda la historia clínica"
+                >
+                  <Printer className="w-4 h-4" /> Imprimir Historia
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           <Tabs defaultValue="consultas" className="flex-1 flex flex-col min-h-0">
@@ -119,23 +201,47 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                 consultasFiltradas.map((c) => {
                   const hora = fmtHora(c.created_at, c.cita?.hora);
                   return (
-                    <div key={c.id} className="p-3 rounded-lg border">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">
-                          {fmtFecha(c.fecha)}{hora ? ` · ${hora} hs` : ""}
-                        </span>
-                        {c.medico?.especialidad && (
-                          <Badge className="bg-blue-100 text-blue-700 border-0 dark:bg-blue-900/40 dark:text-blue-200">
-                            {c.medico.especialidad.nombre}
-                          </Badge>
-                        )}
-                        {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
-                        {c.reposo_tipo && (
-                          <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
-                            {c.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
-                            {c.reposo_hasta ? ` hasta ${fmtFecha(c.reposo_hasta)}` : " (hasta nueva orden)"}
-                          </Badge>
-                        )}
+                    <div key={c.id} className="p-3 rounded-lg border space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">
+                            {fmtFecha(c.fecha)}{hora ? ` · ${hora} hs` : ""}
+                          </span>
+                          {c.medico?.especialidad && (
+                            <Badge className="bg-blue-100 text-blue-700 border-0 dark:bg-blue-900/40 dark:text-blue-200">
+                              {c.medico.especialidad.nombre}
+                            </Badge>
+                          )}
+                          {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
+                          {c.reposo_tipo && (
+                            <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
+                              {c.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
+                              {c.reposo_hasta ? ` hasta ${fmtFecha(c.reposo_hasta)}` : " (hasta nueva orden)"}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {c.reposo_tipo && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs gap-1 text-red-700 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800"
+                              onClick={() => handleImprimir({ type: "reposo", consulta: c })}
+                              title="Imprimir Certificado de Reposo Médico con Código QR"
+                            >
+                              <ShieldAlert className="w-3.5 h-3.5" /> Imp. Reposo
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleImprimir({ type: "consulta", consulta: c })}
+                            title="Imprimir o guardar en PDF esta consulta"
+                          >
+                            <Printer className="w-3.5 h-3.5" /> Imp. Consulta
+                          </Button>
+                        </div>
                       </div>
                       {c.motivo_consulta && (
                         <p className="text-sm mt-1"><span className="text-muted-foreground">Motivo: </span>{c.motivo_consulta}</p>
@@ -209,6 +315,233 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Vista de Impresión Aislada (HTML/PDF) con QR */}
+      <div id="historia-print">
+        {paciente && printTarget && (
+          <div className="p-4 font-sans text-black max-w-3xl mx-auto">
+            {/* Encabezado Institucional */}
+            <div className="text-center border-b-2 border-black pb-3 mb-4">
+              <h1 className="text-xl font-bold uppercase tracking-wider">SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+              <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide mt-0.5">Gral. José E. Díaz</p>
+              <h2 className="text-base font-bold text-gray-900 mt-2 tracking-wide uppercase">
+                {printTarget.type === "reposo"
+                  ? printTarget.consulta.reposo_tipo === "domiciliario"
+                    ? "CERTIFICADO DE REPOSO DOMICILIARIO"
+                    : "CONSTANCIA DE ENFERMO LOCAL"
+                  : printTarget.type === "todas"
+                  ? "HISTORIA CLÍNICA GENERAL"
+                  : "INFORME DE CONSULTA MÉDICA"}
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Impreso el {new Date().toLocaleDateString("es-PY")} a las {new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs
+              </p>
+            </div>
+
+            {/* Datos del Paciente */}
+            <div className="bg-gray-50 p-3 rounded border border-gray-300 mb-5 text-sm grid grid-cols-2 gap-2">
+              <div>
+                <p><strong>Paciente:</strong> {paciente.apellidos}, {paciente.nombres}</p>
+                <p><strong>Cédula de Identidad (CI):</strong> {paciente.documento}</p>
+              </div>
+              <div>
+                <p><strong>Tipo / Grado:</strong> {paciente.tipo} {paciente.grado ? `— ${paciente.grado}` : ""}</p>
+                <p><strong>Unidad / Sección:</strong> {paciente.unidad || "—"} {paciente.promocion ? `(Curso ${paciente.promocion})` : ""}</p>
+              </div>
+            </div>
+
+            {/* OPCIÓN 1: CERTIFICADO DE REPOSO MÉDICO (DOMICILIARIO O ENFERMO LOCAL) */}
+            {printTarget.type === "reposo" ? (
+              <div className="border-2 border-red-600 p-5 rounded space-y-4 text-sm bg-white">
+                <div className="flex justify-between font-bold border-b border-red-300 pb-2 text-base text-red-900">
+                  <span>REF: {printTarget.consulta.reposo_tipo === "domiciliario" ? "REP-DOM" : "ENF-LOC"}-{paciente.documento}-{printTarget.consulta.id}</span>
+                  <span>FECHA EMISIÓN: {fmtFecha(printTarget.consulta.fecha)}</span>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="bg-red-50 border border-red-200 p-3 rounded">
+                    <p className="font-bold text-red-900 text-base">TIPO DE CONDICIÓN MÉDICA:</p>
+                    <p className="text-lg font-extrabold text-red-700 mt-1 uppercase">
+                      {printTarget.consulta.reposo_tipo === "domiciliario"
+                        ? "• REPOSO DOMICILIARIO (FUERA DE LA UNIDAD)"
+                        : "• ENFERMO LOCAL (PERMANECE EN LA UNIDAD)"}
+                    </p>
+                    <p className="text-xs text-red-800 mt-1 font-medium">
+                      {printTarget.consulta.reposo_tipo === "domiciliario"
+                        ? "El cadete debe cumplir reposo en su domicilio particular eximido de toda actividad."
+                        : "El cadete permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200">
+                    <div>
+                      <p className="font-bold text-gray-700">FECHA DE INICIO:</p>
+                      <p className="text-base font-semibold">{fmtFecha(printTarget.consulta.fecha)}</p>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-700">HASTA (INCLUSIVE):</p>
+                      <p className="text-base font-semibold">
+                        {printTarget.consulta.reposo_hasta
+                          ? fmtFecha(printTarget.consulta.reposo_hasta)
+                          : "Hasta nueva orden médica"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {printTarget.consulta.diagnostico && (
+                    <div>
+                      <p className="font-bold text-gray-800">DIAGNÓSTICO MÉDICO:</p>
+                      <p className="pl-2 pt-0.5">
+                        {printTarget.consulta.diagnostico}
+                        {printTarget.consulta.cie10 ? ` [CIE-10: ${printTarget.consulta.cie10.codigo} - ${printTarget.consulta.cie10.descripcion}]` : ""}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="font-bold text-gray-800">INDICACIONES / RESTRICCIONES:</p>
+                    <p className="pl-2 pt-0.5">
+                      {printTarget.consulta.tratamiento || "Se indica suspensión total de actividades físicas, instrucción y ejercicios durante el periodo indicado."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pie con Código QR y Firma */}
+                <div className="pt-10 mt-8 flex justify-between items-end border-t border-gray-300">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 border border-gray-400 bg-white rounded">
+                      <QRCodeSVG
+                        value={getQrPayload(printTarget.consulta, paciente, "reposo")}
+                        size={105}
+                        level="M"
+                      />
+                    </div>
+                    <div className="text-xs space-y-0.5">
+                      <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL QR</p>
+                      <p className="text-gray-600">Sanidad ANP — Documento Oficial</p>
+                      <p className="font-mono text-[10px] text-gray-500">ID: REP-{paciente.documento}-{printTarget.consulta.id}</p>
+                      <p className="text-[10px] text-gray-400">Escanee para verificar autenticidad</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <div className="w-52 border-b border-black mb-1 mx-auto"></div>
+                    <p className="font-bold text-sm">Dr(a). {printTarget.consulta.medico?.apellidos}, {printTarget.consulta.medico?.nombres}</p>
+                    <p className="text-xs text-gray-600">Firma y Sello del Profesional Médico</p>
+                  </div>
+                </div>
+              </div>
+            ) : printTarget.type === "todas" ? (
+              /* OPCIÓN 2: HISTORIA CLÍNICA COMPLETA */
+              <div className="space-y-4">
+                <h3 className="font-bold border-b border-gray-400 pb-1 text-sm uppercase">Historial de Consultas Registradas ({consultasFiltradas.length})</h3>
+                {consultasFiltradas.map((c) => {
+                  const h = fmtHora(c.created_at, c.cita?.hora);
+                  return (
+                    <div key={c.id} className="border border-gray-300 p-3 rounded space-y-1.5 text-xs">
+                      <div className="flex justify-between font-bold border-b pb-1 text-sm">
+                        <span>{fmtFecha(c.fecha)}{h ? ` · ${h} hs` : ""} — {c.medico?.especialidad?.nombre || "Consulta"}</span>
+                        {c.cie10 && <span>CIE-10: {c.cie10.codigo}</span>}
+                      </div>
+                      {c.motivo_consulta && <p><strong>Motivo:</strong> {c.motivo_consulta}</p>}
+                      {c.examen_fisico && <p><strong>Examen Físico:</strong> {c.examen_fisico}</p>}
+                      {c.diagnostico && <p><strong>Diagnóstico:</strong> {c.diagnostico} {c.cie10 ? `(${c.cie10.descripcion})` : ""}</p>}
+                      {c.tratamiento && <p className="whitespace-pre-wrap"><strong>Tratamiento:</strong> {c.tratamiento}</p>}
+                      {c.reposo_tipo && (
+                        <p className="text-red-700 font-bold"><strong>Reposo Médico:</strong> {c.reposo_tipo === "domiciliario" ? "Domiciliario" : "Local"} {c.reposo_hasta ? `hasta ${fmtFecha(c.reposo_hasta)}` : ""}</p>
+                      )}
+                      {c.medico && <p className="text-gray-600 pt-1">Atendió: Dr(a). {c.medico.apellidos}, {c.medico.nombres}</p>}
+                    </div>
+                  );
+                })}
+
+                <div className="pt-6 flex justify-between items-center border-t border-gray-300">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1 border border-gray-400 bg-white rounded">
+                      <QRCodeSVG
+                        value={getQrPayload(null, paciente, "todas")}
+                        size={80}
+                        level="M"
+                      />
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold">VERIFICACIÓN DE FICHA CLÍNICA</p>
+                      <p className="text-gray-600 font-mono text-[10px]">HC-{paciente.documento}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">Sanidad ANP — Todos los derechos reservados</p>
+                </div>
+              </div>
+            ) : printTarget.type === "consulta" ? (
+              /* OPCIÓN 3: INFORME DE CONSULTA INDIVIDUAL */
+              <div className="border-2 border-gray-400 p-5 rounded space-y-4 text-sm bg-white">
+                <div className="flex justify-between font-bold border-b pb-2 text-base">
+                  <span>FECHA: {fmtFecha(printTarget.consulta.fecha)} · HORA: {fmtHora(printTarget.consulta.created_at, printTarget.consulta.cita?.hora) || "—"} hs</span>
+                  <span>ESPECIALIDAD: {printTarget.consulta.medico?.especialidad?.nombre || "—"}</span>
+                </div>
+
+                <div className="space-y-3">
+                  {printTarget.consulta.motivo_consulta && (
+                    <div>
+                      <p className="font-bold text-gray-800">MOTIVO DE CONSULTA:</p>
+                      <p className="pl-2 pt-0.5">{printTarget.consulta.motivo_consulta}</p>
+                    </div>
+                  )}
+                  {printTarget.consulta.examen_fisico && (
+                    <div>
+                      <p className="font-bold text-gray-800">EXAMEN FÍSICO / HALLAZGOS:</p>
+                      <p className="pl-2 pt-0.5">{printTarget.consulta.examen_fisico}</p>
+                    </div>
+                  )}
+                  {printTarget.consulta.diagnostico && (
+                    <div>
+                      <p className="font-bold text-gray-800">DIAGNÓSTICO:</p>
+                      <p className="pl-2 pt-0.5">{printTarget.consulta.diagnostico} {printTarget.consulta.cie10 ? `[CIE-10: ${printTarget.consulta.cie10.codigo} - ${printTarget.consulta.cie10.descripcion}]` : ""}</p>
+                    </div>
+                  )}
+                  {printTarget.consulta.tratamiento && (
+                    <div>
+                      <p className="font-bold text-gray-800">TRATAMIENTO Y PRESCRIPCIÓN:</p>
+                      <p className="pl-2 pt-0.5 whitespace-pre-wrap">{printTarget.consulta.tratamiento}</p>
+                    </div>
+                  )}
+                  {printTarget.consulta.reposo_tipo && (
+                    <div className="bg-red-50 border border-red-200 p-3 rounded">
+                      <p className="font-bold text-red-800">REPOSO MÉDICO CONCEDIDO:</p>
+                      <p className="pl-2 pt-0.5 text-red-900 font-semibold">
+                        {printTarget.consulta.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
+                        {printTarget.consulta.reposo_hasta ? ` hasta la fecha ${fmtFecha(printTarget.consulta.reposo_hasta)}` : " (hasta nueva orden)"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-12 mt-8 flex justify-between items-end border-t border-gray-300">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1 border border-gray-400 bg-white rounded">
+                      <QRCodeSVG
+                        value={getQrPayload(printTarget.consulta, paciente, "consulta")}
+                        size={90}
+                        level="M"
+                      />
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL</p>
+                      <p className="font-mono text-[10px] text-gray-500">CON-{paciente.documento}-{printTarget.consulta.id}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <div className="w-52 border-b border-black mb-1 mx-auto"></div>
+                    <p className="font-bold text-sm">Dr(a). {printTarget.consulta.medico?.apellidos}, {printTarget.consulta.medico?.nombres}</p>
+                    <p className="text-xs text-gray-600">Firma y Sello del Profesional</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       <ConsultaForm
         open={formOpen}

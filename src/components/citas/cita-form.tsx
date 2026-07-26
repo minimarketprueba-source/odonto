@@ -5,12 +5,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { matchPaciente } from "@/lib/utils";
+import { matchPaciente, matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { usePacientes, type Paciente } from "@/api/pacientes";
@@ -34,7 +32,9 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [medicoId, setMedicoId] = useState("");
-  const [fecha, setFecha] = useState(fechaHoyISO());
+  const [busquedaMedico, setBusquedaMedico] = useState("");
+  const [mostrarListaMedicos, setMostrarListaMedicos] = useState(false);
+  const [fecha, setFecha] = useState(fechaInicial || fechaHoyISO());
   const [hora, setHora] = useState("08:00");
   const [motivo, setMotivo] = useState("");
 
@@ -43,11 +43,26 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
       setBusquedaPaciente("");
       setPaciente(null);
       setMedicoId("");
+      setBusquedaMedico("");
+      setMostrarListaMedicos(false);
       setFecha(fechaInicial || fechaHoyISO());
       setHora("08:00");
       setMotivo("");
     }
   }, [open, fechaInicial]);
+
+  const medicosFiltrados = useMemo(() => {
+    if (!busquedaMedico.trim()) return medicos;
+    return medicos.filter((m) => {
+      const target = `${m.apellidos} ${m.nombres} ${m.especialidad?.nombre || ""}`;
+      return matchTexto(target, busquedaMedico);
+    });
+  }, [medicos, busquedaMedico]);
+
+  const medicoSeleccionado = useMemo(
+    () => medicos.find((m) => String(m.id) === medicoId) || null,
+    [medicos, medicoId]
+  );
 
   const sugerencias = useMemo(() => {
     if (!busquedaPaciente.trim() || busquedaPaciente.trim().length < 2) return [];
@@ -132,19 +147,75 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 relative">
             <Label htmlFor="c-medico">Médico *</Label>
-            <Select value={medicoId} onValueChange={setMedicoId}>
-              <SelectTrigger id="c-medico"><SelectValue placeholder="Selecciona un médico" /></SelectTrigger>
-              <SelectContent>
-                {medicos.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>
-                    {m.apellidos}, {m.nombres}
-                    {m.especialidad ? ` — ${m.especialidad.nombre}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {medicoSeleccionado ? (
+              <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
+                <span className="text-sm font-medium">
+                  {medicoSeleccionado.apellidos}, {medicoSeleccionado.nombres}
+                  {medicoSeleccionado.especialidad && (
+                    <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200">
+                      {medicoSeleccionado.especialidad.nombre}
+                    </Badge>
+                  )}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setMedicoId("");
+                    setBusquedaMedico("");
+                    setMostrarListaMedicos(true);
+                  }}
+                >
+                  Cambiar
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="c-medico"
+                  className="pl-9"
+                  placeholder="Buscar por nombre o especialidad..."
+                  value={busquedaMedico}
+                  onChange={(e) => {
+                    setBusquedaMedico(e.target.value);
+                    setMostrarListaMedicos(true);
+                  }}
+                  onFocus={() => setMostrarListaMedicos(true)}
+                  onBlur={() => setTimeout(() => setMostrarListaMedicos(false), 200)}
+                />
+                {mostrarListaMedicos && (
+                  <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-48 overflow-y-auto divide-y">
+                    {medicosFiltrados.length === 0 ? (
+                      <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron médicos</p>
+                    ) : (
+                      medicosFiltrados.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                          onClick={() => {
+                            setMedicoId(String(m.id));
+                            setMostrarListaMedicos(false);
+                          }}
+                        >
+                          <span className="font-medium">{m.apellidos}, {m.nombres}</span>
+                          {m.especialidad && (
+                            <Badge variant="outline" className="text-xs font-normal">
+                              {m.especialidad.nombre}
+                            </Badge>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

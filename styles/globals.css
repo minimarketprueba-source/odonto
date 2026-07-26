@@ -26,6 +26,54 @@
     padding: 10mm 12mm;
   }
 }
+
+/* Impresión aislada de la historia clínica / consulta */
+#historia-print {
+  display: none;
+}
+@media print {
+  body.printing-historia * {
+    visibility: hidden !important;
+  }
+  body.printing-historia #historia-print,
+  body.printing-historia #historia-print * {
+    visibility: visible !important;
+  }
+  body.printing-historia #historia-print {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 10mm 12mm;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
+
+/* Impresión aislada de reposo directo desde el formulario de registro */
+#consulta-reposo-print {
+  display: none;
+}
+@media print {
+  body.printing-reposo * {
+    visibility: hidden !important;
+  }
+  body.printing-reposo #consulta-reposo-print,
+  body.printing-reposo #consulta-reposo-print * {
+    visibility: visible !important;
+  }
+  body.printing-reposo #consulta-reposo-print {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 10mm 12mm;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}
 /* Ocultar sidebar y header al imprimir para impresión profesional */
 @media print {
   .sidebar-print-hide,
