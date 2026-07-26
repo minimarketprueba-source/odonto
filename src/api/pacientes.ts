@@ -85,11 +85,18 @@ export interface CreatePacienteInput {
   activo?: boolean;
 }
 
-/** Mensaje claro cuando la base rechaza una cédula ya registrada. */
+/** Traduce los errores de la base a algo que se entienda sin ser programador. */
 function mensajeError(error: { code?: string; message: string }, accion: string): Error {
   if (error.code === "23505") {
     return new Error(
       "Ya existe un paciente con esa cédula. Búsquelo en el listado (puede estar dado de baja) y use esa ficha."
+    );
+  }
+  // La columna familiar_de se agrega en una actualización aparte de la base.
+  if (error.code === "PGRST204" && error.message.includes("familiar_de")) {
+    return new Error(
+      "Falta aplicar la actualización de la base para guardar «Familiar de». " +
+      "Registre al paciente sin ese dato y avise al administrador."
     );
   }
   return new Error(`${accion}: ${error.message}`);

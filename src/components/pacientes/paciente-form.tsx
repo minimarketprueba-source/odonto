@@ -124,7 +124,13 @@ export function PacienteForm({
       grado: externo ? null : sanitizePlainText(form.grado) || null,
       promocion: form.tipo === "cadete" ? sanitizePlainText(form.promocion) || null : null,
       unidad: externo ? null : sanitizePlainText(form.unidad) || null,
-      familiar_de: form.tipo === "familiar" ? sanitizePlainText(form.familiar_de) || null : null,
+      // Solo se envía si hay algo que guardar: así el alta funciona igual
+      // aunque la columna todavía no exista en la base.
+      ...(form.tipo === "familiar" && form.familiar_de.trim()
+        ? { familiar_de: sanitizePlainText(form.familiar_de) }
+        : paciente?.familiar_de
+          ? { familiar_de: null }
+          : {}),
       fecha_nacimiento: form.fecha_nacimiento || null,
       sexo: (form.sexo || null) as "M" | "F" | null,
       email: sanitizePlainText(form.email) || null,
