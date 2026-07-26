@@ -28,6 +28,19 @@ function fmtFecha(f: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
+function fmtHora(created_at?: string | null, citaHora?: string | null): string | null {
+  if (created_at) {
+    const d = new Date(created_at);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+  if (citaHora) {
+    return citaHora.slice(0, 5);
+  }
+  return null;
+}
+
 export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: HistoriaClinicaDialogProps) {
   const { hasPermission, canView } = usePermissions();
   const puedeRegistrar = hasPermission("consultas", "editar");
@@ -103,45 +116,50 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                   Sin consultas registradas todavía.
                 </p>
               ) : (
-                consultasFiltradas.map((c) => (
-                  <div key={c.id} className="p-3 rounded-lg border">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{fmtFecha(c.fecha)}</span>
-                      {c.medico?.especialidad && (
-                        <Badge className="bg-blue-100 text-blue-700 border-0 dark:bg-blue-900/40 dark:text-blue-200">
-                          {c.medico.especialidad.nombre}
-                        </Badge>
+                consultasFiltradas.map((c) => {
+                  const hora = fmtHora(c.created_at, c.cita?.hora);
+                  return (
+                    <div key={c.id} className="p-3 rounded-lg border">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">
+                          {fmtFecha(c.fecha)}{hora ? ` · ${hora} hs` : ""}
+                        </span>
+                        {c.medico?.especialidad && (
+                          <Badge className="bg-blue-100 text-blue-700 border-0 dark:bg-blue-900/40 dark:text-blue-200">
+                            {c.medico.especialidad.nombre}
+                          </Badge>
+                        )}
+                        {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
+                        {c.reposo_tipo && (
+                          <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
+                            {c.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
+                            {c.reposo_hasta ? ` hasta ${fmtFecha(c.reposo_hasta)}` : " (hasta nueva orden)"}
+                          </Badge>
+                        )}
+                      </div>
+                      {c.motivo_consulta && (
+                        <p className="text-sm mt-1"><span className="text-muted-foreground">Motivo: </span>{c.motivo_consulta}</p>
                       )}
-                      {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
-                      {c.reposo_tipo && (
-                        <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
-                          {c.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
-                          {c.reposo_hasta ? ` hasta ${fmtFecha(c.reposo_hasta)}` : " (hasta nueva orden)"}
-                        </Badge>
+                      {c.examen_fisico && (
+                        <p className="text-sm"><span className="text-muted-foreground">Examen: </span>{c.examen_fisico}</p>
+                      )}
+                      {c.diagnostico && (
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Diagnóstico: </span>
+                          {c.diagnostico}{c.cie10 ? ` (${c.cie10.descripcion})` : ""}
+                        </p>
+                      )}
+                      {c.tratamiento && (
+                        <p className="text-sm whitespace-pre-wrap"><span className="text-muted-foreground">Tratamiento: </span>{c.tratamiento}</p>
+                      )}
+                      {c.medico && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Atendió: Dr(a). {c.medico.apellidos}, {c.medico.nombres}{hora ? ` (${hora} hs)` : ""}
+                        </p>
                       )}
                     </div>
-                    {c.motivo_consulta && (
-                      <p className="text-sm mt-1"><span className="text-muted-foreground">Motivo: </span>{c.motivo_consulta}</p>
-                    )}
-                    {c.examen_fisico && (
-                      <p className="text-sm"><span className="text-muted-foreground">Examen: </span>{c.examen_fisico}</p>
-                    )}
-                    {c.diagnostico && (
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Diagnóstico: </span>
-                        {c.diagnostico}{c.cie10 ? ` (${c.cie10.descripcion})` : ""}
-                      </p>
-                    )}
-                    {c.tratamiento && (
-                      <p className="text-sm whitespace-pre-wrap"><span className="text-muted-foreground">Tratamiento: </span>{c.tratamiento}</p>
-                    )}
-                    {c.medico && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Atendió: Dr(a). {c.medico.apellidos}, {c.medico.nombres}
-                      </p>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </TabsContent>
 

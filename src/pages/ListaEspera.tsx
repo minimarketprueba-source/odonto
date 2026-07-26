@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { ClipboardList, Plus, Search, Megaphone, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeText } from "@/lib/utils";
+import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePacientes, type Paciente } from "@/api/pacientes";
@@ -62,11 +62,10 @@ export default function ListaEspera() {
   }), [registros, estadoSel]);
 
   const sugerencias = useMemo(() => {
-    const q = normalizeText(busqueda.trim());
-    if (q.length < 2) return [];
+    if (!busqueda.trim() || busqueda.trim().length < 2) return [];
     return pacientes
       .filter((p) => p.activo)
-      .filter((p) => normalizeText(`${p.nombres} ${p.apellidos}`).includes(q) || normalizeText(p.documento || "").includes(q))
+      .filter((p) => matchPaciente(p, busqueda))
       .slice(0, 6);
   }, [pacientes, busqueda]);
 

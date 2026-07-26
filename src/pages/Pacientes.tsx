@@ -11,7 +11,7 @@ import {
   Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeText } from "@/lib/utils";
+import { matchPaciente } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
@@ -19,13 +19,29 @@ import { HistoriaClinicaDialog } from "@/components/consultas/historia-clinica-d
 import {
   TIPOS_PACIENTE, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
+import { useUltimasAtenciones } from "@/api/consultas";
 
 const POR_PAGINA = 12;
+
+const FILTROS_ATENCION = [
+  { value: "todos", label: "Con o sin atención" },
+  { value: "semana", label: "Atendidos: última semana" },
+  { value: "mes", label: "Atendidos: último mes" },
+  { value: "alguna_vez", label: "Atendidos: alguna vez" },
+] as const;
+
+type FiltroAtencion = (typeof FILTROS_ATENCION)[number]["value"];
 
 function fmtFecha(f: string | null): string {
   if (!f) return "—";
   const [y, m, d] = f.split("-");
   return `${d}/${m}/${y}`;
+}
+
+function fechaHaceDias(dias: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function Pacientes() {
@@ -39,6 +55,7 @@ export default function Pacientes() {
   const [busqueda, setBusqueda] = useState("");
   const [tipoSel, setTipoSel] = useState("todos");
   const [estadoSel, setEstadoSel] = useState<"activos" | "inactivos" | "todos">("activos");
+  const [atencionSel, setAtencionSel] = useState<FiltroAtencion>("todos");
   const [pagina, setPagina] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [seleccionado, setSeleccionado] = useState<Paciente | null>(null);
@@ -47,20 +64,30 @@ export default function Pacientes() {
 
   const busquedaDebounced = useDebounce(busqueda, 300);
 
+  // Última consulta de cada paciente; se carga solo si el filtro lo necesita.
+  const { data: ultimasAtenciones = {} } = useUltimasAtenciones(atencionSel !== "todos");
+
   const filtrados = useMemo(() => {
-    const q = normalizeText(busquedaDebounced.trim());
-    return pacientes.filter((p) => {
+    const corte =
+      atencionSel === "semana" ? fechaHaceDias(7) :
+      atencionSel === "mes" ? fechaHaceDias(30) : null;
+    const lista = pacientes.filter((p) => {
       if (estadoSel === "activos" && !p.activo) return false;
       if (estadoSel === "inactivos" && p.activo) return false;
       if (tipoSel !== "todos" && p.tipo !== tipoSel) return false;
-      if (!q) return true;
-      return (
-        normalizeText(`${p.nombres} ${p.apellidos}`).includes(q) ||
-        normalizeText(p.documento || "").includes(q) ||
-        normalizeText(p.unidad || "").includes(q)
-      );
+      if (atencionSel !== "todos") {
+        const ultima = ultimasAtenciones[p.id];
+        if (!ultima) return false;
+        if (corte && ultima < corte) return false;
+      }
+      return matchPaciente(p, busquedaDebounced);
     });
-  }, [pacientes, busquedaDebounced, tipoSel, estadoSel]);
+    // Con filtro de atención activo, los atendidos más recientemente van primero.
+    if (atencionSel !== "todos") {
+      lista.sort((a, b) => (ultimasAtenciones[b.id] || "").localeCompare(ultimasAtenciones[a.id] || ""));
+    }
+    return lista;
+  }, [pacientes, busquedaDebounced, tipoSel, estadoSel, atencionSel, ultimasAtenciones]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
@@ -127,6 +154,14 @@ export default function Pacientes() {
               <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={atencionSel} onValueChange={(v) => { setAtencionSel(v as FiltroAtencion); setPagina(1); }}>
+            <SelectTrigger className="sm:w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FILTROS_ATENCION.map((f) => (
+                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (
@@ -151,6 +186,11 @@ export default function Pacientes() {
                     <Badge variant="outline">{tipoLabel(p.tipo)}</Badge>
                     {p.sexo && <Badge variant="outline">{p.sexo === "F" ? "Femenino" : "Masculino"}</Badge>}
                     {!p.activo && <Badge variant="destructive">Inactivo</Badge>}
+                    {atencionSel !== "todos" && ultimasAtenciones[p.id] && (
+                      <Badge className="bg-green-100 text-green-700 border-0 dark:bg-green-900/40 dark:text-green-200">
+                        Atendido: {fmtFecha(ultimasAtenciones[p.id])}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {[p.promocion && `Curso: ${p.promocion}`, p.unidad && `Sección: ${p.unidad}`, p.fecha_nacimiento && `Nac.: ${fmtFecha(p.fecha_nacimiento)}`]

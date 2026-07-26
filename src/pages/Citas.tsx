@@ -8,7 +8,7 @@ import {
   Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeText } from "@/lib/utils";
+import { matchTexto } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/context/auth-context";
 import { CitaForm } from "@/components/citas/cita-form";
@@ -54,11 +54,9 @@ function rangoDelMes(mes: string): { desde: string; hasta: string } {
 }
 
 function coincideBusqueda(cita: Cita, q: string): boolean {
-  if (!q) return true;
-  const texto = normalizeText(
-    `${cita.paciente?.nombres || ""} ${cita.paciente?.apellidos || ""} ${cita.paciente?.documento || ""} ${cita.medico?.nombres || ""} ${cita.medico?.apellidos || ""} ${cita.medico?.especialidad?.nombre || ""}`
-  );
-  return texto.includes(q);
+  if (!q || !q.trim()) return true;
+  const texto = `${cita.paciente?.apellidos || ""} ${cita.paciente?.nombres || ""} ${cita.paciente?.apellidos || ""}, ${cita.paciente?.nombres || ""} ${cita.paciente?.documento || ""} ${cita.medico?.nombres || ""} ${cita.medico?.apellidos || ""} ${cita.medico?.especialidad?.nombre || ""}`;
+  return matchTexto(texto, q);
 }
 
 export default function Citas() {
@@ -86,11 +84,10 @@ export default function Citas() {
   const cambiarEstado = useCambiarEstadoCita();
   const admitir = useAdmitirCita();
 
-  const q = normalizeText(busqueda.trim());
   const filtrar = (lista: Cita[]) => {
     let r = lista;
     if (soloMias && miMedico) r = r.filter((c) => c.medico_id === miMedico.id);
-    return r.filter((c) => coincideBusqueda(c, q));
+    return r.filter((c) => coincideBusqueda(c, busqueda));
   };
 
   const citas = filtrar(citasDelDia);

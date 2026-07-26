@@ -29,6 +29,7 @@ export interface Consulta {
   reposo_desde: string | null;      // yyyy-mm-dd (por defecto la fecha de la consulta)
   reposo_hasta: string | null;      // yyyy-mm-dd inclusive; null = hasta nueva orden
   created_at?: string;
+  cita?: { id: number; hora: string } | null;
   medico?: {
     id: number;
     nombres: string;
@@ -60,7 +61,7 @@ export interface CreateConsultaInput {
 }
 
 const CONSULTA_SELECT =
-  "*, medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color)), cie10:cie10(id, codigo, descripcion)";
+  "*, medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color)), cie10:cie10(id, codigo, descripcion), cita:citas(id, hora)";
 
 export async function fetchConsultasPaciente(pacienteId: number): Promise<Consulta[]> {
   const { data, error } = await supabase
@@ -120,6 +121,29 @@ export function useConsultasPaciente(pacienteId: number | null) {
     queryKey: queryKeys.consultas.porPaciente(pacienteId ?? 0),
     queryFn: () => fetchConsultasPaciente(pacienteId!),
     enabled: !!pacienteId,
+  });
+}
+
+/** Última fecha de consulta de cada paciente (para el filtro «atendidos» del padrón). */
+export async function fetchUltimasAtenciones(): Promise<Record<number, string>> {
+  const { data, error } = await supabase
+    .from("consultas")
+    .select("paciente_id, fecha")
+    .order("fecha", { ascending: false })
+    .limit(10000);
+  if (error) throw new Error(`Error al cargar las atenciones: ${error.message}`);
+  const ultimas: Record<number, string> = {};
+  for (const c of (data || []) as { paciente_id: number; fecha: string }[]) {
+    if (!ultimas[c.paciente_id]) ultimas[c.paciente_id] = c.fecha; // viene ordenado: la primera es la más reciente
+  }
+  return ultimas;
+}
+
+export function useUltimasAtenciones(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.consultas.atenciones(),
+    queryFn: fetchUltimasAtenciones,
+    enabled,
   });
 }
 

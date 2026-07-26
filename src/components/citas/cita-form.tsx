@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeText } from "@/lib/utils";
+import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { usePacientes, type Paciente } from "@/api/pacientes";
@@ -50,14 +50,10 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   }, [open, fechaInicial]);
 
   const sugerencias = useMemo(() => {
-    const q = normalizeText(busquedaPaciente.trim());
-    if (!q || q.length < 2) return [];
+    if (!busquedaPaciente.trim() || busquedaPaciente.trim().length < 2) return [];
     return pacientes
       .filter((p) => p.activo)
-      .filter((p) =>
-        normalizeText(`${p.nombres} ${p.apellidos}`).includes(q) ||
-        normalizeText(p.documento || "").includes(q)
-      )
+      .filter((p) => matchPaciente(p, busquedaPaciente))
       .slice(0, 6);
   }, [pacientes, busquedaPaciente]);
 
