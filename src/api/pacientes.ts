@@ -17,15 +17,21 @@ export const CLINICA_ID = 1;
 
 export const TIPOS_PACIENTE = [
   { value: "cadete", label: "Cadete" },
+  { value: "oficial", label: "Oficial" },
+  { value: "suboficial", label: "Suboficial" },
+  { value: "funcionario", label: "Funcionario / Personal Administrativo" },
+  { value: "medico", label: "Médico / Personal de Sanidad" },
   { value: "policia", label: "Policía" },
   { value: "familiar", label: "Familiar" },
   { value: "civil", label: "Civil" },
 ] as const;
 
-/** Tipos que ya no se ofrecen pero pueden existir en fichas viejas. */
+/** Tipos que pueden existir en fichas legacy o personalizadas. */
 const TIPOS_PACIENTE_LEGACY: Record<string, string> = {
   oficial: "Oficial",
   suboficial: "Suboficial",
+  funcionario: "Funcionario",
+  medico: "Médico",
   personal: "Personal",
 };
 

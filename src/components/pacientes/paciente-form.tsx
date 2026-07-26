@@ -33,10 +33,10 @@ interface PacienteFormProps {
   busquedaInicial?: string;
 }
 
-/** Etiqueta de "Unidad" según el tipo: no es lo mismo la sección de un cadete que la comisaría de un policía. */
 function etiquetaUnidad(tipo: string): string {
-  if (tipo === "policia") return "Dependencia / Comisaría";
-  if (tipo === "cadete") return "Sección";
+  if (tipo === "policia" || tipo === "oficial" || tipo === "suboficial") return "Dependencia / Comisaría / Unidad";
+  if (tipo === "cadete") return "Sección / Batallón";
+  if (tipo === "funcionario" || tipo === "medico") return "Departamento / Sección / Sanidad";
   return "Unidad / Sección";
 }
 
