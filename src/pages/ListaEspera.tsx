@@ -188,7 +188,7 @@ export default function ListaEspera() {
               <Label htmlFor="le-paciente">Paciente *</Label>
               {paciente ? (
                 <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
-                  <span className="text-sm">{paciente.apellidos}, {paciente.nombres} · CI {paciente.documento}</span>
+                  <span className="text-sm">{paciente.apellidos}, {paciente.nombres} · CI {paciente.documento || "sin cédula"}</span>
                   <Button variant="ghost" size="sm" onClick={() => setPaciente(null)}>Cambiar</Button>
                 </div>
               ) : (

@@ -14,7 +14,7 @@ import { Plus, Stethoscope, FileText, Printer, ShieldAlert } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions";
 import { useConsultasPaciente, type Consulta } from "@/api/consultas";
 import { useRecetasPaciente } from "@/api/recetas";
-import type { Paciente } from "@/api/pacientes";
+import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
 import { imprimirCertificadoReposo, imprimirHistoriaClinicaHTML } from "@/lib/imprimir";
@@ -58,9 +58,21 @@ function cleanQrText(text: string): string {
     .replace(/Ñ/g, "N");
 }
 
+/** Identificador del paciente para los documentos oficiales.
+ *  Un familiar puede no tener cédula propia: se usa su nº de ficha. */
+function idPaciente(p: Paciente): string {
+  return p.documento?.trim() || `P${p.id}`;
+}
+
+/** Cédula tal como se muestra en un impreso. */
+function ciImpresa(p: Paciente): string {
+  return p.documento?.trim() || "sin cédula";
+}
+
 function getQrPayload(c: Consulta | null, paciente: Paciente | null, tipo: "consulta" | "reposo" | "todas"): string {
   if (!paciente) return "";
   const inst = "SANIDAD POLICIAL - ACADEMIA NACIONAL DE POLICIA";
+  const idPac = idPaciente(paciente);
 
   let raw = "";
 
@@ -68,32 +80,32 @@ function getQrPayload(c: Consulta | null, paciente: Paciente | null, tipo: "cons
     raw = [
       inst,
       `DOCUMENTO: CERTIFICADO DE REPOSO MEDICO`,
-      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${paciente.documento})`,
+      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${ciImpresa(paciente)})`,
       `Tipo Reposo: ${c.reposo_tipo === "domiciliario" ? "DOMICILIARIO" : "ENFERMO LOCAL"}`,
       `Desde: ${fmtFecha(c.fecha)} Hasta: ${c.reposo_hasta ? fmtFecha(c.reposo_hasta) : "Nueva orden"}`,
       `Dx CIE-10: ${c.cie10?.codigo || "N/A"} - ${c.cie10?.descripcion || c.diagnostico || ""}`,
       `Medico: Dr(a). ${c.medico?.apellidos || ""}, ${c.medico?.nombres || ""}`,
-      `ID Verificacion: REP-${paciente.documento}-${c.id}`,
+      `ID Verificacion: REP-${idPac}-${c.id}`,
     ].join("\n");
   } else if (tipo === "consulta" && c) {
     raw = [
       inst,
       `DOCUMENTO: INFORME DE CONSULTA MEDICA`,
-      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${paciente.documento})`,
+      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${ciImpresa(paciente)})`,
       `Fecha: ${fmtFecha(c.fecha)}`,
       `Especialidad: ${c.medico?.especialidad?.nombre || "Consulta"}`,
       `Dx CIE-10: ${c.cie10?.codigo || "N/A"} - ${c.diagnostico || ""}`,
       `Medico: Dr(a). ${c.medico?.apellidos || ""}, ${c.medico?.nombres || ""}`,
-      `ID Verificacion: CON-${paciente.documento}-${c.id}`,
+      `ID Verificacion: CON-${idPac}-${c.id}`,
     ].join("\n");
   } else {
     raw = [
       inst,
       `DOCUMENTO: HISTORIA CLINICA GENERAL`,
-      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${paciente.documento})`,
-      `Tipo/Unidad: ${paciente.tipo} - ${paciente.unidad || "ANP"}`,
+      `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${ciImpresa(paciente)})`,
+      `Tipo: ${labelTipoPaciente(paciente.tipo)}${paciente.unidad ? ` - ${paciente.unidad}` : ""}`,
       `Emision: ${new Date().toLocaleDateString("es-PY")}`,
-      `ID Verificacion: HC-${paciente.documento}`,
+      `ID Verificacion: HC-${idPac}`,
     ].join("\n");
   }
 
@@ -380,11 +392,16 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
             <div className="bg-gray-50 p-3 rounded border border-gray-300 mb-5 text-sm grid grid-cols-2 gap-2">
               <div>
                 <p><strong>Paciente:</strong> {paciente.apellidos}, {paciente.nombres}</p>
-                <p><strong>Cédula de Identidad (CI):</strong> {paciente.documento}</p>
+                <p><strong>Cédula de Identidad (CI):</strong> {ciImpresa(paciente)}</p>
               </div>
               <div>
-                <p><strong>Tipo / Grado:</strong> {paciente.tipo} {paciente.grado ? `— ${paciente.grado}` : ""}</p>
-                <p><strong>Unidad / Sección:</strong> {paciente.unidad || "—"} {paciente.promocion ? `(Curso ${paciente.promocion})` : ""}</p>
+                <p><strong>Tipo / Grado:</strong> {labelTipoPaciente(paciente.tipo)} {paciente.grado ? `— ${paciente.grado}` : ""}</p>
+                {paciente.unidad && (
+                  <p><strong>Unidad / Sección:</strong> {paciente.unidad} {paciente.promocion ? `(Curso ${paciente.promocion})` : ""}</p>
+                )}
+                {paciente.familiar_de && (
+                  <p><strong>Familiar de:</strong> {paciente.familiar_de}</p>
+                )}
               </div>
             </div>
 
@@ -392,7 +409,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
             {printTarget.type === "reposo" ? (
               <div className="border-2 border-red-600 p-5 rounded space-y-4 text-sm bg-white">
                 <div className="flex justify-between font-bold border-b border-red-300 pb-2 text-base text-red-900">
-                  <span>REF: {printTarget.consulta.reposo_tipo === "domiciliario" ? "REP-DOM" : "ENF-LOC"}-{paciente.documento}-{printTarget.consulta.id}</span>
+                  <span>REF: {printTarget.consulta.reposo_tipo === "domiciliario" ? "REP-DOM" : "ENF-LOC"}-{idPaciente(paciente)}-{printTarget.consulta.id}</span>
                   <span>FECHA EMISIÓN: {fmtFecha(printTarget.consulta.fecha)}</span>
                 </div>
 
@@ -406,8 +423,8 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                     </p>
                     <p className="text-xs text-red-800 mt-1 font-medium">
                       {printTarget.consulta.reposo_tipo === "domiciliario"
-                        ? "El cadete debe cumplir reposo en su domicilio particular eximido de toda actividad."
-                        : "El cadete permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
+                        ? "El/la paciente debe cumplir reposo en su domicilio particular eximido de toda actividad."
+                        : "El/la paciente permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
                     </p>
                   </div>
 
@@ -457,7 +474,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                     <div className="text-xs space-y-0.5">
                       <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL QR</p>
                       <p className="text-gray-600">Sanidad ANP — Documento Oficial</p>
-                      <p className="font-mono text-[10px] text-gray-500">ID: REP-{paciente.documento}-{printTarget.consulta.id}</p>
+                      <p className="font-mono text-[10px] text-gray-500">ID: REP-{idPaciente(paciente)}-{printTarget.consulta.id}</p>
                       <p className="text-[10px] text-gray-400">Escanee para verificar autenticidad</p>
                     </div>
                   </div>
@@ -504,7 +521,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                     </div>
                     <div className="text-xs">
                       <p className="font-bold">VERIFICACIÓN DE FICHA CLÍNICA</p>
-                      <p className="text-gray-600 font-mono text-[10px]">HC-{paciente.documento}</p>
+                      <p className="text-gray-600 font-mono text-[10px]">HC-{idPaciente(paciente)}</p>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500">Sanidad ANP — Todos los derechos reservados</p>
@@ -565,7 +582,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                     </div>
                     <div className="text-xs">
                       <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL</p>
-                      <p className="font-mono text-[10px] text-gray-500">CON-{paciente.documento}-{printTarget.consulta.id}</p>
+                      <p className="font-mono text-[10px] text-gray-500">CON-{idPaciente(paciente)}-{printTarget.consulta.id}</p>
                     </div>
                   </div>
 

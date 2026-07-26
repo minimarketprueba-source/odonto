@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Loader2, Search } from "lucide-react";
+import { AlertTriangle, Loader2, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente, matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
-import { usePacientes, type Paciente } from "@/api/pacientes";
+import { usePermissions } from "@/hooks/use-permissions";
+import { PacienteForm } from "@/components/pacientes/paciente-form";
+import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import { useMedicosActivos, useCreateCita, fechaHoyISO } from "@/api/citas";
 import { useAusencias, useHorarios, evaluarDisponibilidad } from "@/api/horarios";
 
@@ -23,6 +25,9 @@ interface CitaFormProps {
 
 export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
+  const puedeCrearPaciente = hasPermission("pacientes", "editar");
+  const [altaPacienteOpen, setAltaPacienteOpen] = useState(false);
   const { data: pacientes = [] } = usePacientes();
   const { data: medicos = [] } = useMedicosActivos();
   const { data: horarios = [] } = useHorarios();
@@ -98,6 +103,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -112,7 +118,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
               <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
                 <span className="text-sm">
                   {paciente.apellidos}, {paciente.nombres}
-                  <span className="text-muted-foreground"> · CI {paciente.documento}</span>
+                  <span className="text-muted-foreground"> · CI {paciente.documento || "sin cédula"}</span>
                 </span>
                 <Button variant="ghost" size="sm" onClick={() => setPaciente(null)}>Cambiar</Button>
               </div>
@@ -138,9 +144,24 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                         onClick={() => setPaciente(p)}
                       >
                         {p.apellidos}, {p.nombres}
-                        <span className="text-muted-foreground"> · CI {p.documento}</span>
+                        <span className="text-muted-foreground">
+                          {" "}· CI {p.documento || "sin cédula"} · {labelTipoPaciente(p.tipo)}
+                        </span>
                       </button>
                     ))}
+                  </div>
+                )}
+                {busquedaPaciente.trim().length >= 2 && sugerencias.length === 0 && (
+                  <div className="rounded-md border border-dashed p-3 text-center space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      No hay ningún paciente con «{busquedaPaciente.trim()}».
+                    </p>
+                    {puedeCrearPaciente && (
+                      <Button variant="outline" size="sm" className="gap-1.5"
+                        onClick={() => setAltaPacienteOpen(true)}>
+                        <UserPlus className="w-4 h-4" /> Registrar paciente nuevo
+                      </Button>
+                    )}
                   </div>
                 )}
               </>
@@ -255,5 +276,14 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Alta rápida cuando el paciente todavía no está en el padrón. */}
+    <PacienteForm
+      open={altaPacienteOpen}
+      onOpenChange={setAltaPacienteOpen}
+      busquedaInicial={busquedaPaciente}
+      onCreated={(nuevo) => { setPaciente(nuevo); setBusquedaPaciente(""); }}
+    />
+    </>
   );
 }

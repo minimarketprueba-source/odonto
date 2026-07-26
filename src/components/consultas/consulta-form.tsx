@@ -56,13 +56,13 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   const [diagnostico, setDiagnostico] = useState("");
   const [tratamiento, setTratamiento] = useState("");
   const [cieBusqueda, setCieBusqueda] = useState("");
-  const [cieSel, setCieSel] = useState<Cie10 | null>(null);
+  const [cieLista, setCieLista] = useState<Cie10[]>([]);
   const [reposoTipo, setReposoTipo] = useState<"none" | ReposoTipo>("none");
   const [reposoHasta, setReposoHasta] = useState("");
   const [reposoDias, setReposoDias] = useState("");
 
   const cieDebounced = useDebounce(cieBusqueda, 300);
-  const { data: cieOpciones = [] } = useSearchCie10(cieSel ? "" : cieDebounced);
+  const { data: cieOpciones = [] } = useSearchCie10(cieDebounced);
 
   useEffect(() => {
     if (open) {
@@ -75,7 +75,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       setDiagnostico("");
       setTratamiento("");
       setCieBusqueda("");
-      setCieSel(null);
+      setCieLista([]);
       setReposoTipo("none");
       setReposoHasta("");
       setReposoDias("");
@@ -98,18 +98,22 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   const handleGuardar = async (opts?: { eImprimirReposo?: boolean }) => {
     if (!pacienteId) return;
     if (!medicoId) { toast.error("Selecciona el médico que atendió."); return; }
-    if (!diagnostico.trim() && !motivo.trim()) {
-      toast.error("Registra al menos el motivo o el diagnóstico.");
+    if (cieLista.length === 0 && !diagnostico.trim() && !motivo.trim()) {
+      toast.error("Registra al menos un diagnóstico CIE-10, motivo o descripción.");
       return;
     }
-    if (!cieSel) {
-      toast.error("Selecciona el diagnóstico CIE-10 (es obligatorio para guardar).");
+    if (cieLista.length === 0) {
+      toast.error("Selecciona al menos un diagnóstico CIE-10 (es obligatorio).");
       return;
     }
     if (reposoTipo !== "none" && reposoHasta && reposoHasta < fecha) {
       toast.error("La fecha 'hasta' del reposo no puede ser anterior a la consulta.");
       return;
     }
+
+    const cieTexto = cieLista.map((c) => `[${c.codigo}] ${c.descripcion}`).join(" / ");
+    const diagFinal = diagnostico.trim() ? `${cieTexto} — ${diagnostico.trim()}` : cieTexto;
+
     try {
       const res = await crear.mutateAsync({
         paciente_id: pacienteId,
@@ -118,8 +122,8 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
         fecha,
         motivo_consulta: sanitizePlainText(motivo) || null,
         examen_fisico: sanitizePlainText(examen) || null,
-        cie10_id: cieSel?.id ?? null,
-        diagnostico: sanitizePlainText(diagnostico) || null,
+        cie10_id: cieLista[0]?.id ?? null,
+        diagnostico: sanitizePlainText(diagFinal) || null,
         tratamiento: sanitizePlainText(tratamiento) || null,
         reposo_tipo: reposoTipo === "none" ? null : reposoTipo,
         reposo_desde: reposoTipo === "none" ? null : fecha,
@@ -134,7 +138,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
               `DOCUMENTO: ${reposoTipo === "domiciliario" ? "CERTIFICADO DE REPOSO DOMICILIARIO" : "CONSTANCIA DE ENFERMO LOCAL"}`,
               `Paciente: ${pacienteNombre}`,
               `Desde: ${fecha.split("-").reverse().join("/")} Hasta: ${reposoHasta ? reposoHasta.split("-").reverse().join("/") : "Nueva orden"}`,
-              `Dx: ${cieSel?.codigo || ""} ${cieSel?.descripcion || ""}`,
+              `Dx: ${cieLista.map((c) => c.codigo).join(", ")}`,
               `Medico: Dr(a). ${medicoSeleccionado?.apellidos || ""} ${medicoSeleccionado?.nombres || ""}`,
             ].join("\n"))}
             size={105}
@@ -148,8 +152,8 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           tipoReposo: reposoTipo as "domiciliario" | "local",
           fechaDesde: fecha.split("-").reverse().join("/"),
           fechaHasta: reposoHasta ? reposoHasta.split("-").reverse().join("/") : null,
-          cieCodigo: cieSel?.codigo,
-          cieDescripcion: cieSel?.descripcion,
+          cieCodigo: cieLista.map((c) => c.codigo).join(", "),
+          cieDescripcion: cieLista.map((c) => `${c.codigo}: ${c.descripcion}`).join(" | "),
           diagnosticoDetalle: diagnostico,
           tratamiento,
           medicoNombre: medicoSeleccionado ? `Dr(a). ${medicoSeleccionado.apellidos}, ${medicoSeleccionado.nombres}` : "Profesional Médico",
@@ -288,48 +292,80 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
               </div>
             </div>
 
-            {/* Fila 3: CIE-10 y Diagnóstico texto libre */}
+            {/* Fila 3: CIE-10 (Múltiples diagnósticos) y Diagnóstico texto libre */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5 relative">
-                <Label htmlFor="co-cie" className="font-semibold text-sm">Diagnóstico CIE-10 *</Label>
-                {cieSel ? (
-                  <div className="flex items-center justify-between gap-2 p-2.5 rounded-md border bg-muted/30">
-                    <span className="text-sm">
-                      <Badge variant="outline" className="mr-2 font-mono font-semibold">{cieSel.codigo}</Badge>
-                      {cieSel.descripcion}
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={() => setCieSel(null)}>Quitar</Button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="co-cie"
-                        className="pl-9 h-10"
-                        placeholder="Buscar por código o descripción..."
-                        value={cieBusqueda}
-                        onChange={(e) => setCieBusqueda(e.target.value)}
-                      />
-                    </div>
-                    {cieOpciones.length > 0 && (
-                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-44 overflow-y-auto divide-y">
-                        {cieOpciones.map((c) => (
+              <div className="space-y-2 relative">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="co-cie" className="font-semibold text-sm">Diagnósticos CIE-10 *</Label>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {cieLista.length} seleccionado{cieLista.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="co-cie"
+                    className="pl-9 h-10"
+                    placeholder="Buscar y seleccionar diagnósticos (ej. Caries, Necrosis)..."
+                    value={cieBusqueda}
+                    onChange={(e) => setCieBusqueda(e.target.value)}
+                  />
+                  {cieOpciones.length > 0 && cieBusqueda.trim() && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-52 overflow-y-auto divide-y">
+                      {cieOpciones.map((c) => {
+                        const yaSeleccionado = cieLista.some((item) => item.id === c.id);
+                        return (
                           <button
                             key={c.id}
                             type="button"
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                            onClick={() => setCieSel(c)}
+                            className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 ${
+                              yaSeleccionado ? "bg-blue-50 text-blue-900 font-semibold dark:bg-blue-950 dark:text-blue-100" : "hover:bg-accent"
+                            }`}
+                            onClick={() => {
+                              if (!yaSeleccionado) {
+                                setCieLista((prev) => [...prev, c]);
+                              }
+                              setCieBusqueda("");
+                            }}
                           >
-                            <span className="font-mono font-semibold mr-2">{c.codigo}</span>
-                            {c.descripcion}
+                            <span>
+                              <span className="font-mono font-bold mr-2 text-blue-700 dark:text-blue-400">{c.codigo}</span>
+                              {c.descripcion}
+                            </span>
+                            {yaSeleccionado && <span className="text-xs text-blue-600 font-bold">✓ Agregado</span>}
                           </button>
-                        ))}
-                      </div>
-                    )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Lista de Diagnósticos CIE-10 Seleccionados */}
+                {cieLista.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {cieLista.map((c) => (
+                      <Badge
+                        key={c.id}
+                        variant="outline"
+                        className="px-2.5 py-1 text-xs bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 flex items-center gap-1.5 shadow-xs"
+                      >
+                        <span className="font-mono font-bold text-blue-950 dark:text-blue-100">{c.codigo}</span>
+                        <span className="max-w-[220px] truncate">{c.descripcion}</span>
+                        <button
+                          type="button"
+                          className="ml-1 text-blue-600 hover:text-red-600 font-bold hover:bg-blue-100 dark:hover:bg-blue-900 rounded px-1 text-xs"
+                          onClick={() => setCieLista((prev) => prev.filter((item) => item.id !== c.id))}
+                          title="Quitar este diagnóstico"
+                        >
+                          ✕
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
                 )}
               </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="co-diagnostico" className="font-semibold text-sm">Diagnóstico (observaciones / detalle)</Label>
                 <Input

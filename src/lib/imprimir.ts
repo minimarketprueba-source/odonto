@@ -66,8 +66,8 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
         </p>
         <p style="margin:4px 0 0 0; font-size:11px; color:#991b1b;">
           ${esDom
-            ? "El cadete debe cumplir reposo en su domicilio particular eximido de toda actividad."
-            : "El cadete permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
+            ? "El/la paciente debe cumplir reposo en su domicilio particular eximido de toda actividad."
+            : "El/la paciente permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
         </p>
       </div>
 

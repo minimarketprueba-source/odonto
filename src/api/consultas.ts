@@ -99,7 +99,7 @@ export async function searchCie10(q: string): Promise<Cie10[]> {
     .select("id, codigo, descripcion")
     .eq("activo", true)
     .order("codigo")
-    .limit(15);
+    .limit(35);
   if (palabras.length <= 1) {
     query = query.or(`codigo.ilike.%${palabras[0] ?? q}%,descripcion.ilike.%${palabras[0] ?? q}%`);
   } else {
