@@ -65,10 +65,10 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-            Sistema de Gestión Antropométrica
+            Sección Sanidad
           </CardTitle>
           <CardDescription className="text-muted-foreground font-medium">
-            Ingresa a tu cuenta para gestionar datos antropométricos
+            Academia Nacional de Policía — Sistema de citas médicas
           </CardDescription>
         </CardHeader>
         <CardContent>

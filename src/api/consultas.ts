@@ -124,16 +124,35 @@ export function useConsultasPaciente(pacienteId: number | null) {
   });
 }
 
-/** Última fecha de consulta de cada paciente (para el filtro «atendidos» del padrón). */
-export async function fetchUltimasAtenciones(): Promise<Record<number, string>> {
+export interface AtencionRegistro {
+  paciente_id: number;
+  fecha: string;
+}
+
+/** Todas las atenciones (paciente + fecha), para estadísticas y filtros. */
+export async function fetchAtenciones(): Promise<AtencionRegistro[]> {
   const { data, error } = await supabase
     .from("consultas")
     .select("paciente_id, fecha")
     .order("fecha", { ascending: false })
     .limit(10000);
   if (error) throw new Error(`Error al cargar las atenciones: ${error.message}`);
+  return (data || []) as AtencionRegistro[];
+}
+
+export function useAtenciones(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.consultas.registros(),
+    queryFn: fetchAtenciones,
+    enabled,
+  });
+}
+
+/** Última fecha de consulta de cada paciente (para el filtro «atendidos» del padrón). */
+export async function fetchUltimasAtenciones(): Promise<Record<number, string>> {
+  const registros = await fetchAtenciones();
   const ultimas: Record<number, string> = {};
-  for (const c of (data || []) as { paciente_id: number; fecha: string }[]) {
+  for (const c of registros) {
     if (!ultimas[c.paciente_id]) ultimas[c.paciente_id] = c.fecha; // viene ordenado: la primera es la más reciente
   }
   return ultimas;

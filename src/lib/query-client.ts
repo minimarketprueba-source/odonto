@@ -92,6 +92,7 @@ export const queryKeys = {
     all: ['consultas'] as const,
     porPaciente: (pacienteId: number) => [...queryKeys.consultas.all, 'paciente', pacienteId] as const,
     atenciones: () => [...queryKeys.consultas.all, 'atenciones'] as const,
+    registros: () => [...queryKeys.consultas.all, 'registros'] as const,
   },
   // Catálogo CIE-10
   cie10: {

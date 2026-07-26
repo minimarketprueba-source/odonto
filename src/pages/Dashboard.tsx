@@ -6,12 +6,25 @@ import { CalendarDays, Users, Stethoscope, HeartPulse, ClipboardCheck } from "lu
 import { useAuth } from "@/context/auth-context"
 import { usePacientes } from "@/api/pacientes"
 import { useCitasDelDia, useMiMedico, fechaHoyISO } from "@/api/citas"
+import { useAtenciones } from "@/api/consultas"
+
+function pacientesDistintos(regs: { paciente_id: number; fecha: string }[], desde?: string): number {
+  const ids = new Set<number>()
+  for (const r of regs) {
+    if (!desde || r.fecha >= desde) ids.add(r.paciente_id)
+  }
+  return ids.size
+}
 
 export default function Dashboard() {
   const { user } = useAuth()
   const { data: pacientes = [] } = usePacientes()
   const { data: citasHoy = [] } = useCitasDelDia(fechaHoyISO())
   const { data: miMedico } = useMiMedico(user?.id)
+  const { data: atenciones = [] } = useAtenciones()
+
+  const hoy = fechaHoyISO()
+  const inicioMes = `${hoy.slice(0, 7)}-01`
 
   const misCitasHoy = miMedico ? citasHoy.filter((c) => c.medico_id === miMedico.id) : []
   const misEnEspera = misCitasHoy
@@ -21,10 +34,12 @@ export default function Dashboard() {
   const misAtendidas = misCitasHoy.filter((c) => c.estado === "atendida")
 
   const stats = [
-    { valor: pacientes.filter((p) => p.activo).length, etiqueta: "pacientes activos" },
-    { valor: citasHoy.length, etiqueta: "citas hoy" },
-    { valor: citasHoy.filter((c) => c.estado === "pendiente" || c.estado === "confirmada" || c.estado === "admitida").length, etiqueta: "por atender hoy" },
-    { valor: citasHoy.filter((c) => c.estado === "atendida").length, etiqueta: "atendidas hoy" },
+    { valor: pacientes.filter((p) => p.activo).length, etiqueta: "pacientes activos", href: "/pacientes" },
+    { valor: citasHoy.length, etiqueta: "citas hoy", href: "/citas" },
+    { valor: citasHoy.filter((c) => c.estado === "pendiente" || c.estado === "confirmada" || c.estado === "admitida").length, etiqueta: "por atender hoy", href: "/citas" },
+    { valor: pacientesDistintos(atenciones, hoy), etiqueta: "atendidos hoy", href: "/pacientes?atencion=hoy" },
+    { valor: pacientesDistintos(atenciones, inicioMes), etiqueta: "atendidos este mes", href: "/pacientes?atencion=mes" },
+    { valor: pacientesDistintos(atenciones), etiqueta: "atendidos hasta la fecha", href: "/pacientes?atencion=alguna_vez" },
   ]
 
   const modulos = [
@@ -95,17 +110,17 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <HeartPulse className="w-6 h-6 text-primary" />
-              Sanidad ISEPOL — Citas Médicas
+              Sección Sanidad — Academia Nacional de Policía
             </CardTitle>
             <CardDescription>Sesión iniciada como {user?.email ?? "—"}.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {stats.map((s) => (
-                <div key={s.etiqueta} className="p-3 rounded-lg border bg-muted/30 text-center">
+                <Link key={s.etiqueta} to={s.href} className="block p-3 rounded-lg border bg-muted/30 text-center hover:border-primary/60 transition-colors">
                   <div className="text-2xl font-bold">{s.valor}</div>
                   <div className="text-xs text-muted-foreground">{s.etiqueta}</div>
-                </div>
+                </Link>
               ))}
             </div>
           </CardContent>

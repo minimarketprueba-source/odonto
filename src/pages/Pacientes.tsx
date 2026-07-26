@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const POR_PAGINA = 12;
 
 const FILTROS_ATENCION = [
   { value: "todos", label: "Con o sin atención" },
+  { value: "hoy", label: "Atendidos: hoy" },
   { value: "semana", label: "Atendidos: última semana" },
   { value: "mes", label: "Atendidos: último mes" },
   { value: "alguna_vez", label: "Atendidos: alguna vez" },
@@ -55,7 +57,12 @@ export default function Pacientes() {
   const [busqueda, setBusqueda] = useState("");
   const [tipoSel, setTipoSel] = useState("todos");
   const [estadoSel, setEstadoSel] = useState<"activos" | "inactivos" | "todos">("activos");
-  const [atencionSel, setAtencionSel] = useState<FiltroAtencion>("todos");
+  // El filtro de atención puede venir preseleccionado desde el Dashboard (?atencion=hoy|mes|...)
+  const [searchParams] = useSearchParams();
+  const [atencionSel, setAtencionSel] = useState<FiltroAtencion>(() => {
+    const p = searchParams.get("atencion");
+    return FILTROS_ATENCION.some((f) => f.value === p) ? (p as FiltroAtencion) : "todos";
+  });
   const [pagina, setPagina] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [seleccionado, setSeleccionado] = useState<Paciente | null>(null);
@@ -69,6 +76,7 @@ export default function Pacientes() {
 
   const filtrados = useMemo(() => {
     const corte =
+      atencionSel === "hoy" ? fechaHaceDias(0) :
       atencionSel === "semana" ? fechaHaceDias(7) :
       atencionSel === "mes" ? fechaHaceDias(30) : null;
     const lista = pacientes.filter((p) => {
