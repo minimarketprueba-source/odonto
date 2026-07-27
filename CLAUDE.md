@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Pendientes (lo que sigue)
 
-0. **EJECUTAR**: `Escritorio\Actualizar_Base_Pacientes.txt` en el SQL Editor (columna `familiar_de` + índice único `pacientes_documento_unico`). Verificación esperada: 1 | 1 | 0. Hasta entonces, el campo "Familiar de" da error PGRST204 al guardar (el resto del alta funciona: el payload omite la columna si va vacía).
+0. (Migración de pacientes externos EJECUTADA y verificada end-to-end el 2026-07-26: columna `familiar_de` ✓, índice único `pacientes_documento_unico` ✓ — la BD devuelve 409 ante cédula repetida —, alta de familiar y de policía probadas en producción con cuenta de médica ✓.)
 
 0. Ideas PY HIS aún no hechas (decidir con el usuario): PDF de consulta/historial, estudios solicitados, procedimientos con historial, preconsulta (signos vitales), historial de medicamentos prescriptos. (Migración de agenda EJECUTADA y verificada end-to-end el 2026-07-20: cita+admisión+no_acudio+horarios probados en producción con cuenta de enfermería.)
 
