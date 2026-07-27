@@ -10,21 +10,27 @@ import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
 
+// `label` es lo que se ve en la lista desplegable (corto, para que no estire el
+// formulario); `oficial` es el nombre completo que sale impreso en el documento.
 export const DESTINOS_SALVOCONDUCTO = [
-  { value: "hospital_policia", label: 'Hospital de Policía "Rigoberto Caballero"' },
-  { value: "estudios", label: "Estudios médicos / laboratorio" },
-  { value: "otro", label: "Otro destino" },
+  {
+    value: "hospital_policia",
+    label: "Hospital de Policía",
+    oficial: 'Hospital de Policía "Rigoberto Caballero"',
+  },
+  { value: "estudios", label: "Estudios médicos", oficial: "Estudios médicos / laboratorio" },
+  { value: "otro", label: "Otro destino", oficial: "Otro destino" },
 ] as const;
 
 export type DestinoSalvoconducto = (typeof DESTINOS_SALVOCONDUCTO)[number]["value"];
 
 /** Texto del destino tal como sale impreso en el documento. */
 export function labelDestino(destino: string, detalle?: string | null): string {
-  if (destino === "otro" || destino === "estudios") {
-    const base = DESTINOS_SALVOCONDUCTO.find((d) => d.value === destino)?.label ?? destino;
-    return detalle?.trim() ? (destino === "otro" ? detalle : `${base} — ${detalle}`) : base;
-  }
-  return DESTINOS_SALVOCONDUCTO.find((d) => d.value === destino)?.label ?? destino;
+  const d = DESTINOS_SALVOCONDUCTO.find((x) => x.value === destino);
+  const base = d?.oficial ?? destino;
+  if (destino === "otro") return detalle?.trim() || base;
+  if (destino === "estudios" && detalle?.trim()) return `${base} — ${detalle.trim()}`;
+  return base;
 }
 
 export interface Salvoconducto {

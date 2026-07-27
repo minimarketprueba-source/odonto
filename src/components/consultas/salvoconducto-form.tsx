@@ -186,7 +186,7 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
             <div className="space-y-1">
               <Label htmlFor="sc-destino">Destino *</Label>
               <Select value={destino} onValueChange={setDestino}>
-                <SelectTrigger id="sc-destino"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="sc-destino" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {DESTINOS_SALVOCONDUCTO.map((d) => (
                     <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
@@ -197,7 +197,7 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
             <div className="space-y-1">
               <Label htmlFor="sc-medico">Profesional tratante *</Label>
               <Select value={medicoId} onValueChange={setMedicoId}>
-                <SelectTrigger id="sc-medico"><SelectValue placeholder="Seleccione" /></SelectTrigger>
+                <SelectTrigger id="sc-medico" className="w-full"><SelectValue placeholder="Seleccione" /></SelectTrigger>
                 <SelectContent>
                   {medicos.map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
