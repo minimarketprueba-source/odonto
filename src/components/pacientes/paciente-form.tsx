@@ -34,7 +34,10 @@ interface PacienteFormProps {
 }
 
 function etiquetaUnidad(tipo: string): string {
-  if (tipo === "policia" || tipo === "oficial" || tipo === "suboficial") return "Dependencia / Comisaría / Unidad";
+  // En el personal de la Academia este campo guarda el cargo de la lista de
+  // revista; en un policía de afuera, la dependencia de la que viene.
+  if (tipo === "oficial" || tipo === "suboficial") return "Cargo o función en la Academia";
+  if (tipo === "policia") return "Dependencia / Comisaría / Unidad";
   if (tipo === "cadete") return "Sección / Batallón";
   if (tipo === "funcionario" || tipo === "medico") return "Departamento / Sección / Sanidad";
   return "Unidad / Sección";
