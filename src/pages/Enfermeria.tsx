@@ -25,7 +25,7 @@ import { matchPaciente } from "@/lib/utils";
 import { usePacientes, labelTipoPaciente } from "@/api/pacientes";
 import { useSearchCie10, type Cie10 } from "@/api/consultas";
 import {
-  useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama,
+  useSalas, useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama,
   useRegistrarSignosVitales, useEgresarPacienteCama, type Cama, type Internacion,
 } from "@/api/enfermeria";
 import { imprimirHojaEnfermeria, cleanQrText } from "@/lib/imprimir";
@@ -33,6 +33,7 @@ import { useAuth } from "@/context/auth-context";
 
 export default function Enfermeria() {
   const { user } = useAuth();
+  const { data: salas = [] } = useSalas();
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: ingresos = [] } = useEnfermeriaIngresos();
   const { data: pacientes = [] } = usePacientes();
@@ -102,8 +103,8 @@ export default function Enfermeria() {
 
   // Contadores
   const totalCamas = camas.length;
-  const ocupadas = camas.filter((c) => c.estado === "ocupada").length;
-  const disponibles = camas.filter((c) => c.estado === "disponible").length;
+  const ocupadas = camas.filter((c) => mapaIngresos.has(c.id)).length;
+  const disponibles = totalCamas - ocupadas;
   const pctOcupacion = totalCamas > 0 ? Math.round((ocupadas / totalCamas) * 100) : 0;
 
   // Filtrado de camas por sala y búsqueda
@@ -398,26 +399,23 @@ export default function Enfermeria() {
         <Card className="border shadow-xs">
           <CardContent className="p-4 space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              {/* Tabs por Sala */}
-              <Tabs value={salaFiltro} onValueChange={setSalaFiltro} className="w-full md:w-auto">
-                <TabsList className="flex flex-wrap h-auto p-1 bg-muted/60">
-                  <TabsTrigger value="todas" className="text-xs font-semibold px-3 py-1.5">
-                    Todas las Salas ({totalCamas})
-                  </TabsTrigger>
-                  <TabsTrigger value="1" className="text-xs font-semibold px-3 py-1.5">
-                    Sala 1 (Masc)
-                  </TabsTrigger>
-                  <TabsTrigger value="2" className="text-xs font-semibold px-3 py-1.5">
-                    Sala 2 (Fem)
-                  </TabsTrigger>
-                  <TabsTrigger value="3" className="text-xs font-semibold px-3 py-1.5">
-                    Sala 3 (Aislamiento)
-                  </TabsTrigger>
-                  <TabsTrigger value="4" className="text-xs font-semibold px-3 py-1.5">
-                    Pavellón Internación
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              {/* Salas reales, tomadas de la base: hoy la Sanidad tiene una sola
+                  sala de observación, así que el filtro se muestra únicamente
+                  si algún día se agrega otra. */}
+              {salas.length > 1 && (
+                <Tabs value={salaFiltro} onValueChange={setSalaFiltro} className="w-full md:w-auto">
+                  <TabsList className="flex flex-wrap h-auto p-1 bg-muted/60">
+                    <TabsTrigger value="todas" className="text-xs font-semibold px-3 py-1.5">
+                      Todas ({totalCamas})
+                    </TabsTrigger>
+                    {salas.map((s) => (
+                      <TabsTrigger key={s.id} value={String(s.id)} className="text-xs font-semibold px-3 py-1.5">
+                        {s.nombre}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
 
               {/* Input Búsqueda */}
               <div className="relative w-full md:w-72">
@@ -438,7 +436,7 @@ export default function Enfermeria() {
           {camasFiltradas.map((cama) => {
             const ing = mapaIngresos.get(cama.id);
             const paciente = ing?.paciente;
-            const esOcupada = cama.estado === "ocupada" && ing;
+            const esOcupada = !!ing;
 
             return (
               <Card
@@ -623,7 +621,7 @@ export default function Enfermeria() {
                   </SelectTrigger>
                   <SelectContent>
                     {camas
-                      .filter((c) => c.estado === "disponible" || String(c.id) === camaId)
+                      .filter((c) => !mapaIngresos.has(c.id) || String(c.id) === camaId)
                       .map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>
                           {c.codigo} — {c.sala_nombre} (Libre)
