@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarOff, Clock, Plus, Trash2 } from "lucide-react";
+import { CalendarOff, Clock, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { matchTexto } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useMedicosActivos, useMiMedico } from "@/api/citas";
@@ -32,6 +33,7 @@ export default function Horarios() {
   const quitarAusencia = useDeleteAusencia();
 
   const [medicoId, setMedicoId] = useState("");
+  const [busquedaMedico, setBusquedaMedico] = useState("");
   const [dia, setDia] = useState("1");
   const [desdeHora, setDesdeHora] = useState("07:00");
   const [hastaHora, setHastaHora] = useState("13:00");
@@ -45,6 +47,17 @@ export default function Horarios() {
   }, [miMedico, medicoId]);
 
   const idSel = Number(medicoId) || null;
+  const medicoSeleccionado = useMemo(
+    () => medicos.find((m) => String(m.id) === medicoId) || null,
+    [medicos, medicoId]
+  );
+  // Busca por nombre, apellido o especialidad, en cualquier orden y sin tildes.
+  const medicosFiltrados = useMemo(() => {
+    if (!busquedaMedico.trim()) return medicos;
+    return medicos.filter((m) =>
+      matchTexto(`${m.apellidos} ${m.nombres} ${m.especialidad?.nombre || ""}`, busquedaMedico)
+    );
+  }, [medicos, busquedaMedico]);
   const horariosSel = useMemo(
     () => horarios.filter((h) => h.medico_id === idSel),
     [horarios, idSel]
@@ -108,18 +121,60 @@ export default function Horarios() {
           </p>
         </div>
 
-        <div className="space-y-1 max-w-md">
-          <Label>Profesional</Label>
-          <Select value={medicoId} onValueChange={setMedicoId}>
-            <SelectTrigger><SelectValue placeholder="Selecciona un profesional" /></SelectTrigger>
-            <SelectContent>
-              {medicos.map((m) => (
-                <SelectItem key={m.id} value={String(m.id)}>
-                  {m.apellidos}, {m.nombres}{m.especialidad ? ` — ${m.especialidad.nombre}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-1 max-w-lg">
+          <Label htmlFor="h-medico">Profesional</Label>
+          {medicoSeleccionado ? (
+            <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
+              <span className="text-sm font-medium truncate">
+                {medicoSeleccionado.apellidos}, {medicoSeleccionado.nombres}
+                {medicoSeleccionado.especialidad && (
+                  <span className="text-muted-foreground font-normal">
+                    {" "}— {medicoSeleccionado.especialidad.nombre}
+                  </span>
+                )}
+              </span>
+              <Button
+                variant="ghost" size="sm" className="h-7 text-xs flex-shrink-0"
+                onClick={() => { setMedicoId(""); setBusquedaMedico(""); }}
+              >
+                Cambiar
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="h-medico"
+                  className="pl-9"
+                  placeholder="Buscar por nombre, apellido o especialidad..."
+                  value={busquedaMedico}
+                  onChange={(e) => setBusquedaMedico(e.target.value)}
+                />
+              </div>
+              <div className="rounded-md border divide-y max-h-72 overflow-y-auto">
+                {medicosFiltrados.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">
+                    Ningún profesional coincide con «{busquedaMedico.trim()}».
+                  </p>
+                ) : (
+                  medicosFiltrados.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                      onClick={() => setMedicoId(String(m.id))}
+                    >
+                      {m.apellidos}, {m.nombres}
+                      {m.especialidad && (
+                        <span className="text-muted-foreground"> — {m.especialidad.nombre}</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {idSel && (
