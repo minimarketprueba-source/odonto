@@ -21,6 +21,7 @@ import {
   useCitasDelDia, useCitasRango, useMiMedico,
   type Cita, type EstadoCita,
 } from "@/api/citas";
+import { useAtenciones } from "@/api/consultas";
 
 const COLOR_ESTADO: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
@@ -53,6 +54,24 @@ function rangoDelMes(mes: string): { desde: string; hasta: string } {
   return { desde: `${mes}-01`, hasta: `${mes}-${String(ultimo).padStart(2, "0")}` };
 }
 
+function saludoPorHora(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Buenos días";
+  if (h < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+/** "2 pacientes" / "1 paciente" */
+function plural(n: number, singular: string, plural_: string): string {
+  return `${n} ${n === 1 ? singular : plural_}`;
+}
+
+/** ["a", "b", "c"] → "a, b y c" */
+function unirFrase(partes: string[]): string {
+  if (partes.length <= 1) return partes[0] ?? "";
+  return `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`;
+}
+
 function coincideBusqueda(cita: Cita, q: string): boolean {
   if (!q || !q.trim()) return true;
   const texto = `${cita.paciente?.apellidos || ""} ${cita.paciente?.nombres || ""} ${cita.paciente?.apellidos || ""}, ${cita.paciente?.nombres || ""} ${cita.paciente?.documento || ""} ${cita.medico?.nombres || ""} ${cita.medico?.apellidos || ""} ${cita.medico?.especialidad?.nombre || ""}`;
@@ -81,6 +100,7 @@ export default function Citas() {
     vista === "mes" ? hasta : ""
   );
   const { data: miMedico } = useMiMedico(user?.id);
+  const { data: atenciones = [] } = useAtenciones();
   const cambiarEstado = useCambiarEstadoCita();
   const admitir = useAdmitirCita();
 
@@ -118,6 +138,37 @@ export default function Citas() {
     ...e,
     total: citas.filter((c) => c.estado === e.value).length,
   }));
+
+  // --- Saludo de bienvenida con el resumen del día ---
+  // Si la cuenta tiene ficha de profesional, habla de SUS citas; si no
+  // (enfermería, administración), del total de la Sanidad.
+  const esHoy = fecha === fechaHoyISO();
+  const citasDeHoy = miMedico
+    ? citasDelDia.filter((c) => c.medico_id === miMedico.id)
+    : citasDelDia;
+  const hoyEnEspera = citasDeHoy.filter((c) => c.estado === "admitida").length;
+  const hoyPorLlegar = citasDeHoy.filter((c) => c.estado === "pendiente" || c.estado === "confirmada").length;
+  const hoyAtendidas = citasDeHoy.filter((c) => c.estado === "atendida").length;
+  const nombreSaludo = miMedico ? ` ${miMedico.nombres.split(" ")[0]}` : "";
+  const posesivo = miMedico ? "tiene" : "hay";
+
+  // Consultas registradas hoy: incluye las que se atendieron sin cita previa.
+  const consultasDeHoy = atenciones.filter(
+    (a) => a.fecha === fecha && (!miMedico || a.medico_id === miMedico.id)
+  ).length;
+
+  const detalleDia = unirFrase([
+    hoyEnEspera > 0 ? `${plural(hoyEnEspera, "paciente esperando", "pacientes esperando")}` : "",
+    hoyPorLlegar > 0 ? `${plural(hoyPorLlegar, "por llegar", "por llegar")}` : "",
+    hoyAtendidas > 0 ? `${plural(hoyAtendidas, "ya atendido", "ya atendidos")}` : "",
+  ].filter(Boolean));
+
+  const mensajeDia =
+    citasDeHoy.length === 0
+      ? `Hoy no ${posesivo} citas agendadas.`
+      : hoyEnEspera === 0 && hoyPorLlegar === 0
+        ? `Hoy ${posesivo} ${plural(citasDeHoy.length, "cita", "citas")}. ¡Ya está todo atendido!`
+        : `Hoy ${posesivo} ${plural(citasDeHoy.length, "cita", "citas")}: ${detalleDia}.`;
 
   const accionesCita = (c: Cita) => (
     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap no-print">
@@ -212,6 +263,27 @@ export default function Citas() {
   return (
     <AppLayout>
       <div className="space-y-4" id="agenda-imprimible">
+        {vista === "dia" && esHoy && (
+          <div className="no-print rounded-lg border bg-gradient-to-r from-primary/10 to-accent/10 px-4 py-3">
+            <p className="font-semibold">
+              {saludoPorHora()}{nombreSaludo} 👋
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {mensajeDia}
+              {consultasDeHoy > 0 && (
+                <span className="text-green-700 dark:text-green-300 font-medium">
+                  {" "}Ya {miMedico ? "atendió" : "se atendió"} a {plural(consultasDeHoy, "paciente", "pacientes")} hoy.
+                </span>
+              )}
+              {hoyEnEspera > 0 && (
+                <span className="text-cyan-700 dark:text-cyan-300 font-medium">
+                  {" "}Hay gente esperando en sala.
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold flex items-center gap-2">

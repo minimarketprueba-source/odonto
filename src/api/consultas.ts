@@ -127,13 +127,14 @@ export function useConsultasPaciente(pacienteId: number | null) {
 export interface AtencionRegistro {
   paciente_id: number;
   fecha: string;
+  medico_id: number;
 }
 
-/** Todas las atenciones (paciente + fecha), para estadísticas y filtros. */
+/** Todas las atenciones (paciente + fecha + profesional), para estadísticas y filtros. */
 export async function fetchAtenciones(): Promise<AtencionRegistro[]> {
   const { data, error } = await supabase
     .from("consultas")
-    .select("paciente_id, fecha")
+    .select("paciente_id, fecha, medico_id")
     .order("fecha", { ascending: false })
     .limit(10000);
   if (error) throw new Error(`Error al cargar las atenciones: ${error.message}`);
