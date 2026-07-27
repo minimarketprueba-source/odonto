@@ -482,6 +482,204 @@ export function imprimirHistoriaClinicaHTML(pacienteNombre: string, pacienteDoc:
   ejecutarImpresionIframe(tituloDoc, html);
 }
 
+export interface DatosImpresionFichaRac {
+  numero: string;
+  fecha: string;
+  edad: string;
+  sexo: string;
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  jerarquia?: string | null;
+  domicilio?: string | null;
+  barrioCompania?: string | null;
+  localidad?: string | null;
+  referenciaDomiciliaria?: string | null;
+  telefono?: string | null;
+  horaAdmision?: string | null;
+  horaEnfermeria?: string | null;
+  presionArterial?: string | null;
+  fc?: string | null;
+  fr?: string | null;
+  spo2?: string | null;
+  temp?: string | null;
+  motivoConsulta?: string | null;
+  discriminante?: string | null;
+  triajeLabel?: string | null;
+  triajeHex?: string | null;
+  enfermero?: string | null;
+  horaMedico?: string | null;
+  patologiaPrevia?: string | null;
+  alergias?: string | null;
+  examenFisico?: string | null;
+  laboratorio?: string | null;
+  radiologia?: string | null;
+  diagnostico?: string | null;
+  tratamiento?: string | null;
+  evolucion?: string | null;
+  plan?: string | null;
+  horaDestino?: string | null;
+  /** value del destino elegido; marca la casilla correspondiente. */
+  destino?: string | null;
+  destinoDias?: number | null;
+  profesionalNombre?: string | null;
+}
+
+/** Ficha de RAC (urgencias), con la misma disposición que la ficha en papel. */
+export function imprimirFichaRac(datos: DatosImpresionFichaRac) {
+  const vacio = "&nbsp;";
+  const v = (texto?: string | null) => (texto ? String(texto) : vacio);
+  // Reserva alto para lo escrito a mano cuando el campo viene vacío.
+  const campo = (etiqueta: string, texto?: string | null, alto = 0) => `
+    <div style="border-bottom:1px solid #94a3b8; padding:3px 4px; min-height:${alto || 18}px;">
+      <span style="font-size:9px; font-weight:700; color:#334155;">${etiqueta}</span>
+      <span style="font-size:11px; margin-left:6px;">${v(texto)}</span>
+    </div>`;
+  const seccion = (hora: string | null | undefined, titulo: string, cuerpo: string) => `
+    <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+      <tr>
+        <td style="width:58px; border:1px solid #000; text-align:center; vertical-align:top; padding:3px;">
+          <div style="font-size:8px; font-weight:700;">HORA</div>
+          <div style="font-size:12px; font-weight:700; margin-top:2px;">${hora || vacio}</div>
+        </td>
+        <td style="border:1px solid #000; padding:0;">
+          <div style="border-bottom:1px solid #000; padding:2px 5px; font-size:11px; font-weight:800;">${titulo}</div>
+          <div style="padding:4px 5px;">${cuerpo}</div>
+        </td>
+      </tr>
+    </table>`;
+
+  const casilla = (valor: string, etiqueta: string, pideDias: boolean) => {
+    const marcada = datos.destino === valor;
+    return `
+      <tr>
+        <td style="padding:3px 6px; font-size:11px; width:150px;">${etiqueta}</td>
+        <td style="padding:3px 6px;">
+          <span style="display:inline-block; width:34px; height:15px; border:1px solid #000;
+            text-align:center; font-weight:800; font-size:12px; line-height:15px;
+            background:${marcada ? "#000" : "#fff"}; color:${marcada ? "#fff" : "#000"};">${marcada ? "X" : ""}</span>
+        </td>
+        <td style="padding:3px 6px; font-size:11px;">
+          ${pideDias
+            ? `<span style="display:inline-block; min-width:44px; border-bottom:1px solid #000; text-align:center; font-weight:700;">${
+                marcada && datos.destinoDias ? datos.destinoDias : vacio
+              }</span> días`
+            : ""}
+        </td>
+      </tr>`;
+  };
+
+  const html = `
+    <div style="text-align:center; margin-bottom:8px;">
+      <div style="font-size:13px; font-weight:800;">INSTITUTO SUPERIOR DE EDUCACIÓN POLICIAL</div>
+      <div style="font-size:12px; font-weight:800;">DIRECCIÓN DE GRADO</div>
+      <div style="font-size:12px; font-weight:800;">ACADEMIA NACIONAL DE POLICÍA "GRAL. JOSÉ E. DÍAZ"</div>
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+      <tr>
+        <td style="border:1px solid #000; padding:3px 6px; font-size:12px; font-weight:800; width:150px;">
+          FICHA DE RAC
+        </td>
+        <td style="border:1px solid #000; padding:3px 6px; font-size:11px;">
+          N°: <strong>${datos.numero}</strong>
+        </td>
+        <td style="border:1px solid #000; padding:3px 6px; font-size:11px;">
+          FECHA: <strong>${datos.fecha}</strong>
+        </td>
+        <td style="border:1px solid #000; padding:3px 6px; font-size:11px;">
+          EDAD: <strong>${v(datos.edad)}</strong>
+        </td>
+        <td style="border:1px solid #000; padding:3px 6px; font-size:11px;">
+          SEXO: <strong>${v(datos.sexo)}</strong>
+        </td>
+      </tr>
+    </table>
+
+    ${seccion(datos.horaAdmision, "1. ADMISIÓN", `
+      <table style="width:100%; border-collapse:collapse;">
+        <tr>
+          <td style="width:62%; vertical-align:top;">
+            ${campo("Nombre y apellido:", datos.pacienteNombre)}
+            ${campo("Domicilio:", datos.domicilio)}
+            ${campo("Barrio o Compañía:", datos.barrioCompania)}
+            ${campo("Localidad:", datos.localidad)}
+            ${campo("Referencia Domiciliaria:", datos.referenciaDomiciliaria)}
+          </td>
+          <td style="width:38%; vertical-align:top; padding-left:8px;">
+            ${campo("N° C.I.:", datos.pacienteDocumento)}
+            ${campo("Jerarquía:", datos.jerarquia)}
+            ${campo("Tel./Cel.:", datos.telefono)}
+          </td>
+        </tr>
+      </table>`)}
+
+    ${seccion(datos.horaEnfermeria, "2. ENFERMERÍA", `
+      <table style="width:100%; border-collapse:collapse; margin-bottom:4px;">
+        <tr>
+          ${[
+            ["PA", datos.presionArterial],
+            ["FC", datos.fc],
+            ["FR", datos.fr],
+            ["SPO2", datos.spo2],
+            ["T° Axilar", datos.temp],
+          ].map(([et, val]) => `
+            <td style="border:1px solid #94a3b8; padding:3px 5px; font-size:10px;">
+              <strong>${et}</strong>
+              <span style="font-size:12px; margin-left:4px;">${v(val as string)}</span>
+            </td>`).join("")}
+        </tr>
+      </table>
+      <table style="width:100%; border-collapse:collapse;">
+        <tr>
+          <td style="width:64%; vertical-align:top;">
+            ${campo("Motivo de consulta:", datos.motivoConsulta, 26)}
+            ${campo("Discriminante:", datos.discriminante)}
+            ${campo("Firma y sello:", datos.enfermero)}
+          </td>
+          <td style="width:36%; vertical-align:middle; text-align:center; padding-left:8px;">
+            <div style="font-size:9px; font-weight:700; color:#334155;">CLASIFICACIÓN</div>
+            <div style="display:inline-block; margin-top:3px; padding:6px 14px; border:2px solid #000;
+              border-radius:4px; font-size:13px; font-weight:800; text-transform:uppercase;
+              background:${datos.triajeHex || "#fff"}; color:${datos.triajeHex ? "#fff" : "#000"};">
+              ${datos.triajeLabel || "SIN CLASIFICAR"}
+            </div>
+          </td>
+        </tr>
+      </table>`)}
+
+    ${seccion(datos.horaMedico, "3. MÉDICO", `
+      <table style="width:100%; border-collapse:collapse;">
+        <tr>
+          <td style="width:64%; vertical-align:top;">${campo("Patología Previa y Tratamiento Actual:", datos.patologiaPrevia, 26)}</td>
+          <td style="width:36%; vertical-align:top; padding-left:8px;">${campo("Alergias:", datos.alergias, 26)}</td>
+        </tr>
+      </table>
+      ${campo("Examen Físico:", datos.examenFisico, 26)}
+      ${campo("Laboratorio:", datos.laboratorio)}
+      ${campo("Radiología:", datos.radiologia)}
+      ${campo("Diagnóstico:", datos.diagnostico, 26)}
+      ${campo("TRATAMIENTO Suministro en Consultorio:", datos.tratamiento, 44)}
+      ${campo("Evolución:", datos.evolucion, 44)}
+      ${campo("Plan:", datos.plan, 30)}`)}
+
+    ${seccion(datos.horaDestino, "4. DESTINO / NOVEDAD", `
+      <table style="border-collapse:collapse;">
+        ${casilla("sin_servicio", "Parte Sin Servicio", true)}
+        ${casilla("enfermo_local", "Enfermo local", true)}
+        ${casilla("reposo_domiciliario", "Reposo Domiciliario", true)}
+        ${casilla("internacion", "Internación", true)}
+        ${casilla("alta", "Alta", false)}
+      </table>
+      <div style="margin-top:26px; text-align:center;">
+        <div style="width:260px; border-bottom:1px solid #000; margin:0 auto 3px auto;"></div>
+        <div style="font-size:11px; font-weight:700;">${v(datos.profesionalNombre)}</div>
+        <div style="font-size:9px; color:#475569;">NOMBRE, FIRMA Y SELLO DEL PROFESIONAL</div>
+      </div>`)}
+  `;
+
+  ejecutarImpresionIframe(`Ficha de RAC ${datos.numero}`, html);
+}
+
 function ejecutarImpresionIframe(titulo: string, bodyContent: string) {
   // Eliminar iframe previo si existe
   const idIframe = "anp-print-iframe";

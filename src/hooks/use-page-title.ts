@@ -9,6 +9,7 @@ export function usePageTitle() {
     "/pacientes": "Pacientes",
     "/citas": "Agenda de citas",
     "/horarios": "Horarios de atención",
+    "/rac": "Urgencias — Ficha de RAC",
     "/lista-espera": "Lista de espera",
     "/reportes": "Reportes",
     "/mantenimiento": "Mantenimiento",

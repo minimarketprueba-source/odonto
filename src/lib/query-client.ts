@@ -133,6 +133,12 @@ export const queryKeys = {
     porPaciente: (pacienteId: number) => [...queryKeys.salvoconductos.all, 'paciente', pacienteId] as const,
     porDia: (fecha: string) => [...queryKeys.salvoconductos.all, 'dia', fecha] as const,
   },
+  // Fichas de RAC (urgencias)
+  rac: {
+    all: ['rac'] as const,
+    rango: (desde: string, hasta: string) => [...queryKeys.rac.all, 'rango', desde, hasta] as const,
+    porPaciente: (pacienteId: number) => [...queryKeys.rac.all, 'paciente', pacienteId] as const,
+  },
   // Especialidades
   especialidades: {
     all: ['especialidades'] as const,
