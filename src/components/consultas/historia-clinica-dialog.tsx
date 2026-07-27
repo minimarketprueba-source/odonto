@@ -17,7 +17,7 @@ import { useRecetasPaciente } from "@/api/recetas";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
-import { imprimirCertificadoReposo, imprimirHistoriaClinicaHTML } from "@/lib/imprimir";
+import { imprimirCertificadoReposo, imprimirInformeConsulta, imprimirHistoriaClinicaHTML } from "@/lib/imprimir";
 
 interface HistoriaClinicaDialogProps {
   open: boolean;
@@ -152,6 +152,41 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
         cieDescripcion: c.cie10?.descripcion,
         diagnosticoDetalle: c.diagnostico,
         tratamiento: c.tratamiento,
+        medicoNombre: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : "Profesional Médico",
+        consultaId: c.id,
+        qrSvgHtml,
+      });
+    } else if (target.type === "consulta" && target.consulta) {
+      const c = target.consulta;
+      const qrSvgHtml = renderToStaticMarkup(
+        <QRCodeSVG
+          value={getQrPayload(c, paciente, "consulta")}
+          size={105}
+          level="M"
+        />
+      );
+
+      const hora = fmtHora(c.created_at, c.cita?.hora);
+      const reposoStr = c.reposo_tipo
+        ? `${c.reposo_tipo === "domiciliario" ? "Reposo Domiciliario" : "Enfermo Local"} desde ${fmtFecha(c.fecha)} ${c.reposo_hasta ? `hasta ${fmtFecha(c.reposo_hasta)}` : "hasta nueva orden"}`
+        : null;
+
+      imprimirInformeConsulta({
+        pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
+        pacienteDocumento: paciente.documento,
+        pacienteTipo: labelTipoPaciente(paciente.tipo),
+        pacienteGrado: paciente.grado,
+        pacienteUnidad: paciente.unidad || "ANP",
+        fechaConsulta: fmtFecha(c.fecha),
+        horaConsulta: hora,
+        especialidad: c.medico?.especialidad?.nombre || "Consulta General",
+        motivoConsulta: c.motivo_consulta,
+        examenFisico: c.examen_fisico,
+        cieCodigo: c.cie10?.codigo,
+        cieDescripcion: c.cie10?.descripcion,
+        diagnosticoDetalle: c.diagnostico,
+        tratamiento: c.tratamiento,
+        reposoOtorgado: reposoStr,
         medicoNombre: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : "Profesional Médico",
         consultaId: c.id,
         qrSvgHtml,

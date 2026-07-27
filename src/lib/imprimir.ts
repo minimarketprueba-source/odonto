@@ -21,6 +21,27 @@ export interface DatosImpresionReposo {
   qrSvgHtml?: string;
 }
 
+export interface DatosImpresionConsulta {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteTipo?: string | null;
+  pacienteGrado?: string | null;
+  pacienteUnidad?: string | null;
+  fechaConsulta: string;
+  horaConsulta?: string | null;
+  especialidad?: string | null;
+  motivoConsulta?: string | null;
+  examenFisico?: string | null;
+  cieCodigo?: string | null;
+  cieDescripcion?: string | null;
+  diagnosticoDetalle?: string | null;
+  tratamiento?: string | null;
+  reposoOtorgado?: string | null;
+  medicoNombre: string;
+  consultaId: number | string;
+  qrSvgHtml?: string;
+}
+
 export function cleanQrText(text: string): string {
   return text
     .normalize("NFD")
@@ -98,6 +119,99 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
           ${datos.tratamiento || "Se indica suspensión total de actividades físicas, instrucción y ejercicios durante el periodo indicado."}
         </p>
       </div>
+
+      <div class="footer-qr">
+        <div style="display:flex; align-items:center; gap: 12px;">
+          ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
+          <div style="font-size:10px; color:#475569;">
+            <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
+            <p style="margin:1px 0;">Sanidad ANP — Documento Oficial</p>
+            <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
+            <p style="margin:1px 0; color:#64748b;">Escanee para verificar validez</p>
+          </div>
+        </div>
+
+        <div class="firmas">
+          <div class="linea-firma"></div>
+          <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.medicoNombre}</p>
+          <p style="margin:0; font-size:10px; color:#64748b;">Firma y Sello del Profesional Médico</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
+export function imprimirInformeConsulta(datos: DatosImpresionConsulta) {
+  const tituloDoc = "INFORME DE CONSULTA MÉDICA";
+  const refCod = `CON-${datos.pacienteDocumento || "0"}-${datos.consultaId}`;
+
+  const html = `
+    <div class="header">
+      <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+      <p class="sub">Gral. José E. Díaz</p>
+      <h2>${tituloDoc}</h2>
+      <p class="meta">Emisión: ${new Date().toLocaleDateString("es-PY")} — ${new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs</p>
+    </div>
+
+    <div class="box-paciente">
+      <div>
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
+      </div>
+      <div>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${datos.pacienteTipo || "Cadete"} ${datos.pacienteGrado ? `— ${datos.pacienteGrado}` : ""}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+      </div>
+    </div>
+
+    <div class="box-reposo">
+      <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 12px; font-weight:bold; color: #1e293b;">
+        <span>REF: ${refCod}</span>
+        <span>FECHA CONSULTA: ${datos.fechaConsulta}${datos.horaConsulta ? ` (${datos.horaConsulta} hs)` : ""}</span>
+      </div>
+
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12px; font-weight:bold; color:#0f172a;">ESPECIALIDAD / SERVICIO:</span>
+        <span style="font-size:13px; font-weight:800; color:#1e40af; text-transform:uppercase;">${datos.especialidad || "CONSULTA GENERAL"}</span>
+      </div>
+
+      ${datos.motivoConsulta ? `
+        <div style="margin-bottom:14px; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+          <p style="margin:0 0 4px 0; font-weight:bold; color:#334155; font-size:11px; text-transform:uppercase;">MOTIVO DE CONSULTA:</p>
+          <p style="margin:0; font-size:12.5px; color:#0f172a;">${datos.motivoConsulta}</p>
+        </div>
+      ` : ""}
+
+      ${datos.examenFisico ? `
+        <div style="margin-bottom:14px; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+          <p style="margin:0 0 4px 0; font-weight:bold; color:#334155; font-size:11px; text-transform:uppercase;">EXAMEN FÍSICO / HALLAZGOS:</p>
+          <p style="margin:0; font-size:12.5px; color:#0f172a; white-space:pre-wrap;">${datos.examenFisico}</p>
+        </div>
+      ` : ""}
+
+      <div style="margin-bottom:14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px 12px;">
+        <p style="margin:0 0 4px 0; font-weight:bold; color:#1e40af; font-size:11px; text-transform:uppercase;">DIAGNÓSTICO MÉDICO (CIE-10):</p>
+        <p style="margin:0; font-size:13px; font-weight:600; color:#1e3a8a;">
+          ${datos.diagnosticoDetalle ? `${datos.diagnosticoDetalle} ` : ""}
+          ${datos.cieCodigo ? `[CIE-10: ${datos.cieCodigo} - ${datos.cieDescripcion || ""}]` : ""}
+        </p>
+      </div>
+
+      ${datos.tratamiento ? `
+        <div style="margin-bottom:14px; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+          <p style="margin:0 0 4px 0; font-weight:bold; color:#334155; font-size:11px; text-transform:uppercase;">TRATAMIENTO / INDICACIONES:</p>
+          <p style="margin:0; font-size:12.5px; color:#0f172a; white-space:pre-wrap;">${datos.tratamiento}</p>
+        </div>
+      ` : ""}
+
+      ${datos.reposoOtorgado ? `
+        <div style="margin-bottom:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:10px 12px;">
+          <p style="margin:0 0 2px 0; font-weight:bold; color:#991b1b; font-size:11px; text-transform:uppercase;">CONDICIÓN DE REPOSO OTORGADO:</p>
+          <p style="margin:0; font-size:12.5px; font-weight:bold; color:#b91c1c;">${datos.reposoOtorgado}</p>
+        </div>
+      ` : ""}
 
       <div class="footer-qr">
         <div style="display:flex; align-items:center; gap: 12px;">
@@ -227,7 +341,7 @@ function ejecutarImpresionIframe(titulo: string, bodyContent: string) {
             font-size: 12px;
           }
           .box-reposo {
-            border: 2px solid #dc2626;
+            border: 2px solid #0284c7;
             border-radius: 6px;
             padding: 14px;
             background-color: #fff;
