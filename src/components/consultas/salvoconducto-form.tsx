@@ -9,9 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Ambulance, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sanitizePlainText } from "@/lib/security";
@@ -185,27 +183,35 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="sc-destino">Destino *</Label>
-              <Select value={destino} onValueChange={setDestino}>
-                <SelectTrigger id="sc-destino" className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {DESTINOS_SALVOCONDUCTO.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                id="sc-destino"
+                value={destino}
+                onChange={setDestino}
+                buscarPlaceholder="Buscar destino..."
+                vacioTexto="No hay ningún destino con ese nombre."
+                opciones={DESTINOS_SALVOCONDUCTO.map((d) => ({
+                  value: d.value,
+                  label: d.label,
+                  // El nombre completo del impreso también sirve para buscar.
+                  buscarPor: d.oficial,
+                }))}
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="sc-medico">Profesional tratante *</Label>
-              <Select value={medicoId} onValueChange={setMedicoId}>
-                <SelectTrigger id="sc-medico" className="w-full"><SelectValue placeholder="Seleccione" /></SelectTrigger>
-                <SelectContent>
-                  {medicos.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.apellidos}, {m.nombres}{m.especialidad ? ` — ${m.especialidad.nombre}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                id="sc-medico"
+                value={medicoId}
+                onChange={setMedicoId}
+                placeholder="Seleccione"
+                buscarPlaceholder="Buscar por nombre o especialidad..."
+                vacioTexto="No hay ningún profesional con ese nombre."
+                opciones={medicos.map((m) => ({
+                  value: String(m.id),
+                  label: `${m.apellidos}, ${m.nombres}`,
+                  detalle: m.especialidad?.nombre ?? null,
+                }))}
+              />
             </div>
           </div>
 
