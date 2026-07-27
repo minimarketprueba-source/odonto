@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble } from "lucide-react";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useConsultasPaciente, type Consulta } from "@/api/consultas";
@@ -20,6 +20,7 @@ import {
 } from "@/api/anulaciones";
 import { AnularDialog } from "./anular-dialog";
 import { useInternacionesPaciente } from "@/api/enfermeria";
+import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } from "@/api/rac";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
@@ -134,6 +135,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const { data: consultas = [], isLoading } = useConsultasPaciente(open ? (paciente?.id ?? null) : null, isAdmin);
   const { data: recetas = [] } = useRecetasPaciente(open && veRecetas ? (paciente?.id ?? null) : null, isAdmin);
   const { data: internaciones = [] } = useInternacionesPaciente(open ? (paciente?.id ?? null) : null);
+  const { data: fichasRac = [] } = useFichasRacPaciente(open ? (paciente?.id ?? null) : null);
   const anularConsulta = useAnularConsulta();
   const anularReceta = useAnularReceta();
   const restaurarConsulta = useRestaurarConsulta();
@@ -375,6 +377,54 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {fichasRac.length > 0 && servicioFiltro === "todos" && (
+                <div className="rounded-lg border border-rose-300 dark:border-rose-800 overflow-hidden">
+                  <div className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 flex items-center gap-2">
+                    <Ambulance className="w-4 h-4 text-rose-700 dark:text-rose-300" />
+                    <span className="text-sm font-semibold text-rose-800 dark:text-rose-200">
+                      Atenciones de urgencia ({fichasRac.length})
+                    </span>
+                  </div>
+                  <div className="divide-y">
+                    {fichasRac.map((f) => {
+                      const nivel = nivelTriaje(f.triaje);
+                      const signos = [
+                        f.pa_sistolica && f.pa_diastolica && `PA ${f.pa_sistolica}/${f.pa_diastolica}`,
+                        f.fc && `FC ${f.fc}`,
+                        f.fr && `FR ${f.fr}`,
+                        f.spo2 && `SpO2 ${f.spo2}%`,
+                        f.temp && `T° ${f.temp}`,
+                      ].filter(Boolean).join(" · ");
+                      return (
+                        <div key={f.id} className="px-3 py-2 text-sm">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">
+                              {fmtFecha(f.fecha)} · {f.hora_admision?.slice(0, 5)} hs
+                            </span>
+                            <Badge variant="outline">{numeroRac(f.numero)}</Badge>
+                            {nivel && (
+                              <Badge className={`border ${nivel.clase}`}>{nivel.value.toUpperCase()}</Badge>
+                            )}
+                            {f.estado === "espera"
+                              ? <Badge variant="outline">En espera del médico</Badge>
+                              : f.destino && (
+                                  <Badge variant="outline">
+                                    {labelDestino(f.destino)}
+                                    {f.destino_dias ? ` · ${f.destino_dias} día${f.destino_dias === 1 ? "" : "s"}` : ""}
+                                  </Badge>
+                                )}
+                          </div>
+                          {f.motivo_consulta && (
+                            <p className="text-muted-foreground text-xs mt-0.5">{f.motivo_consulta}</p>
+                          )}
+                          {signos && <p className="text-muted-foreground text-xs">{signos}</p>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
