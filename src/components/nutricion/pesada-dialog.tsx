@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Scale, Activity, HeartPulse } from "lucide-react";
 import { useCrearPesada, CadeteNutricion, calcularDxICC } from "@/api/nutricion";
 import { calcularIMC, clasificarIMC } from "@/lib/utils/imc-utils";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 
 interface PesadaDialogProps {
   cadete: CadeteNutricion | null;
@@ -64,7 +64,7 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
     e.preventDefault();
     if (!cadete) return;
     if (!numPeso || numPeso <= 0) {
-      toast.error("Por favor ingrese un peso válido en kg");
+      await showSwalError("Por favor ingrese un peso válido en kg");
       return;
     }
 
@@ -82,10 +82,10 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
         observaciones: observaciones || undefined,
       });
 
-      toast.success(`Ficha antropométrica guardada para ${cadete.nombre} ${cadete.apellido}`);
       onOpenChange(false);
+      await showSwalSuccess(`Ficha antropométrica registrada correctamente para ${cadete.nombre} ${cadete.apellido}`);
     } catch (error: any) {
-      toast.error(error.message || "Error al registrar la pesada");
+      await showSwalError(error.message || "Error al registrar la pesada");
     }
   };
 

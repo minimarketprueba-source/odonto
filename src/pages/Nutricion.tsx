@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PesadaDialog } from "@/components/nutricion/pesada-dialog";
 import { useCadetesNutricion, CadeteNutricion } from "@/api/nutricion";
 import { getColorIMC } from "@/lib/utils/imc-utils";
-import { toast } from "sonner";
+import { showSwalInfo, showSwalError } from "@/lib/swal";
 import { imprimirFichaAntropometrica } from "@/lib/imprimir";
 import {
   Search,
@@ -95,7 +95,7 @@ export default function Nutricion() {
   };
 
   const handleExportar = (formato: string) => {
-    toast.info(`Generando exportación en formato ${formato}...`);
+    showSwalInfo(`Generando exportación en formato ${formato}...`);
   };
 
   return (
@@ -127,7 +127,7 @@ export default function Nutricion() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toast.info("Importación en desarrollo")}
+              onClick={() => showSwalInfo("Importación en desarrollo")}
               className="gap-1 sm:gap-2 text-xs sm:text-sm"
             >
               <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -137,7 +137,7 @@ export default function Nutricion() {
 
             <Button
               size="sm"
-              onClick={() => toast.info("Para agregar cadetes, vaya a la sección de Pacientes")}
+              onClick={() => showSwalInfo("Para agregar cadetes, vaya a la sección de Pacientes")}
               className="gap-1 sm:gap-2 text-xs sm:text-sm"
             >
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -465,7 +465,7 @@ export default function Nutricion() {
                         size="icon"
                         className="h-8 w-8"
                         title="Editar cadete"
-                        onClick={() => toast.info("Edición de cadete en sección Pacientes")}
+                        onClick={() => showSwalInfo("La edición de fichas se realiza en la sección Pacientes")}
                       >
                         <SquarePen className="w-4 h-4" />
                       </Button>
@@ -475,7 +475,7 @@ export default function Nutricion() {
                         size="icon"
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                         title="Eliminar cadete"
-                        onClick={() => toast.error("Solo un administrador puede eliminar fichas")}
+                        onClick={() => showSwalError("Solo un administrador puede eliminar fichas de cadetes")}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
