@@ -16,6 +16,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { imprimirFichaRac } from "@/lib/imprimir";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
+import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { useMedicosActivos, fechaHoyISO } from "@/api/citas";
 import { useSearchCie10, type Cie10 } from "@/api/consultas";
 import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
@@ -598,19 +599,11 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="rac-medico" className="text-xs font-semibold">Médico tratante *</Label>
-                    <Combobox
+                    <MedicoSelector
                       id="rac-medico"
                       value={medicoId}
                       onChange={setMedicoId}
                       disabled={soloLectura}
-                      placeholder="Elija el profesional"
-                      buscarPlaceholder="Buscar por nombre o especialidad..."
-                      vacioTexto="No hay ningún profesional con ese nombre."
-                      opciones={medicos.map((m) => ({
-                        value: String(m.id),
-                        label: `${m.apellidos}, ${m.nombres}`,
-                        detalle: m.especialidad?.nombre ?? null,
-                      }))}
                     />
                   </div>
                 </div>

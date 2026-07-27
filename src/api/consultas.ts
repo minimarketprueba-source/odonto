@@ -13,6 +13,55 @@ import { cambiarEstadoCita } from "./citas";
 
 export type ReposoTipo = "local" | "domiciliario";
 
+/** Conducta con la que termina la atención (la misma lista del papel de RAC). */
+export type DestinoAtencion =
+  | "alta"
+  | "sin_servicio"
+  | "enfermo_local"
+  | "reposo_domiciliario"
+  | "internacion";
+
+/**
+ * Destinos posibles y qué reposo genera cada uno.
+ *
+ * "Parte sin servicio" también exime de la educación física (decisión del
+ * 2026-07-27): la Sanidad lo usa para el que no está para formar ni hacer
+ * ejercicio, aunque siga en la unidad. Por eso va como reposo local.
+ */
+export const DESTINOS_ATENCION: {
+  value: DestinoAtencion;
+  label: string;
+  /** Si pide cantidad de días. `alta` no pide. */
+  pideDias: boolean;
+  /** Reposo que se guarda en la consulta (null = ninguno). */
+  reposo: ReposoTipo | null;
+}[] = [
+  { value: "alta", label: "Alta", pideDias: false, reposo: null },
+  { value: "sin_servicio", label: "Parte sin servicio", pideDias: true, reposo: "local" },
+  { value: "enfermo_local", label: "Enfermo local", pideDias: true, reposo: "local" },
+  { value: "reposo_domiciliario", label: "Reposo domiciliario", pideDias: true, reposo: "domiciliario" },
+  { value: "internacion", label: "Internación", pideDias: true, reposo: "local" },
+];
+
+export function destinoAtencion(destino?: string | null) {
+  return DESTINOS_ATENCION.find((d) => d.value === destino) ?? null;
+}
+
+/**
+ * Cómo mostrar la conducta de una consulta. Las consultas anteriores a la
+ * columna `destino` no la tienen: para esas se deduce del reposo.
+ */
+export function labelDestinoAtencion(
+  destino?: string | null,
+  reposoTipo?: ReposoTipo | null
+): string {
+  const d = destinoAtencion(destino);
+  if (d) return d.label;
+  if (reposoTipo === "domiciliario") return "Reposo domiciliario";
+  if (reposoTipo === "local") return "Enfermo local";
+  return "Alta";
+}
+
 export interface Consulta {
   id: number;
   clinica_id: number;
@@ -25,6 +74,8 @@ export interface Consulta {
   cie10_id: number | null;
   diagnostico: string | null;
   tratamiento: string | null;
+  /** Conducta final. null en las consultas viejas, anteriores a la columna. */
+  destino: DestinoAtencion | null;
   reposo_tipo: ReposoTipo | null;   // null = sin reposo
   reposo_desde: string | null;      // yyyy-mm-dd (por defecto la fecha de la consulta)
   reposo_hasta: string | null;      // yyyy-mm-dd inclusive; null = hasta nueva orden
@@ -60,6 +111,7 @@ export interface CreateConsultaInput {
   cie10_id?: number | null;
   diagnostico?: string | null;
   tratamiento?: string | null;
+  destino?: DestinoAtencion | null;
   reposo_tipo?: ReposoTipo | null;
   reposo_desde?: string | null;
   reposo_hasta?: string | null;

@@ -10,6 +10,12 @@ export interface DatosImpresionReposo {
   pacienteGrado?: string | null;
   pacienteUnidad?: string | null;
   tipoReposo: "domiciliario" | "local";
+  /**
+   * Conducta exacta con la que se cierra la atención. Distingue el parte sin
+   * servicio del enfermo local, que en la base son los dos reposo "local".
+   * Si no viene, el documento se arma según `tipoReposo` (consultas viejas).
+   */
+  destino?: DestinoImpreso | null;
   fechaDesde: string;
   fechaHasta?: string | null;
   cieCodigo?: string | null;
@@ -50,10 +56,52 @@ export function cleanQrText(text: string): string {
     .replace(/Ñ/g, "N");
 }
 
+/** Título, código de referencia y texto de cada conducta que se imprime. */
+const DOCUMENTOS_REPOSO = {
+  reposo_domiciliario: {
+    titulo: "CERTIFICADO DE REPOSO DOMICILIARIO",
+    ref: "REP-DOM",
+    condicion: "REPOSO DOMICILIARIO (FUERA DE LA UNIDAD)",
+    detalle: "El/la paciente debe cumplir reposo en su domicilio particular eximido de toda actividad.",
+  },
+  enfermo_local: {
+    titulo: "CONSTANCIA DE ENFERMO LOCAL",
+    ref: "ENF-LOC",
+    condicion: "ENFERMO LOCAL (DENTRO DE LA UNIDAD)",
+    detalle: "El/la paciente permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos.",
+  },
+  sin_servicio: {
+    titulo: "PARTE SIN SERVICIO",
+    ref: "SIN-SERV",
+    condicion: "SIN SERVICIO (DENTRO DE LA UNIDAD)",
+    detalle: "El/la paciente queda eximido del servicio, la guardia, la instrucción y los ejercicios físicos por el periodo indicado.",
+  },
+  internacion: {
+    titulo: "CONSTANCIA DE INTERNACIÓN",
+    ref: "INTERN",
+    condicion: "INTERNACIÓN EN SALA DE OBSERVACIÓN",
+    detalle: "El/la paciente queda internado en la sala de observación de la Sanidad, eximido de toda actividad.",
+  },
+} as const;
+
+export type DestinoImpreso = keyof typeof DOCUMENTOS_REPOSO;
+
+/**
+ * Textos del documento de cada conducta. Con `reposoTipo` como respaldo para
+ * las consultas viejas, anteriores a la columna `destino`.
+ */
+export function documentoReposo(
+  destino?: DestinoImpreso | null,
+  reposoTipo?: "domiciliario" | "local" | null
+) {
+  const clave = destino ?? (reposoTipo === "domiciliario" ? "reposo_domiciliario" : "enfermo_local");
+  return DOCUMENTOS_REPOSO[clave];
+}
+
 export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
-  const esDom = datos.tipoReposo === "domiciliario";
-  const tituloDoc = esDom ? "CERTIFICADO DE REPOSO DOMICILIARIO" : "CONSTANCIA DE ENFERMO LOCAL";
-  const refCod = `${esDom ? "REP-DOM" : "ENF-LOC"}-${datos.pacienteDocumento || "0"}-${datos.consultaId}`;
+  const doc = documentoReposo(datos.destino, datos.tipoReposo);
+  const tituloDoc = doc.titulo;
+  const refCod = `${doc.ref}-${datos.pacienteDocumento || "0"}-${datos.consultaId}`;
 
   const html = `
     <div class="header">
@@ -82,14 +130,8 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
 
       <div class="badge-reposo">
         <p style="margin:0; font-size:11px; font-weight:bold; color:#791616;">CONDICIÓN MÉDICA OTORGADA:</p>
-        <p class="tipo">
-          • ${esDom ? "REPOSO DOMICILIARIO (FUERA DE LA UNIDAD)" : "ENFERMO LOCAL (DENTRO DE LA UNIDAD)"}
-        </p>
-        <p style="margin:4px 0 0 0; font-size:11px; color:#991b1b;">
-          ${esDom
-            ? "El/la paciente debe cumplir reposo en su domicilio particular eximido de toda actividad."
-            : "El/la paciente permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
-        </p>
+        <p class="tipo">• ${doc.condicion}</p>
+        <p style="margin:4px 0 0 0; font-size:11px; color:#991b1b;">${doc.detalle}</p>
       </div>
 
       <div class="dates-grid">

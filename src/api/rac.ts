@@ -16,15 +16,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID, type Paciente } from "./pacientes";
-import { createConsulta, type ReposoTipo } from "./consultas";
+import {
+  createConsulta, DESTINOS_ATENCION, labelDestinoAtencion, type DestinoAtencion,
+} from "./consultas";
 
 export type NivelTriaje = "rojo" | "amarillo" | "verde" | "azul";
-export type DestinoRac =
-  | "alta"
-  | "sin_servicio"
-  | "enfermo_local"
-  | "reposo_domiciliario"
-  | "internacion";
+/** Los destinos son los mismos que los de una consulta común. */
+export type DestinoRac = DestinoAtencion;
 export type EstadoRac = "espera" | "atendida";
 
 /** Los 4 niveles del MSPBS, del más grave al menos grave. */
@@ -73,22 +71,10 @@ export function triaje(nivel?: string | null) {
 /** Orden de atención: primero el más grave, después el que llegó antes. */
 const PESO_TRIAJE: Record<string, number> = { rojo: 0, amarillo: 1, verde: 2, azul: 3 };
 
-export const DESTINOS_RAC: {
-  value: DestinoRac;
-  label: string;
-  pideDias: boolean;
-  /** Reposo que se registra en la consulta (null = ninguno). */
-  reposo: ReposoTipo | null;
-}[] = [
-  { value: "alta", label: "Alta", pideDias: false, reposo: null },
-  { value: "sin_servicio", label: "Parte sin servicio", pideDias: true, reposo: null },
-  { value: "enfermo_local", label: "Enfermo local", pideDias: true, reposo: "local" },
-  { value: "reposo_domiciliario", label: "Reposo domiciliario", pideDias: true, reposo: "domiciliario" },
-  { value: "internacion", label: "Internación", pideDias: true, reposo: "local" },
-];
+export const DESTINOS_RAC = DESTINOS_ATENCION;
 
 export function labelDestino(destino?: string | null): string {
-  return DESTINOS_RAC.find((d) => d.value === destino)?.label ?? "—";
+  return destino ? labelDestinoAtencion(destino) : "—";
 }
 
 export interface FichaRac {
@@ -314,6 +300,7 @@ export async function cerrarFichaRac(input: CerrarFichaRacInput): Promise<FichaR
     cie10_id: input.cie10_id ?? null,
     diagnostico: input.diagnostico ?? null,
     tratamiento: input.tratamiento ?? null,
+    destino: input.destino,
     reposo_tipo: conReposo ? destino!.reposo : null,
     reposo_desde: conReposo ? input.fecha : null,
     reposo_hasta: conReposo ? fechaHastaReposo(input.fecha, dias) : null,

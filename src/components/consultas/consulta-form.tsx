@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -12,14 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Printer, Search, ShieldAlert } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
+import { BedDouble, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAuth } from "@/context/auth-context";
+import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
-import { useCreateConsulta, useSearchCie10, type Cie10, type ReposoTipo } from "@/api/consultas";
-import { imprimirCertificadoReposo, cleanQrText } from "@/lib/imprimir";
+import {
+  DESTINOS_ATENCION, destinoAtencion, useCreateConsulta, useSearchCie10,
+  type Cie10, type DestinoAtencion,
+} from "@/api/consultas";
+import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
+import { imprimirCertificadoReposo, documentoReposo, cleanQrText } from "@/lib/imprimir";
 
 function sumarDiasISO(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T00:00:00`);
@@ -34,6 +40,15 @@ function diasEntre(desde: string, hasta: string): number {
   return Math.round((b - a) / 86400000) + 1;
 }
 
+function horaAhora(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function tituloDocumento(destino: DestinoAtencion): string {
+  return destino === "alta" ? "CONSTANCIA MÉDICA" : documentoReposo(destino).titulo;
+}
+
 interface ConsultaFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,12 +59,14 @@ interface ConsultaFormProps {
 }
 
 export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, cita }: ConsultaFormProps) {
+  const { user } = useAuth();
   const { data: medicos = [] } = useMedicosActivos();
+  const { data: camas = [] } = useEnfermeriaCamas();
+  const { data: internaciones = [] } = useEnfermeriaIngresos();
   const crear = useCreateConsulta();
+  const internar = useIngresarPacienteCama();
 
   const [medicoId, setMedicoId] = useState("");
-  const [busquedaMedico, setBusquedaMedico] = useState("");
-  const [mostrarListaMedicos, setMostrarListaMedicos] = useState(false);
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [motivo, setMotivo] = useState("");
   const [examen, setExamen] = useState("");
@@ -57,9 +74,13 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   const [tratamiento, setTratamiento] = useState("");
   const [cieBusqueda, setCieBusqueda] = useState("");
   const [cieLista, setCieLista] = useState<Cie10[]>([]);
-  const [reposoTipo, setReposoTipo] = useState<"none" | ReposoTipo>("none");
+  const [destino, setDestino] = useState<DestinoAtencion>("alta");
   const [reposoHasta, setReposoHasta] = useState("");
   const [reposoDias, setReposoDias] = useState("");
+  const [camaId, setCamaId] = useState("");
+
+  // Si la internación se creó y después falló la consulta, no se crea de nuevo.
+  const internacionCreada = useRef<number | null>(null);
 
   const cieDebounced = useDebounce(cieBusqueda, 300);
   const { data: cieOpciones = [] } = useSearchCie10(cieDebounced);
@@ -67,8 +88,6 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
   useEffect(() => {
     if (open) {
       setMedicoId(cita ? String(cita.medico_id) : "");
-      setBusquedaMedico("");
-      setMostrarListaMedicos(false);
       setFecha(cita?.fecha || fechaHoyISO());
       setMotivo(cita?.motivo || "");
       setExamen("");
@@ -76,24 +95,27 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       setTratamiento("");
       setCieBusqueda("");
       setCieLista([]);
-      setReposoTipo("none");
+      setDestino("alta");
       setReposoHasta("");
       setReposoDias("");
+      setCamaId("");
+      internacionCreada.current = null;
     }
   }, [open, cita]);
-
-  const medicosFiltrados = useMemo(() => {
-    if (!busquedaMedico.trim()) return medicos;
-    return medicos.filter((m) => {
-      const target = `${m.apellidos} ${m.nombres} ${m.especialidad?.nombre || ""}`;
-      return matchTexto(target, busquedaMedico);
-    });
-  }, [medicos, busquedaMedico]);
 
   const medicoSeleccionado = useMemo(
     () => medicos.find((m) => String(m.id) === medicoId) || null,
     [medicos, medicoId]
   );
+
+  const camasLibres = useMemo(() => {
+    const ocupadas = new Set(internaciones.map((i) => i.cama_id));
+    return camas.filter((c) => !c.fuera_de_servicio && !ocupadas.has(c.id));
+  }, [camas, internaciones]);
+
+  const destinoSel = destinoAtencion(destino);
+  const reposoTipo = destinoSel?.reposo ?? null;
+  const guardando = crear.isPending || internar.isPending;
 
   const handleGuardar = async (opts?: { eImprimirReposo?: boolean }) => {
     if (!pacienteId) return;
@@ -106,8 +128,12 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       toast.error("Selecciona al menos un diagnóstico CIE-10 (es obligatorio).");
       return;
     }
-    if (reposoTipo !== "none" && reposoHasta && reposoHasta < fecha) {
+    if (reposoTipo && reposoHasta && reposoHasta < fecha) {
       toast.error("La fecha 'hasta' del reposo no puede ser anterior a la consulta.");
+      return;
+    }
+    if (destino === "internacion" && !camaId && !internacionCreada.current) {
+      toast.error("Elija la cama donde queda internado.");
       return;
     }
 
@@ -115,6 +141,23 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
     const diagFinal = diagnostico.trim() ? `${cieTexto} — ${diagnostico.trim()}` : cieTexto;
 
     try {
+      // La internación va primero: es lo único que puede chocar (cama ocupada).
+      // Si después falla la consulta, se reintenta sin volver a ocupar la cama.
+      if (destino === "internacion" && !internacionCreada.current) {
+        const creada = await internar.mutateAsync({
+          paciente_id: pacienteId,
+          cama_id: Number(camaId),
+          medico_id: Number(medicoId),
+          ingresado_por: user?.email ?? null,
+          fecha_ingreso: fecha,
+          hora_ingreso: horaAhora(),
+          diagnostico_ingreso: sanitizePlainText(diagFinal) || null,
+          cie10_id: cieLista[0]?.id ?? null,
+          motivo_observacion: sanitizePlainText(motivo) || null,
+        });
+        internacionCreada.current = creada.id;
+      }
+
       const res = await crear.mutateAsync({
         paciente_id: pacienteId,
         medico_id: Number(medicoId),
@@ -125,17 +168,18 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
         cie10_id: cieLista[0]?.id ?? null,
         diagnostico: sanitizePlainText(diagFinal) || null,
         tratamiento: sanitizePlainText(tratamiento) || null,
-        reposo_tipo: reposoTipo === "none" ? null : reposoTipo,
-        reposo_desde: reposoTipo === "none" ? null : fecha,
-        reposo_hasta: reposoTipo === "none" ? null : reposoHasta || null,
+        destino,
+        reposo_tipo: reposoTipo,
+        reposo_desde: reposoTipo ? fecha : null,
+        reposo_hasta: reposoTipo ? reposoHasta || null : null,
       });
 
-      if (opts?.eImprimirReposo && reposoTipo !== "none") {
+      if (opts?.eImprimirReposo && reposoTipo) {
         const qrSvgHtml = renderToStaticMarkup(
           <QRCodeSVG
             value={cleanQrText([
               "SANIDAD POLICIAL - ACADEMIA NACIONAL DE POLICIA",
-              `DOCUMENTO: ${reposoTipo === "domiciliario" ? "CERTIFICADO DE REPOSO DOMICILIARIO" : "CONSTANCIA DE ENFERMO LOCAL"}`,
+              `DOCUMENTO: ${tituloDocumento(destino)}`,
               `Paciente: ${pacienteNombre}`,
               `Desde: ${fecha.split("-").reverse().join("/")} Hasta: ${reposoHasta ? reposoHasta.split("-").reverse().join("/") : "Nueva orden"}`,
               `Dx: ${cieLista.map((c) => c.codigo).join(", ")}`,
@@ -149,7 +193,8 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
         imprimirCertificadoReposo({
           pacienteNombre,
           pacienteDocumento: String(pacienteId),
-          tipoReposo: reposoTipo as "domiciliario" | "local",
+          tipoReposo: reposoTipo,
+          destino: destino as "sin_servicio" | "enfermo_local" | "reposo_domiciliario" | "internacion",
           fechaDesde: fecha.split("-").reverse().join("/"),
           fechaHasta: reposoHasta ? reposoHasta.split("-").reverse().join("/") : null,
           cieCodigo: cieLista.map((c) => c.codigo).join(", "),
@@ -161,14 +206,14 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           qrSvgHtml,
         });
 
-        toast.success(
-          reposoTipo === "domiciliario"
-            ? "Consulta registrada y Certificado de Reposo Domiciliario emitido."
-            : "Consulta registrada y Constancia de Enfermo Local emitida."
-        );
+        toast.success(`Consulta registrada y ${tituloDocumento(destino)} emitido.`);
         onOpenChange(false);
       } else {
-        toast.success(cita ? "Consulta registrada y cita atendida." : "Consulta registrada.");
+        toast.success(
+          destino === "internacion"
+            ? "Consulta registrada y paciente internado. Ya aparece en Enfermería."
+            : cita ? "Consulta registrada y cita atendida." : "Consulta registrada."
+        );
         onOpenChange(false);
       }
     } catch (e) {
@@ -192,75 +237,9 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           <div className="space-y-5 pt-2">
             {/* Fila 1: Médico y Fecha */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5 relative">
+              <div className="space-y-1.5">
                 <Label htmlFor="co-medico" className="font-semibold text-sm">Médico *</Label>
-                {medicoSeleccionado ? (
-                  <div className="flex items-center justify-between gap-2 p-2.5 rounded-md border bg-muted/30">
-                    <span className="text-sm font-medium">
-                      {medicoSeleccionado.apellidos}, {medicoSeleccionado.nombres}
-                      {medicoSeleccionado.especialidad && (
-                        <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200">
-                          {medicoSeleccionado.especialidad.nombre}
-                        </Badge>
-                      )}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        setMedicoId("");
-                        setBusquedaMedico("");
-                        setMostrarListaMedicos(true);
-                      }}
-                    >
-                      Cambiar
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="co-medico"
-                      className="pl-9 h-10"
-                      placeholder="Buscar por nombre o especialidad..."
-                      value={busquedaMedico}
-                      onChange={(e) => {
-                        setBusquedaMedico(e.target.value);
-                        setMostrarListaMedicos(true);
-                      }}
-                      onFocus={() => setMostrarListaMedicos(true)}
-                      onBlur={() => setTimeout(() => setMostrarListaMedicos(false), 200)}
-                    />
-                    {mostrarListaMedicos && (
-                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-48 overflow-y-auto divide-y">
-                        {medicosFiltrados.length === 0 ? (
-                          <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron médicos</p>
-                        ) : (
-                          medicosFiltrados.map((m) => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
-                              onClick={() => {
-                                setMedicoId(String(m.id));
-                                setMostrarListaMedicos(false);
-                              }}
-                            >
-                              <span className="font-medium">{m.apellidos}, {m.nombres}</span>
-                              {m.especialidad && (
-                                <Badge variant="outline" className="text-xs font-normal">
-                                  {m.especialidad.nombre}
-                                </Badge>
-                              )}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <MedicoSelector id="co-medico" value={medicoId} onChange={setMedicoId} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="co-fecha" className="font-semibold text-sm">Fecha *</Label>
@@ -390,21 +369,21 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
               />
             </div>
 
-            {/* Sección de Reposo */}
+            {/* Destino: con qué conducta termina la atención */}
             <div className="rounded-lg border p-4 space-y-4 bg-muted/20">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="co-reposo" className="font-semibold text-sm">Reposo (actividad física)</Label>
-                  <Select value={reposoTipo} onValueChange={(v) => setReposoTipo(v as "none" | ReposoTipo)}>
-                    <SelectTrigger id="co-reposo" className="h-10"><SelectValue /></SelectTrigger>
+                  <Label htmlFor="co-destino" className="font-semibold text-sm">Destino del paciente</Label>
+                  <Select value={destino} onValueChange={(v) => setDestino(v as DestinoAtencion)}>
+                    <SelectTrigger id="co-destino" className="h-10"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin reposo (apto)</SelectItem>
-                      <SelectItem value="local">Enfermo local (en la unidad)</SelectItem>
-                      <SelectItem value="domiciliario">Reposo domiciliario</SelectItem>
+                      {DESTINOS_ATENCION.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                {reposoTipo !== "none" && (
+                {reposoTipo && (
                   <>
                     <div className="space-y-1.5">
                       <Label htmlFor="co-reposo-dias" className="font-semibold text-sm">Cantidad de días</Label>
@@ -446,18 +425,40 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
                 )}
               </div>
 
-              {reposoTipo !== "none" && (
+              {destino === "internacion" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="co-cama" className="font-semibold text-sm flex items-center gap-1.5">
+                    <BedDouble className="w-4 h-4 text-muted-foreground" />
+                    Cama donde queda internado *
+                  </Label>
+                  <Combobox
+                    id="co-cama"
+                    value={camaId}
+                    onChange={setCamaId}
+                    placeholder={camasLibres.length ? "Elija la cama libre" : "No hay camas libres disponibles"}
+                    buscarPlaceholder="Buscar cama..."
+                    vacioTexto="No hay camas libres."
+                    opciones={camasLibres.map((c) => ({
+                      value: String(c.id),
+                      label: c.codigo,
+                      detalle: c.sala_nombre || null,
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Al guardar, el paciente aparece internado en la pantalla de Enfermería.
+                  </p>
+                </div>
+              )}
+
+              {reposoTipo && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40 dark:border-red-900">
                   <div className="flex items-start gap-2.5 text-red-900 dark:text-red-200">
                     <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-sm">
-                        {reposoTipo === "domiciliario"
-                          ? "Certificado de Reposo Domiciliario"
-                          : "Constancia de Enfermo Local (en la Unidad)"}
-                      </p>
+                      <p className="font-bold text-sm">{tituloDocumento(destino)}</p>
                       <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">
-                        Al guardar, se emitirá el documento oficial impreso con Código QR de Verificación Digital.
+                        Queda eximido de la educación física en esas fechas (lo ve Control de Peso).
+                        Al guardar se emite el documento oficial impreso con código QR de verificación.
                       </p>
                     </div>
                   </div>
@@ -466,17 +467,17 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
                     variant="outline"
                     className="h-9 px-3 gap-1.5 font-semibold text-xs text-red-800 border-red-300 bg-white hover:bg-red-100 dark:bg-red-900 dark:text-red-100 shrink-0"
                     onClick={() => handleGuardar({ eImprimirReposo: true })}
-                    disabled={crear.isPending}
+                    disabled={guardando}
                   >
                     <Printer className="w-4 h-4" />
-                    {reposoTipo === "domiciliario" ? "Guardar e Imprimir Reposo Domiciliario" : "Guardar e Imprimir Enfermo Local"}
+                    Guardar e imprimir
                   </Button>
                 </div>
               )}
             </div>
 
-            <Button onClick={() => handleGuardar()} disabled={crear.isPending} className="w-full h-11 font-semibold text-base mt-2">
-              {crear.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            <Button onClick={() => handleGuardar()} disabled={guardando} className="w-full h-11 font-semibold text-base mt-2">
+              {guardando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Registrar consulta
             </Button>
           </div>

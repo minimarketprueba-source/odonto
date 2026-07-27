@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useConsultasPaciente, type Consulta } from "@/api/consultas";
+import { labelDestinoAtencion, useConsultasPaciente, type Consulta } from "@/api/consultas";
 import { useRecetasPaciente } from "@/api/recetas";
 import {
   useAnularConsulta, useAnularReceta, useRestaurarConsulta, useRestaurarReceta,
@@ -24,7 +24,14 @@ import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } 
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
-import { imprimirCertificadoReposo, imprimirInformeConsulta, imprimirHistoriaClinicaHTML } from "@/lib/imprimir";
+import {
+  documentoReposo, imprimirCertificadoReposo, imprimirInformeConsulta, imprimirHistoriaClinicaHTML,
+} from "@/lib/imprimir";
+
+/** Textos del certificado de una consulta (parte sin servicio, enfermo local...). */
+function docReposo(c: Consulta) {
+  return documentoReposo(c.destino === "alta" ? null : c.destino, c.reposo_tipo);
+}
 
 interface HistoriaClinicaDialogProps {
   open: boolean;
@@ -95,7 +102,7 @@ function getQrPayload(c: Consulta | null, paciente: Paciente | null, tipo: "cons
       inst,
       `DOCUMENTO: CERTIFICADO DE REPOSO MEDICO`,
       `Paciente: ${paciente.apellidos}, ${paciente.nombres} (CI: ${ciImpresa(paciente)})`,
-      `Tipo Reposo: ${c.reposo_tipo === "domiciliario" ? "DOMICILIARIO" : "ENFERMO LOCAL"}`,
+      `Tipo Reposo: ${labelDestinoAtencion(c.destino, c.reposo_tipo).toUpperCase()}`,
       `Desde: ${fmtFecha(c.fecha)} Hasta: ${c.reposo_hasta ? fmtFecha(c.reposo_hasta) : "Nueva orden"}`,
       `Dx CIE-10: ${c.cie10?.codigo || "N/A"} - ${c.cie10?.descripcion || c.diagnostico || ""}`,
       `Medico: Dr(a). ${c.medico?.apellidos || ""}, ${c.medico?.nombres || ""}`,
@@ -170,6 +177,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
         pacienteGrado: paciente.grado,
         pacienteUnidad: paciente.unidad || "ANP",
         tipoReposo: c.reposo_tipo === "domiciliario" ? "domiciliario" : "local",
+        destino: c.destino === "alta" ? null : c.destino,
         fechaDesde: fmtFecha(c.fecha),
         fechaHasta: c.reposo_hasta ? fmtFecha(c.reposo_hasta) : null,
         cieCodigo: c.cie10?.codigo,
@@ -192,7 +200,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
 
       const hora = fmtHora(c.created_at, c.cita?.hora);
       const reposoStr = c.reposo_tipo
-        ? `${c.reposo_tipo === "domiciliario" ? "Reposo Domiciliario" : "Enfermo Local"} desde ${fmtFecha(c.fecha)} ${c.reposo_hasta ? `hasta ${fmtFecha(c.reposo_hasta)}` : "hasta nueva orden"}`
+        ? `${labelDestinoAtencion(c.destino, c.reposo_tipo)} desde ${fmtFecha(c.fecha)} ${c.reposo_hasta ? `hasta ${fmtFecha(c.reposo_hasta)}` : "hasta nueva orden"}`
         : null;
 
       imprimirInformeConsulta({
@@ -453,7 +461,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                           {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
                           {c.reposo_tipo && (
                             <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
-                              {c.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
+                              {labelDestinoAtencion(c.destino, c.reposo_tipo)}
                               {c.reposo_hasta ? ` hasta ${fmtFecha(c.reposo_hasta)}` : " (hasta nueva orden)"}
                             </Badge>
                           )}
@@ -680,9 +688,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
               <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide mt-0.5">Gral. José E. Díaz</p>
               <h2 className="text-base font-bold text-gray-900 mt-2 tracking-wide uppercase">
                 {printTarget.type === "reposo"
-                  ? printTarget.consulta.reposo_tipo === "domiciliario"
-                    ? "CERTIFICADO DE REPOSO DOMICILIARIO"
-                    : "CONSTANCIA DE ENFERMO LOCAL"
+                  ? docReposo(printTarget.consulta).titulo
                   : printTarget.type === "todas"
                   ? "HISTORIA CLÍNICA GENERAL"
                   : "INFORME DE CONSULTA MÉDICA"}
@@ -713,7 +719,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
             {printTarget.type === "reposo" ? (
               <div className="border-2 border-red-600 p-5 rounded space-y-4 text-sm bg-white">
                 <div className="flex justify-between font-bold border-b border-red-300 pb-2 text-base text-red-900">
-                  <span>REF: {printTarget.consulta.reposo_tipo === "domiciliario" ? "REP-DOM" : "ENF-LOC"}-{idPaciente(paciente)}-{printTarget.consulta.id}</span>
+                  <span>REF: {docReposo(printTarget.consulta).ref}-{idPaciente(paciente)}-{printTarget.consulta.id}</span>
                   <span>FECHA EMISIÓN: {fmtFecha(printTarget.consulta.fecha)}</span>
                 </div>
 
@@ -721,14 +727,10 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                   <div className="bg-red-50 border border-red-200 p-3 rounded">
                     <p className="font-bold text-red-900 text-base">TIPO DE CONDICIÓN MÉDICA:</p>
                     <p className="text-lg font-extrabold text-red-700 mt-1 uppercase">
-                      {printTarget.consulta.reposo_tipo === "domiciliario"
-                        ? "• REPOSO DOMICILIARIO (FUERA DE LA UNIDAD)"
-                        : "• ENFERMO LOCAL (PERMANECE EN LA UNIDAD)"}
+                      • {docReposo(printTarget.consulta).condicion}
                     </p>
                     <p className="text-xs text-red-800 mt-1 font-medium">
-                      {printTarget.consulta.reposo_tipo === "domiciliario"
-                        ? "El/la paciente debe cumplir reposo en su domicilio particular eximido de toda actividad."
-                        : "El/la paciente permanece en el recinto de la unidad eximido de instrucción, formación y ejercicios físicos."}
+                      {docReposo(printTarget.consulta).detalle}
                     </p>
                   </div>
 

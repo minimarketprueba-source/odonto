@@ -39,9 +39,15 @@ describe("catálogos del RAC", () => {
     expect(NIVELES_TRIAJE.map((n) => n.value)).toEqual(["rojo", "amarillo", "verde", "azul"]);
   });
 
-  it("solo enfermo local, reposo domiciliario e internación eximen de actividad física", () => {
-    const conReposo = DESTINOS_RAC.filter((d) => d.reposo).map((d) => d.value);
-    expect(conReposo).toEqual(["enfermo_local", "reposo_domiciliario", "internacion"]);
+  // Todo lo que no es alta exime de la educación física: el parte sin servicio
+  // también, por decisión del usuario del 2026-07-27.
+  it("solo el alta deja al paciente apto para la actividad física", () => {
+    const sinReposo = DESTINOS_RAC.filter((d) => !d.reposo).map((d) => d.value);
+    expect(sinReposo).toEqual(["alta"]);
+  });
+
+  it("el parte sin servicio exime dentro de la unidad, no en el domicilio", () => {
+    expect(DESTINOS_RAC.find((d) => d.value === "sin_servicio")?.reposo).toBe("local");
   });
 
   it("el alta no pide cantidad de días", () => {
