@@ -351,6 +351,123 @@ export function imprimirSalvoconducto(datos: DatosImpresionSalvoconducto) {
   ejecutarImpresionIframe(tituloDoc, html);
 }
 
+export interface DatosImpresionHojaEnfermeria {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteTipo?: string | null;
+  pacienteGrado?: string | null;
+  pacienteUnidad?: string | null;
+  camaCodigo: string;
+  salaNombre: string;
+  fechaIngreso: string;
+  horaIngreso: string;
+  diagnosticoIngreso?: string | null;
+  motivoObservacion?: string | null;
+  medicoTratante?: string | null;
+  enfermeroCargo?: string | null;
+  signosVitales: {
+    fechaHora: string;
+    pa?: string;
+    fc?: string;
+    fr?: string;
+    temp?: string;
+    spo2?: string;
+    glucemia?: string;
+    observaciones?: string;
+    enfermero?: string;
+  }[];
+  qrSvgHtml?: string;
+}
+
+export function imprimirHojaEnfermeria(datos: DatosImpresionHojaEnfermeria) {
+  const tituloDoc = "HOJA DE CONTROL Y EVOLUCIÓN DE ENFERMERÍA";
+  const refCod = `ENF-CAM-${datos.camaCodigo.replace(/\s+/g, "")}-${datos.pacienteDocumento || "0"}`;
+
+  const filasVitales = datos.signosVitales.map((v) => `
+    <tr>
+      <td style="padding:6px; border:1px solid #cbd5e1; font-weight:bold;">${v.fechaHora}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1; font-weight:bold; color:#1e40af;">${v.pa || "—"}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1;">${v.fc ? `${v.fc} bpm` : "—"}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1;">${v.fr ? `${v.fr} rpm` : "—"}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1; font-weight:bold; color:#b91c1c;">${v.temp ? `${v.temp} °C` : "—"}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1;">${v.spo2 ? `${v.spo2}%` : "—"}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1;">${v.glucemia ? `${v.glucemia} mg/dL` : "—"}</td>
+      <td style="padding:6px; border:1px solid #cbd5e1; font-size:11px;">${v.observaciones || "—"}</td>
+    </tr>
+  `).join("");
+
+  const html = `
+    <div class="header">
+      <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+      <p class="sub">Gral. José E. Díaz</p>
+      <h2>${tituloDoc}</h2>
+      <p class="meta">Emisión: ${new Date().toLocaleDateString("es-PY")} — ${new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs</p>
+    </div>
+
+    <div class="box-paciente">
+      <div>
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
+        <p style="margin:2px 0;"><strong>Médico Tratante:</strong> ${datos.medicoTratante || "—"}</p>
+      </div>
+      <div>
+        <p style="margin:2px 0;"><strong>Ubicación:</strong> ${datos.camaCodigo} (${datos.salaNombre})</p>
+        <p style="margin:2px 0;"><strong>Ingreso:</strong> ${datos.fechaIngreso} a las ${datos.horaIngreso} hs</p>
+        <p style="margin:2px 0;"><strong>Enfermero/a a Cargo:</strong> ${datos.enfermeroCargo || "—"}</p>
+      </div>
+    </div>
+
+    <div class="box-reposo">
+      <div style="margin-bottom:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+        <p style="margin:0 0 2px 0; font-weight:bold; color:#1e293b; font-size:11px; text-transform:uppercase;">DIAGNÓSTICO Y MOTIVO DE OBSERVACIÓN / INTERNACIÓN:</p>
+        <p style="margin:0; font-size:13px; font-weight:600; color:#0f172a;">${datos.diagnosticoIngreso || "En observación de Sanidad"}</p>
+        ${datos.motivoObservacion ? `<p style="margin:4px 0 0 0; font-size:12px; color:#334155;">${datos.motivoObservacion}</p>` : ""}
+      </div>
+
+      <h3 style="margin:16px 0 8px 0; font-size:13px; font-weight:800; color:#1e3a8a; text-transform:uppercase; border-bottom:1px solid #bfdbfe; padding-bottom:4px;">
+        HISTORIAL DE CONSTANTES VITALES Y CONTROLES
+      </h3>
+
+      <table style="width:100%; border-collapse:collapse; text-align:center; font-size:11px; margin-bottom:16px;">
+        <thead>
+          <tr style="background:#f1f5f9; color:#0f172a;">
+            <th style="padding:6px; border:1px solid #cbd5e1;">Fecha / Hora</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">PA (mmHg)</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">FC</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">FR</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Temp</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">SpO2</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Glucemia</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Observaciones / Evolución</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filasVitales.length > 0 ? filasVitales : `<tr><td colspan="8" style="padding:10px; border:1px solid #cbd5e1; color:#64748b;">Sin registros de signos vitales aún.</td></tr>`}
+        </tbody>
+      </table>
+
+      <div class="footer-qr">
+        <div style="display:flex; align-items:center; gap: 12px;">
+          ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
+          <div style="font-size:10px; color:#475569;">
+            <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
+            <p style="margin:1px 0;">Sanidad ANP — Ficha de Enfermería</p>
+            <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
+          </div>
+        </div>
+
+        <div class="firmas">
+          <div class="linea-firma"></div>
+          <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.enfermeroCargo || "Personal de Enfermería"}</p>
+          <p style="margin:0; font-size:10px; color:#64748b;">Firma del Responsable de Enfermería</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
 export function imprimirHistoriaClinicaHTML(pacienteNombre: string, pacienteDoc: string, contenidoBodyHtml: string) {
   const tituloDoc = `HISTORIA CLÍNICA — ${pacienteNombre} (CI: ${pacienteDoc})`;
   const html = `
