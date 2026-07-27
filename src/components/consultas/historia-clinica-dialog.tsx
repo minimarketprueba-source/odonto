@@ -10,10 +10,15 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText, Printer, ShieldAlert } from "lucide-react";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useConsultasPaciente, type Consulta } from "@/api/consultas";
 import { useRecetasPaciente } from "@/api/recetas";
+import {
+  useAnularConsulta, useAnularReceta, useRestaurarConsulta, useRestaurarReceta,
+} from "@/api/anulaciones";
+import { AnularDialog } from "./anular-dialog";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
@@ -49,6 +54,13 @@ function fmtHora(created_at?: string | null, citaHora?: string | null): string |
   }
   return null;
 }
+
+// Tailwind no compila clases armadas al vuelo: hay que nombrarlas enteras.
+const GRID_PESTANAS: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+};
 
 function cleanQrText(text: string): string {
   return text
@@ -113,12 +125,20 @@ function getQrPayload(c: Consulta | null, paciente: Paciente | null, tipo: "cons
 }
 
 export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: HistoriaClinicaDialogProps) {
-  const { hasPermission, canView } = usePermissions();
+  const { hasPermission, canView, isAdmin } = usePermissions();
   const puedeRegistrar = hasPermission("consultas", "editar");
   const puedeRecetar = hasPermission("recetas", "editar");
   const veRecetas = canView("recetas");
-  const { data: consultas = [], isLoading } = useConsultasPaciente(open ? (paciente?.id ?? null) : null);
-  const { data: recetas = [] } = useRecetasPaciente(open && veRecetas ? (paciente?.id ?? null) : null);
+  // El administrador trae también las anuladas, para poder verlas y restaurarlas.
+  const { data: consultas = [], isLoading } = useConsultasPaciente(open ? (paciente?.id ?? null) : null, isAdmin);
+  const { data: recetas = [] } = useRecetasPaciente(open && veRecetas ? (paciente?.id ?? null) : null, isAdmin);
+  const anularConsulta = useAnularConsulta();
+  const anularReceta = useAnularReceta();
+  const restaurarConsulta = useRestaurarConsulta();
+  const restaurarReceta = useRestaurarReceta();
+  const [anularTarget, setAnularTarget] = useState<
+    { tipo: "consulta" | "receta"; id: number; detalle: string; tieneReposo?: boolean; citaId?: number | null } | null
+  >(null);
   const [formOpen, setFormOpen] = useState(false);
   const [recetaOpen, setRecetaOpen] = useState(false);
   const [servicioFiltro, setServicioFiltro] = useState("todos");
@@ -206,20 +226,63 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
     }
   };
 
+  // El administrador recibe también las anuladas, para poder restaurarlas.
+  const vigentes = useMemo(() => consultas.filter((c) => !c.anulada_at), [consultas]);
+  const anuladas = useMemo(() => consultas.filter((c) => c.anulada_at), [consultas]);
+  const recetasVigentes = useMemo(() => recetas.filter((r) => !r.anulada_at), [recetas]);
+  const recetasAnuladas = useMemo(() => recetas.filter((r) => r.anulada_at), [recetas]);
+
   // Historial por servicio (estilo PY HIS): filtro por especialidad de la consulta.
   const servicios = useMemo(() => {
     const conteo = new Map<string, number>();
-    for (const c of consultas) {
+    for (const c of vigentes) {
       const s = c.medico?.especialidad?.nombre;
       if (s) conteo.set(s, (conteo.get(s) || 0) + 1);
     }
     return [...conteo.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [consultas]);
+  }, [vigentes]);
 
   const consultasFiltradas =
     servicioFiltro === "todos"
-      ? consultas
-      : consultas.filter((c) => c.medico?.especialidad?.nombre === servicioFiltro);
+      ? vigentes
+      : vigentes.filter((c) => c.medico?.especialidad?.nombre === servicioFiltro);
+
+  const cantidadPestanas = 1 + (veRecetas ? 1 : 0) + (isAdmin ? 1 : 0);
+
+  const detalleConsulta = (c: Consulta) =>
+    `Consulta del ${fmtFecha(c.fecha)}${c.medico?.especialidad ? ` — ${c.medico.especialidad.nombre}` : ""} — ${nombre}`;
+
+  const handleAnular = async (motivo: string, reabrirCita: boolean) => {
+    if (!anularTarget) return;
+    try {
+      if (anularTarget.tipo === "consulta") {
+        await anularConsulta.mutateAsync({
+          id: anularTarget.id, motivo, citaId: anularTarget.citaId, reabrirCita,
+        });
+        toast.success('Consulta anulada. La puede restaurar desde la pestaña "Anuladas".');
+      } else {
+        await anularReceta.mutateAsync({ id: anularTarget.id, motivo });
+        toast.success('Receta anulada. La puede restaurar desde la pestaña "Anuladas".');
+      }
+      setAnularTarget(null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const handleRestaurar = async (tipo: "consulta" | "receta", id: number, citaId?: number | null) => {
+    try {
+      if (tipo === "consulta") {
+        await restaurarConsulta.mutateAsync({ id, citaId });
+        toast.success("Consulta restaurada. Ya aparece de nuevo en la historia clínica.");
+      } else {
+        await restaurarReceta.mutateAsync(id);
+        toast.success("Receta restaurada.");
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   return (
     <>
@@ -233,10 +296,10 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                   Historia clínica — {nombre}
                 </DialogTitle>
                 <DialogDescription>
-                  CI {paciente?.documento} · {consultas.length} consulta{consultas.length !== 1 ? "s" : ""} registrada{consultas.length !== 1 ? "s" : ""}
+                  CI {paciente?.documento} · {vigentes.length} consulta{vigentes.length !== 1 ? "s" : ""} registrada{vigentes.length !== 1 ? "s" : ""}
                 </DialogDescription>
               </div>
-              {consultas.length > 0 && (
+              {vigentes.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -251,9 +314,14 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
           </DialogHeader>
 
           <Tabs defaultValue="consultas" className="flex-1 flex flex-col min-h-0">
-            <TabsList className={`grid w-full ${veRecetas ? "grid-cols-2" : "grid-cols-1"}`}>
-              <TabsTrigger value="consultas">Consultas ({consultas.length})</TabsTrigger>
-              {veRecetas && <TabsTrigger value="recetas">Recetas ({recetas.length})</TabsTrigger>}
+            <TabsList className={`grid w-full ${GRID_PESTANAS[cantidadPestanas]}`}>
+              <TabsTrigger value="consultas">Consultas ({vigentes.length})</TabsTrigger>
+              {veRecetas && <TabsTrigger value="recetas">Recetas ({recetasVigentes.length})</TabsTrigger>}
+              {isAdmin && (
+                <TabsTrigger value="anuladas">
+                  Anuladas ({anuladas.length + recetasAnuladas.length})
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="consultas" className="flex-1 overflow-y-auto space-y-2 py-2">
@@ -268,7 +336,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                   <Select value={servicioFiltro} onValueChange={setServicioFiltro}>
                     <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="todos">Todos ({consultas.length})</SelectItem>
+                      <SelectItem value="todos">Todos ({vigentes.length})</SelectItem>
                       {servicios.map(([s, n]) => (
                         <SelectItem key={s} value={s}>{s} ({n})</SelectItem>
                       ))}
@@ -326,6 +394,23 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                           >
                             <Printer className="w-3.5 h-3.5" /> Imp. Consulta
                           </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
+                              title="Anular esta consulta (quedó mal cargada)"
+                              onClick={() => setAnularTarget({
+                                tipo: "consulta",
+                                id: c.id,
+                                detalle: detalleConsulta(c),
+                                tieneReposo: !!c.reposo_tipo,
+                                citaId: c.cita_id,
+                              })}
+                            >
+                              <Ban className="w-3.5 h-3.5" /> Anular
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {c.motivo_consulta && (
@@ -361,16 +446,30 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                     <Plus className="w-4 h-4" /> Nueva receta
                   </Button>
                 )}
-                {recetas.length === 0 ? (
+                {recetasVigentes.length === 0 ? (
                   <p className="text-center text-sm text-muted-foreground py-6">Sin recetas emitidas.</p>
                 ) : (
-                  recetas.map((r) => (
+                  recetasVigentes.map((r) => (
                     <div key={r.id} className="p-3 rounded-lg border">
                       <div className="flex items-center gap-2 flex-wrap">
                         <FileText className="w-4 h-4 text-primary" />
                         <span className="font-mono text-sm font-semibold">{r.numero}</span>
                         <span className="text-sm">{fmtFecha(r.fecha)}</span>
                         {r.diagnostico && <Badge variant="outline">{r.diagnostico}</Badge>}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost" size="sm"
+                            className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700 ml-auto"
+                            title="Anular esta receta (quedó mal emitida)"
+                            onClick={() => setAnularTarget({
+                              tipo: "receta",
+                              id: r.id,
+                              detalle: `Receta ${r.numero} del ${fmtFecha(r.fecha)} — ${nombre}`,
+                            })}
+                          >
+                            <Ban className="w-3.5 h-3.5" /> Anular
+                          </Button>
+                        )}
                       </div>
                       <ul className="mt-1 space-y-0.5">
                         {(r.items ?? []).map((i, idx) => (
@@ -397,9 +496,94 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                 )}
               </TabsContent>
             )}
+
+            {isAdmin && (
+              <TabsContent value="anuladas" className="flex-1 overflow-y-auto space-y-2 py-2">
+                {anuladas.length === 0 && recetasAnuladas.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground py-6">
+                    Acá aparecen las consultas y recetas que se anularon por error de carga.
+                    Por ahora no hay ninguna.
+                  </p>
+                ) : (
+                  <>
+                    {anuladas.map((c) => (
+                      <div
+                        key={`c${c.id}`}
+                        className="p-3 rounded-lg border border-dashed border-red-300 bg-red-50/40 dark:border-red-900 dark:bg-red-950/10 opacity-80"
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="destructive">ANULADA</Badge>
+                            <span className="font-medium text-sm line-through">{fmtFecha(c.fecha)}</span>
+                            {c.medico?.especialidad && (
+                              <Badge variant="outline">{c.medico.especialidad.nombre}</Badge>
+                            )}
+                            {c.reposo_tipo && <Badge variant="outline">Tenía reposo</Badge>}
+                          </div>
+                          <Button
+                            variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
+                            onClick={() => handleRestaurar("consulta", c.id, c.cita_id)}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" /> Restaurar
+                          </Button>
+                        </div>
+                        {c.diagnostico && (
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Decía: </span>{c.diagnostico}
+                          </p>
+                        )}
+                        <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                          Anulada el {c.anulada_at ? new Date(c.anulada_at).toLocaleDateString("es-ES") : "—"}
+                          {c.anulada_por ? ` por ${c.anulada_por.split("@")[0]}` : ""}
+                          {c.motivo_anulacion ? ` — ${c.motivo_anulacion}` : ""}
+                        </p>
+                      </div>
+                    ))}
+
+                    {recetasAnuladas.map((r) => (
+                      <div
+                        key={`r${r.id}`}
+                        className="p-3 rounded-lg border border-dashed border-red-300 bg-red-50/40 dark:border-red-900 dark:bg-red-950/10 opacity-80"
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="destructive">ANULADA</Badge>
+                            <FileText className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-mono text-sm font-semibold line-through">{r.numero}</span>
+                            <span className="text-sm">{fmtFecha(r.fecha)}</span>
+                          </div>
+                          <Button
+                            variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
+                            onClick={() => handleRestaurar("receta", r.id)}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" /> Restaurar
+                          </Button>
+                        </div>
+                        <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                          Anulada el {r.anulada_at ? new Date(r.anulada_at).toLocaleDateString("es-ES") : "—"}
+                          {r.anulada_por ? ` por ${r.anulada_por.split("@")[0]}` : ""}
+                          {r.motivo_anulacion ? ` — ${r.motivo_anulacion}` : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      <AnularDialog
+        open={!!anularTarget}
+        onOpenChange={(abierto) => { if (!abierto) setAnularTarget(null); }}
+        que={anularTarget?.tipo ?? "consulta"}
+        detalle={anularTarget?.detalle ?? ""}
+        tieneReposo={anularTarget?.tieneReposo}
+        tieneCita={!!anularTarget?.citaId}
+        guardando={anularConsulta.isPending || anularReceta.isPending}
+        onConfirmar={handleAnular}
+      />
 
       {/* Vista de Impresión Aislada (HTML/PDF) con QR */}
       <div id="historia-print">

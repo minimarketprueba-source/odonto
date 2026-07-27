@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ClipboardCheck,
-  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Ambulance,
+  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Ambulance, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchTexto } from "@/lib/utils";
@@ -24,6 +24,7 @@ import {
   type Cita, type EstadoCita,
 } from "@/api/citas";
 import { useAtenciones } from "@/api/consultas";
+import { useBorrarCita } from "@/api/anulaciones";
 
 const COLOR_ESTADO: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
@@ -81,7 +82,7 @@ function coincideBusqueda(cita: Cita, q: string): boolean {
 }
 
 export default function Citas() {
-  const { hasPermission, isMedico } = usePermissions();
+  const { hasPermission, isMedico, isAdmin } = usePermissions();
   const { user } = useAuth();
   const canEdit = hasPermission("citas", "editar");
   const atiendeConsultas = hasPermission("consultas", "editar");
@@ -107,6 +108,23 @@ export default function Citas() {
   const { data: pacientes = [] } = usePacientes();
   const cambiarEstado = useCambiarEstadoCita();
   const admitir = useAdmitirCita();
+  const borrar = useBorrarCita();
+
+  const handleBorrarCita = async (cita: Cita) => {
+    const quien = cita.paciente ? `${cita.paciente.apellidos}, ${cita.paciente.nombres}` : "este paciente";
+    const confirmado = window.confirm(
+      `¿Borrar la cita del ${cita.fecha} a las ${(cita.hora || "").slice(0, 5)} de ${quien}?\n\n` +
+      "Se borra para siempre y no queda ningún registro. Use esto solo si la cita se cargó por error.\n" +
+      'Si el paciente no vino, es mejor "No acudió"; si se suspendió, "Cancelar".'
+    );
+    if (!confirmado) return;
+    try {
+      await borrar.mutateAsync(cita.id);
+      toast.success("Cita borrada.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   const filtrar = (lista: Cita[]) => {
     let r = lista;
@@ -176,6 +194,16 @@ export default function Citas() {
 
   const accionesCita = (c: Cita) => (
     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap no-print">
+      {isAdmin && (
+        <Button
+          variant="ghost" size="sm"
+          className="text-muted-foreground hover:text-red-600 gap-1"
+          title="Borrar esta cita (se cargó por error)"
+          onClick={() => handleBorrarCita(c)}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      )}
       {canEdit && c.estado === "pendiente" && (
         <Button variant="outline" size="sm" className="gap-1" onClick={() => handleEstado(c, "confirmada")}>
           <CheckCircle2 className="w-3.5 h-3.5" /> Confirmar

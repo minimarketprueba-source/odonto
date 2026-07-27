@@ -27,6 +27,10 @@ export interface Receta {
   diagnostico: string | null;
   indicaciones: string | null;
   notas: string | null;
+  /** Receta anulada por el administrador: no se ve, pero no se borró. */
+  anulada_at: string | null;
+  anulada_por: string | null;
+  motivo_anulacion: string | null;
   items?: RecetaItem[];
   medico?: { id: number; nombres: string; apellidos: string } | null;
 }
@@ -42,11 +46,16 @@ export interface CreateRecetaInput {
 
 const RECETA_SELECT = "*, items:receta_items(*), medico:medicos(id, nombres, apellidos)";
 
-export async function fetchRecetasPaciente(pacienteId: number): Promise<Receta[]> {
-  const { data, error } = await supabase
+export async function fetchRecetasPaciente(
+  pacienteId: number,
+  incluirAnuladas = false
+): Promise<Receta[]> {
+  let query = supabase
     .from("recetas")
     .select(RECETA_SELECT)
-    .eq("paciente_id", pacienteId)
+    .eq("paciente_id", pacienteId);
+  if (!incluirAnuladas) query = query.is("anulada_at", null);
+  const { data, error } = await query
     .order("fecha", { ascending: false })
     .order("id", { ascending: false });
   if (error) throw new Error(`Error al cargar las recetas: ${error.message}`);
@@ -54,7 +63,8 @@ export async function fetchRecetasPaciente(pacienteId: number): Promise<Receta[]
 }
 
 export async function createReceta(input: CreateRecetaInput): Promise<Receta> {
-  // Numero correlativo simple basado en el total actual (institución única).
+  // Numero correlativo sobre el total, incluidas las anuladas: una receta
+  // anulada conserva su número, como en un talonario de papel.
   const { count, error: errorCount } = await supabase
     .from("recetas")
     .select("id", { count: "exact", head: true });
@@ -79,10 +89,10 @@ export async function createReceta(input: CreateRecetaInput): Promise<Receta> {
   return data as Receta;
 }
 
-export function useRecetasPaciente(pacienteId: number | null) {
+export function useRecetasPaciente(pacienteId: number | null, incluirAnuladas = false) {
   return useQuery({
-    queryKey: queryKeys.recetas.porPaciente(pacienteId ?? 0),
-    queryFn: () => fetchRecetasPaciente(pacienteId!),
+    queryKey: [...queryKeys.recetas.porPaciente(pacienteId ?? 0), incluirAnuladas],
+    queryFn: () => fetchRecetasPaciente(pacienteId!, incluirAnuladas),
     enabled: !!pacienteId,
   });
 }

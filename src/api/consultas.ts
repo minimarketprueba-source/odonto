@@ -28,7 +28,12 @@ export interface Consulta {
   reposo_tipo: ReposoTipo | null;   // null = sin reposo
   reposo_desde: string | null;      // yyyy-mm-dd (por defecto la fecha de la consulta)
   reposo_hasta: string | null;      // yyyy-mm-dd inclusive; null = hasta nueva orden
+  /** Consulta anulada por el administrador: no se ve ni cuenta, pero no se borró. */
+  anulada_at: string | null;
+  anulada_por: string | null;
+  motivo_anulacion: string | null;
   created_at?: string;
+  updated_at?: string;
   cita?: { id: number; hora: string } | null;
   medico?: {
     id: number;
@@ -63,11 +68,16 @@ export interface CreateConsultaInput {
 const CONSULTA_SELECT =
   "*, medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color)), cie10:cie10(id, codigo, descripcion), cita:citas(id, hora)";
 
-export async function fetchConsultasPaciente(pacienteId: number): Promise<Consulta[]> {
-  const { data, error } = await supabase
+export async function fetchConsultasPaciente(
+  pacienteId: number,
+  incluirAnuladas = false
+): Promise<Consulta[]> {
+  let query = supabase
     .from("consultas")
     .select(CONSULTA_SELECT)
-    .eq("paciente_id", pacienteId)
+    .eq("paciente_id", pacienteId);
+  if (!incluirAnuladas) query = query.is("anulada_at", null);
+  const { data, error } = await query
     .order("fecha", { ascending: false })
     .order("id", { ascending: false });
   if (error) throw new Error(`Error al cargar la historia clínica: ${error.message}`);
@@ -116,10 +126,11 @@ export async function searchCie10(q: string): Promise<Cie10[]> {
 // Hooks React Query
 // ---------------------------------------------------------------------------
 
-export function useConsultasPaciente(pacienteId: number | null) {
+export function useConsultasPaciente(pacienteId: number | null, incluirAnuladas = false) {
   return useQuery({
-    queryKey: queryKeys.consultas.porPaciente(pacienteId ?? 0),
-    queryFn: () => fetchConsultasPaciente(pacienteId!),
+    // El flag va en la clave: si no, al pedir las anuladas se devolvería la caché sin ellas.
+    queryKey: [...queryKeys.consultas.porPaciente(pacienteId ?? 0), incluirAnuladas],
+    queryFn: () => fetchConsultasPaciente(pacienteId!, incluirAnuladas),
     enabled: !!pacienteId,
   });
 }
@@ -132,9 +143,12 @@ export interface AtencionRegistro {
 
 /** Todas las atenciones (paciente + fecha + profesional), para estadísticas y filtros. */
 export async function fetchAtenciones(): Promise<AtencionRegistro[]> {
+  // Las anuladas no cuentan como atenciones: se filtran en la base, no en
+  // memoria, para que el límite no descarte atenciones reales.
   const { data, error } = await supabase
     .from("consultas")
     .select("paciente_id, fecha, medico_id")
+    .is("anulada_at", null)
     .order("fecha", { ascending: false })
     .limit(10000);
   if (error) throw new Error(`Error al cargar las atenciones: ${error.message}`);
