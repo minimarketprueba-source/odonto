@@ -1,197 +1,186 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Paciente } from "./pacientes";
+// ============================================================================
+// Capa de datos: Enfermería — observación / internación y signos vitales
+// ============================================================================
+// Todo se guarda en la base compartida: lo que carga la enfermera de un turno
+// lo ve el turno siguiente y también las doctoras, desde cualquier computadora.
+// Reglas garantizadas por la base (no solo por la pantalla):
+//   · una cama no puede tener dos pacientes a la vez
+//   · un paciente no puede estar internado en dos camas a la vez
+//   · los signos vitales fuera de rango humano se rechazan
 
-export type EstadoCama = "disponible" | "ocupada" | "limpieza" | "reservada";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { queryKeys } from "@/lib/query-client";
+import { CLINICA_ID, type Paciente } from "./pacientes";
+
+export type EstadoCama = "disponible" | "ocupada";
 export type EstadoIngreso = "activo" | "alta" | "traslado";
 
 export interface Sala {
   id: number;
   nombre: string;
-  descripcion?: string;
-  capacidad: number;
+  descripcion: string | null;
+  orden: number;
+  activa: boolean;
 }
 
 export interface Cama {
   id: number;
   sala_id: number;
-  codigo: string; // ej: CAMA-01
-  estado: EstadoCama;
+  codigo: string;
+  activa: boolean;
+  fuera_de_servicio: boolean;
+  sala?: { id: number; nombre: string } | null;
+  /** Derivado: se calcula con las internaciones activas. */
+  estado?: EstadoCama;
   sala_nombre?: string;
 }
 
 export interface SignoVital {
-  id: string | number;
-  ingreso_id: number;
-  created_at: string; // ISO
-  pa_sistolica?: number | null;
-  pa_diastolica?: number | null;
-  fc?: number | null; // bpm
-  fr?: number | null; // rpm
-  temp?: number | null; // °C
-  spo2?: number | null; // %
-  glucemia?: number | null; // mg/dL
-  observaciones?: string | null;
-  enfermero_nombre?: string | null;
+  id: number;
+  internacion_id: number;
+  registrado_por: string | null;
+  tomado_at: string;
+  pa_sistolica: number | null;
+  pa_diastolica: number | null;
+  fc: number | null;
+  fr: number | null;
+  temp: number | null;
+  spo2: number | null;
+  glucemia: number | null;
+  observaciones: string | null;
 }
 
-export interface IngresoCama {
+export interface Internacion {
   id: number;
   paciente_id: number;
   cama_id: number;
-  fecha_ingreso: string; // yyyy-mm-dd
-  hora_ingreso: string; // hh:mm
-  diagnostico_ingreso?: string | null;
-  cie10_codigo?: string | null;
-  motivo_observacion?: string | null;
-  medico_tratante?: string | null;
-  enfermero_cargo?: string | null;
+  medico_id: number | null;
+  ingresado_por: string | null;
+  fecha_ingreso: string;
+  hora_ingreso: string;
+  diagnostico_ingreso: string | null;
+  cie10_id: number | null;
+  motivo_observacion: string | null;
+  enfermero_cargo: string | null;
   estado: EstadoIngreso;
-  fecha_egreso?: string | null;
-  hora_egreso?: string | null;
-  motivo_egreso?: string | null;
+  fecha_egreso: string | null;
+  hora_egreso: string | null;
+  motivo_egreso: string | null;
+  egresado_por: string | null;
   created_at?: string;
   paciente?: Paciente | null;
   cama?: Cama | null;
+  medico?: { id: number; nombres: string; apellidos: string } | null;
+  cie10?: { id: number; codigo: string; descripcion: string } | null;
   signos_vitales?: SignoVital[];
 }
 
-// ---------------------------------------------------------------------------
-// DATOS SEMILLA EN MEMORIA / LOCALSTORAGE (Fallback robusto)
-// ---------------------------------------------------------------------------
+const INTERNACION_SELECT =
+  "*, paciente:pacientes(*), cama:camas(id, codigo, sala_id, sala:salas(id, nombre)), " +
+  "medico:medicos(id, nombres, apellidos), cie10:cie10(id, codigo, descripcion)";
 
-const KEY_CAMAS = "anp_enfermeria_camas_v1";
-const KEY_INGRESOS = "anp_enfermeria_ingresos_v1";
-const KEY_VITALES = "anp_enfermeria_vitales_v1";
-
-const SALAS_DEFAULT: Sala[] = [
-  { id: 1, nombre: "Sala 1 — Observación Masculina", capacidad: 4 },
-  { id: 2, nombre: "Sala 2 — Observación Femenina", capacidad: 4 },
-  { id: 3, nombre: "Sala 3 — Aislamiento / Cuarentena", capacidad: 2 },
-  { id: 4, nombre: "Pavellón de Internación General", capacidad: 6 },
-];
-
-const CAMAS_DEFAULT: Cama[] = [
-  { id: 101, sala_id: 1, codigo: "CAMA 101", estado: "disponible", sala_nombre: "Sala 1 — Observación Masculina" },
-  { id: 102, sala_id: 1, codigo: "CAMA 102", estado: "disponible", sala_nombre: "Sala 1 — Observación Masculina" },
-  { id: 103, sala_id: 1, codigo: "CAMA 103", estado: "disponible", sala_nombre: "Sala 1 — Observación Masculina" },
-  { id: 104, sala_id: 1, codigo: "CAMA 104", estado: "disponible", sala_nombre: "Sala 1 — Observación Masculina" },
-  { id: 201, sala_id: 2, codigo: "CAMA 201", estado: "disponible", sala_nombre: "Sala 2 — Observación Femenina" },
-  { id: 202, sala_id: 2, codigo: "CAMA 202", estado: "disponible", sala_nombre: "Sala 2 — Observación Femenina" },
-  { id: 203, sala_id: 2, codigo: "CAMA 203", estado: "disponible", sala_nombre: "Sala 2 — Observación Femenina" },
-  { id: 204, sala_id: 2, codigo: "CAMA 204", estado: "disponible", sala_nombre: "Sala 2 — Observación Femenina" },
-  { id: 301, sala_id: 3, codigo: "CAMA 301", estado: "disponible", sala_nombre: "Sala 3 — Aislamiento / Cuarentena" },
-  { id: 302, sala_id: 3, codigo: "CAMA 302", estado: "disponible", sala_nombre: "Sala 3 — Aislamiento / Cuarentena" },
-  { id: 401, sala_id: 4, codigo: "CAMA 401", estado: "disponible", sala_nombre: "Pavellón de Internación General" },
-  { id: 402, sala_id: 4, codigo: "CAMA 402", estado: "disponible", sala_nombre: "Pavellón de Internación General" },
-];
-
-function getCamasLocal(): Cama[] {
-  try {
-    const s = localStorage.getItem(KEY_CAMAS);
-    return s ? JSON.parse(s) : CAMAS_DEFAULT;
-  } catch {
-    return CAMAS_DEFAULT;
+/** Mensajes claros para los choques que impide la base. */
+function traducirError(error: { code?: string; message: string }, accion: string): Error {
+  if (error.code === "23505") {
+    if (error.message.includes("una_por_cama")) {
+      return new Error(
+        "Esa cama ya está ocupada por otro paciente. Actualice la pantalla para ver el estado real."
+      );
+    }
+    if (error.message.includes("un_paciente_activo")) {
+      return new Error("Ese paciente ya está internado en otra cama.");
+    }
   }
-}
-
-function saveCamasLocal(camas: Cama[]) {
-  localStorage.setItem(KEY_CAMAS, JSON.stringify(camas));
-}
-
-function getIngresosLocal(): IngresoCama[] {
-  try {
-    const s = localStorage.getItem(KEY_INGRESOS);
-    return s ? JSON.parse(s) : [];
-  } catch {
-    return [];
+  if (error.code === "23514") {
+    return new Error(
+      "Hay un valor fuera de rango. Revise los signos vitales (por ejemplo, la temperatura o la saturación)."
+    );
   }
+  return new Error(`${accion}: ${error.message}`);
 }
 
-function saveIngresosLocal(ingresos: IngresoCama[]) {
-  localStorage.setItem(KEY_INGRESOS, JSON.stringify(ingresos));
+// --- Salas y camas ---
+
+export async function fetchSalas(): Promise<Sala[]> {
+  const { data, error } = await supabase
+    .from("salas")
+    .select("id, nombre, descripcion, orden, activa")
+    .eq("activa", true)
+    .order("orden");
+  if (error) throw new Error(`Error al cargar las salas: ${error.message}`);
+  return data || [];
 }
 
-function getVitalesLocal(): SignoVital[] {
-  try {
-    const s = localStorage.getItem(KEY_VITALES);
-    return s ? JSON.parse(s) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveVitalesLocal(v: SignoVital[]) {
-  localStorage.setItem(KEY_VITALES, JSON.stringify(v));
-}
-
-// ---------------------------------------------------------------------------
-// OPERACIONES DE DATOS
-// ---------------------------------------------------------------------------
-
-export async function fetchEnfermeriaSalas(): Promise<Sala[]> {
-  return SALAS_DEFAULT;
-}
-
-export async function fetchEnfermeriaCamas(): Promise<Cama[]> {
-  return getCamasLocal();
-}
-
-export async function fetchIngresosActivos(): Promise<IngresoCama[]> {
-  const ingresos = getIngresosLocal().filter((i) => i.estado === "activo");
-  const vitales = getVitalesLocal();
-  return ingresos.map((i) => ({
-    ...i,
-    signos_vitales: vitales.filter((v) => Number(v.ingreso_id) === Number(i.id)),
+export async function fetchCamas(): Promise<Cama[]> {
+  const { data, error } = await supabase
+    .from("camas")
+    .select("id, sala_id, codigo, activa, fuera_de_servicio, sala:salas(id, nombre)")
+    .eq("activa", true)
+    .order("codigo");
+  if (error) throw new Error(`Error al cargar las camas: ${error.message}`);
+  return ((data as unknown as Cama[]) || []).map((c) => ({
+    ...c,
+    sala_nombre: c.sala?.nombre ?? "",
   }));
+}
+
+// --- Internaciones ---
+
+export async function fetchInternacionesActivas(): Promise<Internacion[]> {
+  const { data, error } = await supabase
+    .from("internaciones")
+    .select(INTERNACION_SELECT)
+    .eq("estado", "activo")
+    .order("fecha_ingreso", { ascending: false })
+    .order("hora_ingreso", { ascending: false });
+  if (error) throw new Error(`Error al cargar las internaciones: ${error.message}`);
+  const internaciones = (data as unknown as Internacion[]) || [];
+  if (internaciones.length === 0) return [];
+
+  // Los signos vitales de todas las internaciones activas, en una sola consulta.
+  const { data: vitales, error: errVit } = await supabase
+    .from("signos_vitales")
+    .select("*")
+    .in("internacion_id", internaciones.map((i) => i.id))
+    .order("tomado_at", { ascending: false });
+  if (errVit) throw new Error(`Error al cargar los signos vitales: ${errVit.message}`);
+
+  const porInternacion = new Map<number, SignoVital[]>();
+  for (const v of (vitales as SignoVital[]) || []) {
+    const lista = porInternacion.get(v.internacion_id) || [];
+    lista.push(v);
+    porInternacion.set(v.internacion_id, lista);
+  }
+  return internaciones.map((i) => ({ ...i, signos_vitales: porInternacion.get(i.id) || [] }));
 }
 
 export interface IngresarPacienteInput {
   paciente_id: number;
   cama_id: number;
+  medico_id?: number | null;
+  ingresado_por?: string | null;
   fecha_ingreso: string;
   hora_ingreso: string;
-  diagnostico_ingreso?: string;
-  cie10_codigo?: string;
-  motivo_observacion?: string;
-  medico_tratante?: string;
-  enfermero_cargo?: string;
-  pacienteObj?: Paciente | null;
+  diagnostico_ingreso?: string | null;
+  cie10_id?: number | null;
+  motivo_observacion?: string | null;
+  enfermero_cargo?: string | null;
 }
 
-export async function ingresarPacienteACama(input: IngresarPacienteInput): Promise<IngresoCama> {
-  const camas = getCamasLocal();
-  const camaIdx = camas.findIndex((c) => c.id === input.cama_id);
-  if (camaIdx >= 0) {
-    camas[camaIdx].estado = "ocupada";
-    saveCamasLocal(camas);
-  }
-
-  const ingresos = getIngresosLocal();
-  const nuevoIngreso: IngresoCama = {
-    id: Date.now(),
-    paciente_id: input.paciente_id,
-    cama_id: input.cama_id,
-    fecha_ingreso: input.fecha_ingreso,
-    hora_ingreso: input.hora_ingreso,
-    diagnostico_ingreso: input.diagnostico_ingreso || null,
-    cie10_codigo: input.cie10_codigo || null,
-    motivo_observacion: input.motivo_observacion || null,
-    medico_tratante: input.medico_tratante || null,
-    enfermero_cargo: input.enfermero_cargo || null,
-    estado: "activo",
-    created_at: new Date().toISOString(),
-    paciente: input.pacienteObj || null,
-    cama: camas[camaIdx] || null,
-    signos_vitales: [],
-  };
-
-  ingresos.unshift(nuevoIngreso);
-  saveIngresosLocal(ingresos);
-  return nuevoIngreso;
+export async function ingresarPaciente(input: IngresarPacienteInput): Promise<Internacion> {
+  const { data, error } = await supabase
+    .from("internaciones")
+    .insert({ ...input, clinica_id: CLINICA_ID, estado: "activo" })
+    .select(INTERNACION_SELECT)
+    .single();
+  if (error) throw traducirError(error, "No se pudo registrar el ingreso");
+  return data as unknown as Internacion;
 }
 
 export interface RegistrarVitalesInput {
-  ingreso_id: number;
+  internacion_id: number;
+  registrado_por?: string | null;
   pa_sistolica?: number | null;
   pa_diastolica?: number | null;
   fc?: number | null;
@@ -200,82 +189,77 @@ export interface RegistrarVitalesInput {
   spo2?: number | null;
   glucemia?: number | null;
   observaciones?: string | null;
-  enfermero_nombre?: string | null;
 }
 
 export async function registrarSignosVitales(input: RegistrarVitalesInput): Promise<SignoVital> {
-  const vitales = getVitalesLocal();
-  const nuevo: SignoVital = {
-    id: Date.now(),
-    ingreso_id: input.ingreso_id,
-    created_at: new Date().toISOString(),
-    pa_sistolica: input.pa_sistolica || null,
-    pa_diastolica: input.pa_diastolica || null,
-    fc: input.fc || null,
-    fr: input.fr || null,
-    temp: input.temp || null,
-    spo2: input.spo2 || null,
-    glucemia: input.glucemia || null,
-    observaciones: input.observaciones || null,
-    enfermero_nombre: input.enfermero_nombre || null,
-  };
-  vitales.unshift(nuevo);
-  saveVitalesLocal(vitales);
-  return nuevo;
+  const { data, error } = await supabase
+    .from("signos_vitales")
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw traducirError(error, "No se pudieron registrar los signos vitales");
+  return data as SignoVital;
 }
 
-export interface EgresoCamaInput {
-  ingreso_id: number;
-  cama_id: number;
+export interface EgresoInput {
+  internacion_id: number;
   motivo_egreso: string;
   estado_final: "alta" | "traslado";
+  egresado_por?: string | null;
 }
 
-export async function egresarPacienteCama(input: EgresoCamaInput): Promise<void> {
-  const ingresos = getIngresosLocal();
-  const ingIdx = ingresos.findIndex((i) => i.id === input.ingreso_id);
-  if (ingIdx >= 0) {
-    const d = new Date();
-    ingresos[ingIdx].estado = input.estado_final;
-    ingresos[ingIdx].fecha_egreso = d.toISOString().split("T")[0];
-    ingresos[ingIdx].hora_egreso = d.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" });
-    ingresos[ingIdx].motivo_egreso = input.motivo_egreso;
-    saveIngresosLocal(ingresos);
-  }
-
-  const camas = getCamasLocal();
-  const camaIdx = camas.findIndex((c) => c.id === input.cama_id);
-  if (camaIdx >= 0) {
-    camas[camaIdx].estado = "disponible";
-    saveCamasLocal(camas);
+export async function egresarPaciente(input: EgresoInput): Promise<void> {
+  const ahora = new Date();
+  const { data, error } = await supabase
+    .from("internaciones")
+    .update({
+      estado: input.estado_final,
+      motivo_egreso: input.motivo_egreso,
+      egresado_por: input.egresado_por ?? null,
+      fecha_egreso: `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`,
+      hora_egreso: `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`,
+    })
+    .eq("id", input.internacion_id)
+    .eq("estado", "activo") // evita egresar dos veces la misma internación
+    .select("id");
+  if (error) throw traducirError(error, "No se pudo registrar el egreso");
+  if (!data || data.length !== 1) {
+    throw new Error("Ese paciente ya fue dado de alta. Actualice la pantalla.");
   }
 }
 
 // ---------------------------------------------------------------------------
-// HOOKS REACT QUERY
+// Hooks React Query
 // ---------------------------------------------------------------------------
+
+export function useSalas() {
+  return useQuery({ queryKey: queryKeys.enfermeria.salas(), queryFn: fetchSalas });
+}
 
 export function useEnfermeriaCamas() {
-  return useQuery({
-    queryKey: ["enfermeria", "camas"],
-    queryFn: fetchEnfermeriaCamas,
-  });
+  return useQuery({ queryKey: queryKeys.enfermeria.camas(), queryFn: fetchCamas });
 }
 
 export function useEnfermeriaIngresos() {
   return useQuery({
-    queryKey: ["enfermeria", "ingresos"],
-    queryFn: fetchIngresosActivos,
+    queryKey: queryKeys.enfermeria.internaciones(),
+    queryFn: fetchInternacionesActivas,
+    // Varias personas trabajan sobre las mismas camas: conviene refrescar seguido.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
+}
+
+function invalidar(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.enfermeria.all });
 }
 
 export function useIngresarPacienteCama() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ingresarPacienteACama,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enfermeria"] });
-    },
+    mutationFn: ingresarPaciente,
+    retry: 0, // no reintentar: crearía una segunda internación
+    onSuccess: () => invalidar(queryClient),
   });
 }
 
@@ -283,18 +267,16 @@ export function useRegistrarSignosVitales() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: registrarSignosVitales,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enfermeria"] });
-    },
+    retry: 0,
+    onSuccess: () => invalidar(queryClient),
   });
 }
 
 export function useEgresarPacienteCama() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: egresarPacienteCama,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enfermeria"] });
-    },
+    mutationFn: egresarPaciente,
+    retry: 0,
+    onSuccess: () => invalidar(queryClient),
   });
 }

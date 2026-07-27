@@ -120,6 +120,13 @@ export const queryKeys = {
     all: ['recetas'] as const,
     porPaciente: (pacienteId: number) => [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
   },
+  // Enfermería: salas, camas e internaciones
+  enfermeria: {
+    all: ['enfermeria'] as const,
+    salas: () => [...queryKeys.enfermeria.all, 'salas'] as const,
+    camas: () => [...queryKeys.enfermeria.all, 'camas'] as const,
+    internaciones: () => [...queryKeys.enfermeria.all, 'internaciones'] as const,
+  },
   // Salvoconductos (autorización de traslado)
   salvoconductos: {
     all: ['salvoconductos'] as const,

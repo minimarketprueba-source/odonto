@@ -26,11 +26,13 @@ import { usePacientes, labelTipoPaciente } from "@/api/pacientes";
 import { useSearchCie10, type Cie10 } from "@/api/consultas";
 import {
   useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama,
-  useRegistrarSignosVitales, useEgresarPacienteCama, type Cama, type IngresoCama,
+  useRegistrarSignosVitales, useEgresarPacienteCama, type Cama, type Internacion,
 } from "@/api/enfermeria";
 import { imprimirHojaEnfermeria, cleanQrText } from "@/lib/imprimir";
+import { useAuth } from "@/context/auth-context";
 
 export default function Enfermeria() {
+  const { user } = useAuth();
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: ingresos = [] } = useEnfermeriaIngresos();
   const { data: pacientes = [] } = usePacientes();
@@ -47,10 +49,10 @@ export default function Enfermeria() {
   const [camaPreseleccionada, setCamaPreseleccionada] = useState<Cama | null>(null);
 
   const [modalVitalesOpen, setModalVitalesOpen] = useState(false);
-  const [ingresoSeleccionado, setIngresoSeleccionado] = useState<IngresoCama | null>(null);
+  const [ingresoSeleccionado, setIngresoSeleccionado] = useState<Internacion | null>(null);
 
   const [modalEgresoOpen, setModalEgresoOpen] = useState(false);
-  const [ingresoEgreso, setIngresoEgreso] = useState<IngresoCama | null>(null);
+  const [ingresoEgreso, setIngresoEgreso] = useState<Internacion | null>(null);
 
   // Formulario de Ingreso
   const [pacienteId, setPacienteId] = useState("");
@@ -89,7 +91,7 @@ export default function Enfermeria() {
 
   // Mapa Cama ID -> Ingreso Activo
   const mapaIngresos = useMemo(() => {
-    const map = new Map<number, IngresoCama>();
+    const map = new Map<number, Internacion>();
     ingresos.forEach((ing) => {
       if (ing.estado === "activo") {
         map.set(ing.cama_id, ing);
@@ -138,7 +140,6 @@ export default function Enfermeria() {
     if (!pacienteId) { toast.error("Selecciona un paciente."); return; }
     if (!camaId) { toast.error("Selecciona una cama libre."); return; }
 
-    const pacObj = pacientes.find((p) => String(p.id) === pacienteId) || null;
     const now = new Date();
     const fecha = now.toISOString().split("T")[0];
     const hora = now.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" });
@@ -152,11 +153,10 @@ export default function Enfermeria() {
         fecha_ingreso: fecha,
         hora_ingreso: hora,
         diagnostico_ingreso: diagFinal || "En observación",
-        cie10_codigo: cieSel?.codigo,
+        cie10_id: cieSel?.id ?? null,
         motivo_observacion: motivoObs,
-        medico_tratante: medicoTratante,
+        medico_id: medicoTratante ? Number(medicoTratante) : null,
         enfermero_cargo: enfermeroCargo,
-        pacienteObj: pacObj,
       });
 
       toast.success("Paciente ingresado a cama exitosamente.");
@@ -167,7 +167,7 @@ export default function Enfermeria() {
   };
 
   // Abrir Signos Vitales
-  const handleAbrirVitales = (ing: IngresoCama) => {
+  const handleAbrirVitales = (ing: Internacion) => {
     setIngresoSeleccionado(ing);
     setPaSistolica("");
     setPaDiastolica("");
@@ -191,7 +191,7 @@ export default function Enfermeria() {
 
     try {
       await vitalesMut.mutateAsync({
-        ingreso_id: Number(ingresoSeleccionado.id),
+        internacion_id: Number(ingresoSeleccionado.id),
         pa_sistolica: paSistolica ? Number(paSistolica) : null,
         pa_diastolica: paDiastolica ? Number(paDiastolica) : null,
         fc: fc ? Number(fc) : null,
@@ -200,7 +200,7 @@ export default function Enfermeria() {
         spo2: spo2 ? Number(spo2) : null,
         glucemia: glucemia ? Number(glucemia) : null,
         observaciones: obsVitales,
-        enfermero_nombre: enfermeroVitales,
+        registrado_por: user?.email ?? enfermeroVitales ?? null,
       });
 
       toast.success("Signos vitales registrados correctamente.");
@@ -218,7 +218,7 @@ export default function Enfermeria() {
   };
 
   // Abrir Egreso
-  const handleAbrirEgreso = (ing: IngresoCama) => {
+  const handleAbrirEgreso = (ing: Internacion) => {
     setIngresoEgreso(ing);
     setMotivoEgreso("");
     setTipoEgreso("alta");
@@ -235,8 +235,7 @@ export default function Enfermeria() {
 
     try {
       await egresarMut.mutateAsync({
-        ingreso_id: Number(ingresoEgreso.id),
-        cama_id: Number(ingresoEgreso.cama_id),
+        internacion_id: Number(ingresoEgreso.id),
         motivo_egreso: motivoEgreso,
         estado_final: tipoEgreso,
       });
@@ -253,7 +252,7 @@ export default function Enfermeria() {
   };
 
   // Imprimir Hoja de Enfermería
-  const handleImprimirFicha = (ing: IngresoCama) => {
+  const handleImprimirFicha = (ing: Internacion) => {
     const pac = ing.paciente;
     const camaObj = ing.cama;
     const qrSvgHtml = renderToStaticMarkup(
@@ -272,9 +271,9 @@ export default function Enfermeria() {
     );
 
     const signosFormateados = (ing.signos_vitales || []).map((v) => {
-      const fechaObj = new Date(v.created_at);
+      const fechaObj = new Date(v.tomado_at);
       const fStr = isNaN(fechaObj.getTime())
-        ? v.created_at
+        ? v.tomado_at
         : `${fechaObj.toLocaleDateString("es-PY")} ${fechaObj.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })}`;
       return {
         fechaHora: fStr,
@@ -285,7 +284,7 @@ export default function Enfermeria() {
         spo2: v.spo2 ? String(v.spo2) : undefined,
         glucemia: v.glucemia ? String(v.glucemia) : undefined,
         observaciones: v.observaciones || undefined,
-        enfermero: v.enfermero_nombre || undefined,
+        enfermero: v.registrado_por?.split("@")[0] || undefined,
       };
     });
 
@@ -301,7 +300,7 @@ export default function Enfermeria() {
       horaIngreso: ing.hora_ingreso,
       diagnosticoIngreso: ing.diagnostico_ingreso,
       motivoObservacion: ing.motivo_observacion,
-      medicoTratante: ing.medico_tratante,
+      medicoTratante: ing.medico ? `Dr(a). ${ing.medico.apellidos}, ${ing.medico.nombres}` : null,
       enfermeroCargo: ing.enfermero_cargo,
       signosVitales: signosFormateados,
       qrSvgHtml,
@@ -515,9 +514,9 @@ export default function Enfermeria() {
                             <strong>Dx: </strong>{ing.diagnostico_ingreso || "En observación"}
                           </span>
                         </p>
-                        {ing.medico_tratante && (
+                        {ing.medico && (
                           <p className="text-[11px] text-muted-foreground truncate">
-                            Dr(a): <strong>{ing.medico_tratante}</strong>
+                            Dr(a): <strong>{ing.medico.apellidos}</strong>
                           </p>
                         )}
                       </div>
@@ -847,7 +846,7 @@ export default function Enfermeria() {
                       <tbody className="divide-y">
                         {ingresoSeleccionado.signos_vitales.map((v) => (
                           <tr key={v.id}>
-                            <td className="p-2 font-mono">{new Date(v.created_at).toLocaleString("es-PY")}</td>
+                            <td className="p-2 font-mono">{new Date(v.tomado_at).toLocaleString("es-PY")}</td>
                             <td className="p-2 font-bold text-blue-700">{v.pa_sistolica && v.pa_diastolica ? `${v.pa_sistolica}/${v.pa_diastolica}` : "—"}</td>
                             <td className="p-2">{v.fc ? `${v.fc} bpm` : "—"}</td>
                             <td className="p-2 font-bold text-rose-600">{v.temp ? `${v.temp} °C` : "—"}</td>
