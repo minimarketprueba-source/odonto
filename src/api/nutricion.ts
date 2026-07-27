@@ -122,7 +122,57 @@ function construirObjetoPesada(pesada: any, alturaCm: number, sexo: "M" | "F") {
  * Obtiene la lista de cadetes con su última pesada registrada.
  */
 export async function fetchCadetesNutricion(): Promise<CadeteNutricion[]> {
-  // 1. Cargar las pesadas registradas (con amplio límite)
+  // 1. Intentar obtener cadetes relacionales junto con sus pesadas asociadas
+  const { data: cadetesRel, error: errCadetes } = await supabase
+    .from("cadetes")
+    .select("*, pesadas(*)")
+    .order("apellido", { ascending: true })
+    .order("nombre", { ascending: true });
+
+  if (!errCadetes && cadetesRel && cadetesRel.length > 0) {
+    return cadetesRel.map((c) => {
+      // Ordenar pesadas de este cadete por fecha descendente
+      const listaPesadas: any[] = Array.isArray(c.pesadas) ? [...c.pesadas] : [];
+      listaPesadas.sort((a, b) => {
+        const fA = new Date(a.fecha || a.created_at || 0).getTime();
+        const fB = new Date(b.fecha || b.created_at || 0).getTime();
+        return fB - fA;
+      });
+
+      const pesada = listaPesadas[0] || null;
+      const altura = c.altura_cm || (pesada?.altura_cm) || 170;
+      const sexo = (c.sexo as "M" | "F") || "M";
+
+      return {
+        id: String(c.id),
+        nombre: c.nombre,
+        apellido: c.apellido,
+        dni: c.dni,
+        sexo: sexo,
+        altura_cm: c.altura_cm || null,
+        foto_url: c.foto_url,
+        curso: c.curso || "1er Año",
+        seccion: c.seccion || "Primera",
+        peloton: c.peloton || "Primer Pelotón",
+        compania: c.compania || c.seccion || "Primera",
+        rango: c.rango || "Cadete",
+        activo: c.activo ?? true,
+        ultima_pesada: construirObjetoPesada(pesada, altura, sexo),
+        situacion_medica: {
+          estado: "APTO",
+          descripcion: "Puede realizar actividad física según capacidades",
+        },
+      };
+    });
+  }
+
+  // 2. Si la consulta relacional no devuelve pesadas o falla, intentar consulta manual
+  const { data: cadetes } = await supabase
+    .from("cadetes")
+    .select("*")
+    .order("apellido", { ascending: true })
+    .order("nombre", { ascending: true });
+
   const { data: pesadas } = await supabase
     .from("pesadas")
     .select("*")
@@ -132,32 +182,25 @@ export async function fetchCadetesNutricion(): Promise<CadeteNutricion[]> {
   const ultimasPesadasMap = new Map<string, any>();
   if (pesadas && pesadas.length > 0) {
     for (const p of pesadas) {
-      if (p.cadete_id && !ultimasPesadasMap.has(p.cadete_id)) {
+      if (p.cadete_id && !ultimasPesadasMap.has(String(p.cadete_id))) {
         ultimasPesadasMap.set(String(p.cadete_id), p);
       }
-      if (p.user_id && !ultimasPesadasMap.has(p.user_id)) {
+      if (p.user_id && !ultimasPesadasMap.has(String(p.user_id))) {
         ultimasPesadasMap.set(String(p.user_id), p);
       }
-      if (p.dni && !ultimasPesadasMap.has(p.dni)) {
+      if (p.dni && !ultimasPesadasMap.has(String(p.dni))) {
         ultimasPesadasMap.set(String(p.dni), p);
       }
     }
   }
 
-  // 2. Intentar obtener cadetes de la tabla `cadetes`
-  const { data: cadetes, error: errCadetes } = await supabase
-    .from("cadetes")
-    .select("*")
-    .order("apellido", { ascending: true })
-    .order("nombre", { ascending: true });
-
-  if (!errCadetes && cadetes && cadetes.length > 0) {
+  if (cadetes && cadetes.length > 0) {
     return cadetes.map((c) => {
       const pesada = ultimasPesadasMap.get(String(c.id)) ||
         (c.dni ? ultimasPesadasMap.get(String(c.dni)) : null) ||
         (c.user_id ? ultimasPesadasMap.get(String(c.user_id)) : null);
       
-      const altura = c.altura_cm || 170;
+      const altura = c.altura_cm || (pesada?.altura_cm) || 170;
       const sexo = (c.sexo as "M" | "F") || "M";
 
       return {
