@@ -28,6 +28,7 @@ const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
     pacientes: ["ver", "editar"],
     citas: ["ver", "editar"],
     consultas: ["ver", "editar"],
+    nutricion: ["ver", "editar"],
     recetas: ["ver", "editar"],
     lista_espera: ["ver", "editar"],
   },

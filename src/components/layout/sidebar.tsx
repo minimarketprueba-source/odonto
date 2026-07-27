@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
-import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, ClipboardList, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, BedDouble, Ambulance } from "lucide-react"
+import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, ClipboardList, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, BedDouble, Ambulance, Scale } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
 
 // Helper para obtener la ruta correcta del logo
@@ -30,6 +30,7 @@ export function Sidebar() {
     { name: "Horarios", href: "/horarios", icon: Clock, badge: null as number | null, moduleKey: "citas" },
     { name: "Urgencias (RAC)", href: "/rac", icon: Ambulance, badge: null as number | null, moduleKey: "consultas" },
     { name: "Enfermería", href: "/enfermeria", icon: BedDouble, badge: null as number | null, moduleKey: "consultas" },
+    { name: "Nutrición", href: "/nutricion", icon: Scale, badge: null as number | null, moduleKey: "nutricion" },
     { name: "Lista de espera", href: "/lista-espera", icon: ClipboardList, badge: null as number | null, moduleKey: "lista_espera" },
     { name: "Reportes", href: "/reportes", icon: BarChart2, badge: null as number | null, moduleKey: "reportes" },
     { name: "Mantenimiento", href: "/mantenimiento", icon: Settings, badge: null as number | null, moduleKey: "mantenimiento" },

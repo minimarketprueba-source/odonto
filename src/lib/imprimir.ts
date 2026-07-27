@@ -884,3 +884,115 @@ function ejecutarImpresionIframe(titulo: string, bodyContent: string) {
     }
   }, 250);
 }
+
+export function imprimirFichaAntropometrica(cadete: {
+  nombre: string;
+  apellido: string;
+  dni: string;
+  curso?: string | null;
+  seccion?: string | null;
+  altura_cm?: number | null;
+  ultima_pesada?: {
+    fecha: string;
+    peso_kg: number;
+    imc: number;
+    cintura_cm?: number | null;
+    cadera_cm?: number | null;
+    icc?: number | null;
+    dx_icc?: string | null;
+    porcentaje_mm?: number | null;
+    porcentaje_mg?: number | null;
+    dx_bia?: string | null;
+    egs?: string | null;
+  } | null;
+}) {
+  const p = cadete.ultima_pesada;
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: #000;">
+      <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 style="margin: 0; text-transform: uppercase; font-size: 14px;">POLICÍA NACIONAL — GOBIERNO DEL PARAGUAY</h3>
+        <h2 style="margin: 4px 0; font-size: 15px;">INSTITUTO SUPERIOR DE EDUCACIÓN POLICIAL</h2>
+        <h3 style="margin: 0; font-size: 13px;">ACADEMIA NACIONAL DE POLICÍA "GRAL. JOSÉ E. DÍAZ"</h3>
+        <h1 style="margin: 15px 0 5px 0; font-size: 18px; text-decoration: underline;">FICHA ANTROPOMÉTRICA</h1>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; font-size: 13px; margin-bottom: 15px; line-height: 1.6;">
+        <div><strong>Nombre y Apellido:</strong> ${cadete.nombre} ${cadete.apellido}</div>
+        <div><strong>C.I. Nº:</strong> ${cadete.dni}</div>
+        <div><strong>Curso:</strong> ${cadete.curso || '—'} &nbsp;&nbsp;&nbsp; <strong>Sección:</strong> ${cadete.seccion || '—'}</div>
+        <div><strong>Talla:</strong> ${cadete.altura_cm ? `${cadete.altura_cm} cm` : '—'}</div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; margin-top: 10px;" border="1">
+        <thead>
+          <tr style="background-color: #e5e7eb;">
+            <th style="padding: 8px; text-align: left;">PARÁMETRO</th>
+            <th style="padding: 8px; width: 120px;">VALOR ACTUAL</th>
+            <th style="padding: 8px; text-align: left;">DIAGNÓSTICO / RANGO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 8px; font-weight: bold; text-align: left;">FECHA</td>
+            <td style="padding: 8px;">${p?.fecha || new Date().toLocaleDateString('es-PY')}</td>
+            <td style="padding: 8px; text-align: left;">Control Antropométrico</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; font-weight: bold; text-align: left;">PESO</td>
+            <td style="padding: 8px;">${p?.peso_kg ? `${p.peso_kg} kg` : '—'}</td>
+            <td style="padding: 8px; text-align: left;">—</td>
+          </tr>
+          <tr style="background-color: #f9fafb;">
+            <td style="padding: 8px; font-weight: bold; text-align: left;">IMC</td>
+            <td style="padding: 8px;">${p?.imc || '—'}</td>
+            <td style="padding: 8px; text-align: left;">${p?.imc ? 'Índice de Masa Corporal (OMS)' : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; font-weight: bold; text-align: left;">CINTURA / CADERA</td>
+            <td style="padding: 8px;">${p?.cintura_cm ? `${p.cintura_cm} cm` : '—'} / ${p?.cadera_cm ? `${p.cadera_cm} cm` : '—'}</td>
+            <td style="padding: 8px; text-align: left;">—</td>
+          </tr>
+          <tr style="background-color: #f9fafb;">
+            <td style="padding: 8px; font-weight: bold; text-align: left;">DX ICC</td>
+            <td style="padding: 8px;">${p?.icc || '—'}</td>
+            <td style="padding: 8px; text-align: left;">${p?.dx_icc || 'Diagnóstico Índice Cintura-Cadera'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; font-weight: bold; text-align: left;">%MM (% Masa Muscular)</td>
+            <td style="padding: 8px;">${p?.porcentaje_mm ? `${p.porcentaje_mm}%` : '—'}</td>
+            <td style="padding: 8px; text-align: left;">Porcentaje de Masa Muscular</td>
+          </tr>
+          <tr style="background-color: #f9fafb;">
+            <td style="padding: 8px; font-weight: bold; text-align: left;">%MG (% Masa Grasa)</td>
+            <td style="padding: 8px;">${p?.porcentaje_mg ? `${p.porcentaje_mg}%` : '—'}</td>
+            <td style="padding: 8px; text-align: left;">Porcentaje de Masa Grasa</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; font-weight: bold; text-align: left;">DX BIA</td>
+            <td style="padding: 8px;">—</td>
+            <td style="padding: 8px; text-align: left;">${p?.dx_bia || 'Diagnóstico Bioimpedancia / Grasa Visceral'}</td>
+          </tr>
+          <tr style="background-color: #f9fafb;">
+            <td style="padding: 8px; font-weight: bold; text-align: left;">EGS</td>
+            <td style="padding: 8px;">${p?.egs || 'A'}</td>
+            <td style="padding: 8px; text-align: left;">Evaluación Global Subjetiva</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top: 50px; display: flex; justify-content: space-around; text-align: center;">
+        <div>
+          <div style="width: 200px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
+          <span style="font-size: 11px;">Firma del Cadete</span>
+        </div>
+        <div>
+          <div style="width: 200px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
+          <span style="font-size: 11px;">Firma y Sello Nutricionista</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe("Ficha Antropométrica", html);
+}
+

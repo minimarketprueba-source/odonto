@@ -36,6 +36,7 @@ const Citas = lazy(() => import('./pages/Citas'))
 const Horarios = lazy(() => import('./pages/Horarios'))
 const Enfermeria = lazy(() => import('./pages/Enfermeria'))
 const Rac = lazy(() => import('./pages/Rac'))
+const Nutricion = lazy(() => import('./pages/Nutricion'))
 const PerfilUsuario = lazy(() => import('./pages/PerfilUsuario'))
 const ListaEspera = lazy(() => import('./pages/ListaEspera'))
 const Reportes = lazy(() => import('./pages/Reportes'))
@@ -107,6 +108,7 @@ function App() {
           <Route path="/horarios" element={<ProtectedRoute moduleKey="citas"><Horarios /></ProtectedRoute>} />
           <Route path="/enfermeria" element={<ProtectedRoute moduleKey="consultas"><Enfermeria /></ProtectedRoute>} />
           <Route path="/rac" element={<ProtectedRoute moduleKey="consultas"><Rac /></ProtectedRoute>} />
+          <Route path="/nutricion" element={<ProtectedRoute moduleKey="nutricion"><Nutricion /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><PerfilUsuario /></ProtectedRoute>} />
           <Route path="/lista-espera" element={<ProtectedRoute moduleKey="lista_espera"><ListaEspera /></ProtectedRoute>} />
           <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
