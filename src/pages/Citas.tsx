@@ -149,7 +149,7 @@ export default function Citas() {
   const hoyEnEspera = citasDeHoy.filter((c) => c.estado === "admitida").length;
   const hoyPorLlegar = citasDeHoy.filter((c) => c.estado === "pendiente" || c.estado === "confirmada").length;
   const hoyAtendidas = citasDeHoy.filter((c) => c.estado === "atendida").length;
-  const nombreSaludo = miMedico ? ` ${miMedico.nombres.split(" ")[0]}` : "";
+  const nombreSaludo = miMedico ? `, ${miMedico.nombres.split(" ")[0]}` : "";
   const posesivo = miMedico ? "tiene" : "hay";
 
   // Consultas registradas hoy: incluye las que se atendieron sin cita previa.
