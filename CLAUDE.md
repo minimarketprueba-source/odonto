@@ -18,7 +18,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Feedback de la Dra. Lopez Irala** (2026-07-20, fotos `Downloads\WhatsApp Image 2026-07-20 at 11.*.jpeg`, chat de WhatsApp): estado de cita `no_acudio` (botón UserX en agenda — evita el truco PY HIS de consulta Z71.9 para ausentes), CIE-10 **obligatorio** en consulta-form, reposo con **cantidad de días** calculada/editable (días↔fecha sincronizados, ambos inclusive), filtro **por servicio** (especialidad) en la historia clínica.
 
+- **Pacientes externos** (2026-07-26): la tabla `pacientes` ya NO es solo de cadetes. Tipos nuevos `policia` y `civil` (+ `familiar` que ya existía); `labelTipoPaciente()` / `esPacienteExterno()` en `src/api/pacientes.ts`. Los 24 médicos ahora tienen `pacientes:["ver","editar"]` (aplicado por API admin sobre `user_roles`, preservando el resto de sus permisos); **dar de baja pasó a `canDelete`** = solo admin. `documento` es opcional para familiar/civil (menores sin CI) → los impresos usan `idPaciente()` = documento o `P<id>`. Alta rápida "Registrar paciente nuevo" en el estado vacío de los buscadores de Pacientes, Lista de espera y Agendar cita (`PacienteForm` acepta `onCreated` + `busquedaInicial`). Anti-duplicados: aviso en el form comparando con `normalizeDocumento()` + botón bloqueado + `retry: 0` en `useCreatePaciente` (el retry global de React Query creaba fichas dobles) + índice único parcial en la BD. **OJO**: todo script que vincule cadetes↔pacientes debe filtrar `WHERE tipo = 'cadete'`.
+
 ## Pendientes (lo que sigue)
+
+0. **EJECUTAR**: `Escritorio\Actualizar_Base_Pacientes.txt` en el SQL Editor (columna `familiar_de` + índice único `pacientes_documento_unico`). Verificación esperada: 1 | 1 | 0. Hasta entonces, el campo "Familiar de" da error PGRST204 al guardar (el resto del alta funciona: el payload omite la columna si va vacía).
 
 0. Ideas PY HIS aún no hechas (decidir con el usuario): PDF de consulta/historial, estudios solicitados, procedimientos con historial, preconsulta (signos vitales), historial de medicamentos prescriptos. (Migración de agenda EJECUTADA y verificada end-to-end el 2026-07-20: cita+admisión+no_acudio+horarios probados en producción con cuenta de enfermería.)
 
