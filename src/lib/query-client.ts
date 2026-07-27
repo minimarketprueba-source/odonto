@@ -120,6 +120,12 @@ export const queryKeys = {
     all: ['recetas'] as const,
     porPaciente: (pacienteId: number) => [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
   },
+  // Salvoconductos (autorización de traslado)
+  salvoconductos: {
+    all: ['salvoconductos'] as const,
+    porPaciente: (pacienteId: number) => [...queryKeys.salvoconductos.all, 'paciente', pacienteId] as const,
+    porDia: (fecha: string) => [...queryKeys.salvoconductos.all, 'dia', fecha] as const,
+  },
   // Especialidades
   especialidades: {
     all: ['especialidades'] as const,

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ClipboardCheck,
-  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock,
+  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Ambulance,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchTexto } from "@/lib/utils";
@@ -14,6 +14,8 @@ import { useAuth } from "@/context/auth-context";
 import { CitaForm } from "@/components/citas/cita-form";
 import { ReagendarDialog } from "@/components/citas/reagendar-dialog";
 import { ConsultaForm } from "@/components/consultas/consulta-form";
+import { SalvoconductoForm } from "@/components/consultas/salvoconducto-form";
+import { usePacientes, type Paciente } from "@/api/pacientes";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -91,6 +93,7 @@ export default function Citas() {
   const [formOpen, setFormOpen] = useState(false);
   const [consultaCita, setConsultaCita] = useState<Cita | null>(null);
   const [reagendarCita, setReagendarCita] = useState<Cita | null>(null);
+  const [pacienteSalvoconducto, setPacienteSalvoconducto] = useState<Paciente | null>(null);
   const [soloMias, setSoloMias] = useState(isMedico);
 
   const { data: citasDelDia = [], isLoading: cargandoDia } = useCitasDelDia(fecha);
@@ -101,6 +104,7 @@ export default function Citas() {
   );
   const { data: miMedico } = useMiMedico(user?.id);
   const { data: atenciones = [] } = useAtenciones();
+  const { data: pacientes = [] } = usePacientes();
   const cambiarEstado = useCambiarEstadoCita();
   const admitir = useAdmitirCita();
 
@@ -194,6 +198,20 @@ export default function Citas() {
           <Button variant="outline" size="sm" className="gap-1" onClick={() => setReagendarCita(c)}>
             <CalendarClock className="w-3.5 h-3.5" /> Reagendar
           </Button>
+          {atiendeConsultas && (
+            <Button
+              variant="ghost" size="sm"
+              className="text-red-600 hover:text-red-700 gap-1"
+              title="Expedir salvoconducto (traslado al hospital o a estudios)"
+              onClick={() => {
+                const p = pacientes.find((x) => x.id === c.paciente_id);
+                if (p) setPacienteSalvoconducto(p);
+                else toast.error("No se encontró la ficha del paciente.");
+              }}
+            >
+              <Ambulance className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {(c.estado === "pendiente" || c.estado === "confirmada") && (
             <Button
               variant="ghost" size="sm"
@@ -438,6 +456,11 @@ export default function Citas() {
 
       <CitaForm open={formOpen} onOpenChange={setFormOpen} fechaInicial={vista === "dia" ? fecha : undefined} />
       <ReagendarDialog cita={reagendarCita} onOpenChange={(abierto) => { if (!abierto) setReagendarCita(null); }} />
+      <SalvoconductoForm
+        open={!!pacienteSalvoconducto}
+        onOpenChange={(abierto) => { if (!abierto) setPacienteSalvoconducto(null); }}
+        paciente={pacienteSalvoconducto}
+      />
       <ConsultaForm
         open={!!consultaCita}
         onOpenChange={(abierto) => { if (!abierto) setConsultaCita(null); }}

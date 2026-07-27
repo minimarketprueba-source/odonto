@@ -236,6 +236,121 @@ export function imprimirInformeConsulta(datos: DatosImpresionConsulta) {
   ejecutarImpresionIframe(tituloDoc, html);
 }
 
+export interface DatosImpresionSalvoconducto {
+  numero: string;
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteTipo?: string | null;
+  pacienteGrado?: string | null;
+  pacienteUnidad?: string | null;
+  pacientePromocion?: string | null;
+  destino: string;
+  motivo?: string | null;
+  urgente: boolean;
+  acompanante?: string | null;
+  fechaSalida: string;
+  horaSalida: string;
+  retornoTexto?: string | null;
+  profesionalNombre: string;
+  expedidoPor?: string | null;
+  qrSvgHtml?: string;
+}
+
+/** Autorización de traslado del paciente fuera de la Academia. */
+export function imprimirSalvoconducto(datos: DatosImpresionSalvoconducto) {
+  const tituloDoc = datos.urgente
+    ? "SALVOCONDUCTO MÉDICO DE URGENCIA"
+    : "SALVOCONDUCTO MÉDICO";
+  const datosAcademicos = [
+    datos.pacientePromocion ? `Curso ${datos.pacientePromocion}` : "",
+    datos.pacienteUnidad || "",
+  ].filter(Boolean).join(" · ");
+
+  const html = `
+    <div class="header">
+      <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+      <p class="sub">Gral. José E. Díaz</p>
+      <h2>${tituloDoc}</h2>
+      <p class="meta">N° ${datos.numero} — Emisión: ${datos.fechaSalida} a las ${datos.horaSalida} hs</p>
+    </div>
+
+    <div class="box-paciente">
+      <div>
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
+      </div>
+      <div>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${datos.pacienteTipo || "—"} ${datos.pacienteGrado ? `— ${datos.pacienteGrado}` : ""}</p>
+        ${datosAcademicos ? `<p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datosAcademicos}</p>` : ""}
+      </div>
+    </div>
+
+    <div class="box-reposo">
+      ${datos.urgente ? `
+        <div class="badge-reposo">
+          <p class="tipo" style="margin:0;">• TRASLADO DE URGENCIA</p>
+          <p style="margin:4px 0 0 0; font-size:11px; color:#991b1b;">
+            Requiere traslado inmediato. Se solicita a la guardia dar curso sin demora.
+          </p>
+        </div>` : ""}
+
+      <p style="margin:0 0 4px 0; font-size:13px;">
+        Por la presente se <strong>AUTORIZA LA SALIDA</strong> del personal arriba individualizado
+        de las instalaciones de la Academia Nacional de Policía, por razones médicas, con el
+        siguiente destino:
+      </p>
+
+      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px 12px; margin:10px 0;">
+        <p style="margin:0; font-size:11px; font-weight:bold; color:#1e3a8a;">DESTINO AUTORIZADO:</p>
+        <p style="margin:2px 0 0 0; font-size:15px; font-weight:800; color:#1d4ed8;">${datos.destino}</p>
+      </div>
+
+      ${datos.motivo ? `
+        <div style="margin-bottom:12px;">
+          <p style="margin:0; font-weight:bold; color:#1e293b;">MOTIVO MÉDICO:</p>
+          <p style="margin:2px 0 0 8px;">${datos.motivo}</p>
+        </div>` : ""}
+
+      <div class="dates-grid">
+        <div>
+          <p style="margin:0; font-size:11px; font-weight:bold; color:#475569;">FECHA Y HORA DE SALIDA:</p>
+          <p style="margin:2px 0 0 0; font-size:14px; font-weight:bold;">${datos.fechaSalida} — ${datos.horaSalida} hs</p>
+        </div>
+        <div>
+          <p style="margin:0; font-size:11px; font-weight:bold; color:#475569;">RETORNO PREVISTO:</p>
+          <p style="margin:2px 0 0 0; font-size:14px; font-weight:bold;">${datos.retornoTexto || "Según indicación médica"}</p>
+        </div>
+      </div>
+
+      ${datos.acompanante ? `
+        <div style="margin-bottom:12px;">
+          <p style="margin:0; font-weight:bold; color:#1e293b;">ACOMPAÑANTE:</p>
+          <p style="margin:2px 0 0 8px;">${datos.acompanante}</p>
+        </div>` : ""}
+
+      <div class="footer-qr">
+        <div style="display:flex; align-items:center; gap: 12px;">
+          ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
+          <div style="font-size:10px; color:#475569;">
+            <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
+            <p style="margin:1px 0;">Sanidad ANP — Documento Oficial</p>
+            <p style="margin:1px 0; font-family: monospace;">ID: ${datos.numero}</p>
+            ${datos.expedidoPor ? `<p style="margin:1px 0; color:#64748b;">Expedido por: ${datos.expedidoPor}</p>` : ""}
+          </div>
+        </div>
+
+        <div class="firmas">
+          <div class="linea-firma"></div>
+          <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.profesionalNombre}</p>
+          <p style="margin:0; font-size:10px; color:#64748b;">Firma y Sello del Profesional Tratante</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
 export function imprimirHistoriaClinicaHTML(pacienteNombre: string, pacienteDoc: string, contenidoBodyHtml: string) {
   const tituloDoc = `HISTORIA CLÍNICA — ${pacienteNombre} (CI: ${pacienteDoc})`;
   const html = `

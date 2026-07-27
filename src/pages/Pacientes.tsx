@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope,
+  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
@@ -17,6 +17,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
 import { HistoriaClinicaDialog } from "@/components/consultas/historia-clinica-dialog";
+import { SalvoconductoForm } from "@/components/consultas/salvoconducto-form";
 import {
   TIPOS_PACIENTE, labelTipoPaciente, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
@@ -52,6 +53,8 @@ export default function Pacientes() {
   // Dar de baja es una decisión de padrón (afecta a control de peso): solo admin.
   const puedeDarDeBaja = canDelete("pacientes");
   const veHistoria = canView("consultas");
+  // El salvoconducto lo expide el profesional o la enfermera de turno.
+  const puedeExpedirSalvoconducto = hasPermission("consultas", "editar");
 
   const { data: pacientes = [], isLoading } = usePacientes();
   const cambiarEstado = useCambiarEstadoPaciente();
@@ -70,6 +73,7 @@ export default function Pacientes() {
   const [seleccionado, setSeleccionado] = useState<Paciente | null>(null);
   const [historiaOpen, setHistoriaOpen] = useState(false);
   const [pacienteHistoria, setPacienteHistoria] = useState<Paciente | null>(null);
+  const [pacienteSalvoconducto, setPacienteSalvoconducto] = useState<Paciente | null>(null);
 
   const busquedaDebounced = useDebounce(busqueda, 300);
 
@@ -236,6 +240,16 @@ export default function Pacientes() {
                           <Stethoscope className="w-4 h-4" />
                         </Button>
                       )}
+                      {puedeExpedirSalvoconducto && (
+                        <Button
+                          variant="ghost" size="sm"
+                          title="Expedir salvoconducto (traslado al hospital o a estudios)"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => setPacienteSalvoconducto(p)}
+                        >
+                          <Ambulance className="w-4 h-4" />
+                        </Button>
+                      )}
                       {canEdit && (
                         <Button
                           variant="ghost" size="sm" title="Editar paciente"
@@ -286,6 +300,11 @@ export default function Pacientes() {
         }}
       />
       <HistoriaClinicaDialog open={historiaOpen} onOpenChange={setHistoriaOpen} paciente={pacienteHistoria} />
+      <SalvoconductoForm
+        open={!!pacienteSalvoconducto}
+        onOpenChange={(abierto) => { if (!abierto) setPacienteSalvoconducto(null); }}
+        paciente={pacienteSalvoconducto}
+      />
     </AppLayout>
   );
 }
