@@ -104,7 +104,7 @@ function App() {
           <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
           <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
           <Route path="/horarios" element={<ProtectedRoute moduleKey="citas"><Horarios /></ProtectedRoute>} />
-          <Route path="/enfermeria" element={<ProtectedRoute><Enfermeria /></ProtectedRoute>} />
+          <Route path="/enfermeria" element={<ProtectedRoute moduleKey="consultas"><Enfermeria /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><PerfilUsuario /></ProtectedRoute>} />
           <Route path="/lista-espera" element={<ProtectedRoute moduleKey="lista_espera"><ListaEspera /></ProtectedRoute>} />
           <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
