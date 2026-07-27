@@ -14,7 +14,8 @@ import { Ambulance, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sanitizePlainText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
-import { useMedicosActivos, useMiMedico, fechaHoyISO } from "@/api/citas";
+import { MedicoSelector } from "@/components/consultas/medico-selector";
+import { fechaHoyISO } from "@/api/citas";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import {
   DESTINOS_SALVOCONDUCTO, labelDestino, useCreateSalvoconducto, type Salvoconducto,
@@ -40,8 +41,6 @@ function fmtFecha(f: string | null): string {
 
 export function SalvoconductoForm({ open, onOpenChange, paciente }: SalvoconductoFormProps) {
   const { user } = useAuth();
-  const { data: medicos = [] } = useMedicosActivos();
-  const { data: miMedico } = useMiMedico(user?.id);
   const crear = useCreateSalvoconducto();
 
   const [medicoId, setMedicoId] = useState("");
@@ -57,8 +56,8 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
 
   useEffect(() => {
     if (!open) return;
-    // Si quien está usando el sistema es un profesional, se precarga como tratante.
-    setMedicoId(miMedico ? String(miMedico.id) : "");
+    // Si quien usa el sistema es un profesional, MedicoSelector lo fija como tratante.
+    setMedicoId("");
     setDestino("hospital_policia");
     setDestinoDetalle("");
     setMotivo("");
@@ -68,7 +67,7 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
     setHora(horaAhora());
     setRetornoFecha("");
     setRetornoHora("");
-  }, [open, miMedico]);
+  }, [open]);
 
   const imprimir = (sc: Salvoconducto, p: Paciente) => {
     const destinoTexto = labelDestino(sc.destino, sc.destino_detalle);
@@ -199,19 +198,7 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
             </div>
             <div className="space-y-1">
               <Label htmlFor="sc-medico">Profesional tratante *</Label>
-              <Combobox
-                id="sc-medico"
-                value={medicoId}
-                onChange={setMedicoId}
-                placeholder="Seleccione"
-                buscarPlaceholder="Buscar por nombre o especialidad..."
-                vacioTexto="No hay ningún profesional con ese nombre."
-                opciones={medicos.map((m) => ({
-                  value: String(m.id),
-                  label: `${m.apellidos}, ${m.nombres}`,
-                  detalle: m.especialidad?.nombre ?? null,
-                }))}
-              />
+              <MedicoSelector id="sc-medico" value={medicoId} onChange={setMedicoId} placeholder="Seleccione" />
             </div>
           </div>
 
