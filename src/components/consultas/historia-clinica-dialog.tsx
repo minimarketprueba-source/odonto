@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw } from "lucide-react";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useConsultasPaciente, type Consulta } from "@/api/consultas";
@@ -19,6 +19,7 @@ import {
   useAnularConsulta, useAnularReceta, useRestaurarConsulta, useRestaurarReceta,
 } from "@/api/anulaciones";
 import { AnularDialog } from "./anular-dialog";
+import { useInternacionesPaciente } from "@/api/enfermeria";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
@@ -132,6 +133,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   // El administrador trae también las anuladas, para poder verlas y restaurarlas.
   const { data: consultas = [], isLoading } = useConsultasPaciente(open ? (paciente?.id ?? null) : null, isAdmin);
   const { data: recetas = [] } = useRecetasPaciente(open && veRecetas ? (paciente?.id ?? null) : null, isAdmin);
+  const { data: internaciones = [] } = useInternacionesPaciente(open ? (paciente?.id ?? null) : null);
   const anularConsulta = useAnularConsulta();
   const anularReceta = useAnularReceta();
   const restaurarConsulta = useRestaurarConsulta();
@@ -344,6 +346,39 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                   </Select>
                 </div>
               )}
+              {internaciones.length > 0 && servicioFiltro === "todos" && (
+                <div className="rounded-lg border border-cyan-300 dark:border-cyan-800 overflow-hidden">
+                  <div className="px-3 py-1.5 bg-cyan-50 dark:bg-cyan-950/40 flex items-center gap-2">
+                    <BedDouble className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
+                    <span className="text-sm font-semibold text-cyan-800 dark:text-cyan-200">
+                      Internaciones en enfermería ({internaciones.length})
+                    </span>
+                  </div>
+                  <div className="divide-y">
+                    {internaciones.map((i) => (
+                      <div key={i.id} className="px-3 py-2 text-sm">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">{fmtFecha(i.fecha_ingreso)} · {i.hora_ingreso?.slice(0, 5)} hs</span>
+                          <Badge variant="outline">{i.cama?.codigo ?? `Cama ${i.cama_id}`}</Badge>
+                          {i.estado === "activo"
+                            ? <Badge className="bg-cyan-100 text-cyan-700 border-0 dark:bg-cyan-900/40 dark:text-cyan-200">Internado ahora</Badge>
+                            : <Badge variant="outline">
+                                {i.estado === "traslado" ? "Trasladado" : "Alta"}
+                                {i.fecha_egreso ? ` el ${fmtFecha(i.fecha_egreso)}` : ""}
+                              </Badge>}
+                        </div>
+                        {i.diagnostico_ingreso && (
+                          <p className="text-muted-foreground text-xs mt-0.5">{i.diagnostico_ingreso}</p>
+                        )}
+                        {i.motivo_egreso && (
+                          <p className="text-muted-foreground text-xs">Egreso: {i.motivo_egreso}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {isLoading ? (
                 <p className="text-center text-sm text-muted-foreground py-6">Cargando historia clínica...</p>
               ) : consultasFiltradas.length === 0 ? (

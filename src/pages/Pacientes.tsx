@@ -23,7 +23,7 @@ import {
 } from "@/api/pacientes";
 import { useUltimasAtenciones } from "@/api/consultas";
 
-const POR_PAGINA = 12;
+const POR_PAGINA = 24;
 
 const FILTROS_ATENCION = [
   { value: "todos", label: "Con o sin atención" },
@@ -88,7 +88,7 @@ export default function Pacientes() {
     const lista = pacientes.filter((p) => {
       if (estadoSel === "activos" && !p.activo) return false;
       if (estadoSel === "inactivos" && p.activo) return false;
-      if (tipoSel !== "todos" && p.tipo !== tipoSel) return false;
+      if (tipoSel !== "todos" && (p.tipo || "").toLowerCase() !== tipoSel.toLowerCase()) return false;
       if (atencionSel !== "todos") {
         const ultima = ultimasAtenciones[p.id];
         if (!ultima) return false;
@@ -109,14 +109,16 @@ export default function Pacientes() {
 
   /** Datos secundarios de la tarjeta, según de qué tipo de paciente se trate. */
   const detalle = (p: Paciente): string => {
+    const pTipo = (p.tipo || "").toLowerCase();
+    const esOficialOPolicia = pTipo === "policia" || pTipo === "oficial" || pTipo === "suboficial" || pTipo === "funcionario" || pTipo === "medico" || pTipo === "personal";
     const partes =
-      p.tipo === "familiar"
+      pTipo === "familiar"
         ? [p.familiar_de && `Familiar de: ${p.familiar_de}`, p.telefono && `Tel.: ${p.telefono}`]
-        : p.tipo === "civil"
+        : pTipo === "civil"
           ? [p.telefono && `Tel.: ${p.telefono}`, p.direccion && p.direccion]
-          : p.tipo === "policia"
-            ? [p.grado && `Grado: ${p.grado}`, p.unidad && `Dependencia: ${p.unidad}`]
-            : [p.promocion && `Curso: ${p.promocion}`, p.unidad && `Sección: ${p.unidad}`];
+          : esOficialOPolicia
+            ? [p.grado && `Grado: ${p.grado}`, p.unidad && `Unidad: ${p.unidad}`, p.telefono && `Tel.: ${p.telefono}`]
+            : [p.grado && `Grado: ${p.grado}`, p.promocion && `Curso: ${p.promocion}`, p.unidad && `Sección: ${p.unidad}`];
     return [...partes, p.fecha_nacimiento && `Nac.: ${fmtFecha(p.fecha_nacimiento)}`]
       .filter(Boolean).join(" · ") || "Sin datos adicionales";
   };

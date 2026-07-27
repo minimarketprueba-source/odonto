@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/command"
 import { useNavigate } from "react-router-dom"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationsDropdown } from "@/components/layout/notifications-dropdown"
 
 export function Header() {
   const pageTitle = usePageTitle()
@@ -67,7 +68,14 @@ export function Header() {
           >
             <Search className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10 hidden sm:flex h-8 w-8 sm:h-10 sm:w-10">
+          <NotificationsDropdown />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary-foreground hover:bg-primary-foreground/10 hidden sm:flex h-8 w-8 sm:h-10 sm:w-10"
+            title="Mi perfil"
+            onClick={() => navigate("/perfil")}
+          >
             <User className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
           <ThemeToggle />

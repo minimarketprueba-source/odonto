@@ -155,6 +155,26 @@ export async function fetchInternacionesActivas(): Promise<Internacion[]> {
   return internaciones.map((i) => ({ ...i, signos_vitales: porInternacion.get(i.id) || [] }));
 }
 
+/** Historial de internaciones de un paciente, para su historia clínica. */
+export async function fetchInternacionesPaciente(pacienteId: number): Promise<Internacion[]> {
+  const { data, error } = await supabase
+    .from("internaciones")
+    .select(INTERNACION_SELECT)
+    .eq("paciente_id", pacienteId)
+    .order("fecha_ingreso", { ascending: false })
+    .order("id", { ascending: false });
+  if (error) throw new Error(`Error al cargar las internaciones: ${error.message}`);
+  return (data as unknown as Internacion[]) || [];
+}
+
+export function useInternacionesPaciente(pacienteId: number | null) {
+  return useQuery({
+    queryKey: [...queryKeys.enfermeria.all, "paciente", pacienteId ?? 0],
+    queryFn: () => fetchInternacionesPaciente(pacienteId!),
+    enabled: !!pacienteId,
+  });
+}
+
 export interface IngresarPacienteInput {
   paciente_id: number;
   cama_id: number;

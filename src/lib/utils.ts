@@ -77,13 +77,15 @@ export function matchPaciente(
     documento?: string | null;
     unidad?: string | null;
     promocion?: string | null;
+    tipo?: string | null;
+    grado?: string | null;
   },
   query: string
 ): boolean {
   if (!query || !query.trim()) return true;
 
   const docClean = (p.documento || "").replace(/\D/g, "");
-  const targetText = `${p.apellidos} ${p.nombres} ${p.apellidos}, ${p.nombres} ${p.documento || ""} ${docClean} ${p.unidad || ""} ${p.promocion || ""}`;
+  const targetText = `${p.apellidos} ${p.nombres} ${p.apellidos}, ${p.nombres} ${p.documento || ""} ${docClean} ${p.unidad || ""} ${p.promocion || ""} ${p.tipo || ""} ${p.grado || ""}`;
 
   return matchTexto(targetText, query);
 }
