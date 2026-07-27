@@ -482,13 +482,14 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
           {/* ---------------- 2. ENFERMERÍA ---------------- */}
           <section>
             <p className={tituloSeccion}>2. Enfermería — signos vitales y clasificación</p>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {/* La PA ocupa dos columnas: son dos casillas y una barra en el medio. */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               <div className="space-y-1">
                 <Label htmlFor="rac-hora-enf">Hora</Label>
                 <Input id="rac-hora-enf" type="time" value={form.hora_enfermeria}
                   disabled={modo !== "nueva"} onChange={(e) => set("hora_enfermeria")(e.target.value)} />
               </div>
-              <div className="space-y-1 col-span-2 sm:col-span-1">
+              <div className="space-y-1 col-span-2">
                 <Label>PA (sist./diast.)</Label>
                 <div className="flex items-center gap-1">
                   <Input inputMode="numeric" placeholder="120" value={form.pa_sistolica}
