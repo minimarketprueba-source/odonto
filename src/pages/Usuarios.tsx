@@ -33,7 +33,7 @@ import { showSwal } from "@/components/ui/swal";
 import { supabase } from "@/lib/supabase";
 import { recordAuditAction } from "@/lib/audit";
 import {
-  useAuth, DEFAULT_PERMISOS_SANIDAD, MODULOS_SANIDAD, ROLES_SANIDAD_OPCIONES,
+  useAuth, esEstadoActivo, DEFAULT_PERMISOS_SANIDAD, MODULOS_SANIDAD, ROLES_SANIDAD_OPCIONES,
 } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -191,13 +191,14 @@ function buildUsers(profiles: RawProfile[], roles: RawRoleRow[]): UserRecord[] {
         .filter((value?: string) => Boolean(value && value.trim().length))
         .join(" ") || profile?.nombre_completo || profile?.full_name || email;
 
-    const statusRaw = roleRow?.status ?? profile?.status ?? (profile?.activo ? "active" : undefined);
-    const isActive =
-      typeof profile?.activo === "boolean"
-        ? profile.activo
-        : statusRaw
-        ? ["active", "activo", "habilitado", "enabled"].includes(String(statusRaw).toLowerCase())
-        : true;
+    // Manda `user_roles.status`, que es lo que mira el RLS y lo que escribe
+    // Suspender. `profiles.activo` solo se usa si la persona no tiene fila de
+    // rol (cuentas de la otra app).
+    const isActive = roleRow
+      ? esEstadoActivo(roleRow.status)
+      : typeof profile?.activo === "boolean"
+      ? profile.activo
+      : esEstadoActivo(profile?.status);
 
     return {
       id,
@@ -335,8 +336,20 @@ export default function Usuarios() {
       const { data: rpcData, error: rpcError } = await supabase.rpc("list_admin_users");
 
       if (!rpcError && rpcData) {
+        // El `activo` que devuelve la RPC sale de `profiles`, pero quien manda
+        // sobre el acceso es `user_roles.status` (es lo que mira el RLS y lo
+        // que escribe Suspender). Sin este cruce, suspender a alguien no se
+        // veía reflejado en la lista: seguía figurando "Activo".
+        const { data: roleRows } = await supabase
+          .from("user_roles")
+          .select("user_id, role, status");
+        const estadoPorUsuario = new Map<string, RawRoleRow>(
+          (roleRows ?? []).map((r) => [r.user_id, r as RawRoleRow])
+        );
+
         const normalized: UserRecord[] = (rpcData as any[]).map((row) => {
-          const isActive = row.activo ?? true;
+          const rol = estadoPorUsuario.get(row.id);
+          const isActive = rol ? esEstadoActivo(rol.status) : row.activo ?? true;
           const displayName = row.username || row.email || "Sin nombre";
           return {
             id: row.id,
@@ -344,7 +357,7 @@ export default function Usuarios() {
             displayName,
             createdAt: row.created_at ?? null,
             lastLoginAt: row.last_sign_in_at ?? row.role_updated_at ?? null,
-            role: row.role ?? "sin_rol",
+            role: rol?.role ?? row.role ?? "sin_rol",
             statusLabel: isActive ? "Activo" : "Inactivo",
             isActive,
             seccion: null,
@@ -654,11 +667,11 @@ export default function Usuarios() {
     const nextState = !record.isActive;
 
     const { isConfirmed } = await showSwal({
-      icon: nextState ? "warning" : "question",
+      icon: nextState ? "question" : "warning",
       title: nextState ? "Reactivar usuario" : "Suspender usuario",
       text: nextState
         ? "El usuario volverá a tener acceso a la plataforma."
-        : "El usuario no podrá iniciar sesión hasta que lo habilites nuevamente.",
+        : "El usuario dejará de tener acceso al sistema hasta que lo habilites nuevamente. Si está usando la aplicación en este momento, quedará sin acceso la próxima vez que la abra.",
       showCancelButton: true,
       confirmButtonText: nextState ? "Reactivar" : "Suspender",
     });
@@ -676,36 +689,40 @@ export default function Usuarios() {
         setIsUpdating(false);
         return;
       }
-      console.debug("toggleActiveState: payload preparation", { userId: record.id, nextState });
-      // Si la tabla de perfiles tiene el campo 'activo', mantenemos la actualización allí.
+      // `user_roles.status` es lo que mira `es_sanidad_activo()` en la base y
+      // lo que ahora corta el acceso en auth-context: se escribe SIEMPRE.
+      // Antes solo se tocaba cuando el perfil no traía `activo`, así que según
+      // por dónde se hubiera cargado la lista la suspensión iba a parar a
+      // `profiles` y no frenaba nada.
+      const payload = {
+        user_id: record.id,
+        role: esRolAsignable(record.role) ? record.role : null,
+        status: nextState ? "Activo" : "Inactivo",
+      };
+      const { error } = await supabase
+        .from("user_roles")
+        .upsert(payload, { onConflict: "user_id" })
+        .select("user_id, status, role");
+      if (error) {
+        console.error("Supabase user_roles upsert error:", error);
+        if ((error as any)?.status === 403) {
+          toast({
+            title: "Acción prohibida",
+            description: "No tienes permisos suficientes para modificar el estado (403).",
+            variant: "destructive",
+          });
+        }
+        throw error;
+      }
+
+      // `profiles.activo` se mantiene en sintonía porque lo usa control de
+      // peso, pero si falla no se corta: el estado que vale ya quedó guardado.
       if ("activo" in record.raw) {
-        const { data, error } = await supabase.from("profiles").update({ activo: nextState }).eq("id", record.id).select("id, activo");
-        if (error) {
-          console.error("Supabase profiles update error:", error);
-          throw error;
-        }
-        console.debug("Supabase profiles update result:", data);
-      } else {
-        // Si no existe 'activo' en profiles, actualizamos/creamos la fila en user_roles usando 'status'
-        const payload = {
-          user_id: record.id,
-          role: record.role ?? null,
-          status: nextState ? "Activo" : "Inactivo",
-        };
-        const { data, error } = await supabase.from("user_roles").upsert(payload, { onConflict: "user_id" }).select("user_id, status, role");
-        if (error) {
-          console.error("Supabase user_roles upsert error:", error);
-          // Si es 403, mostrar mensaje más claro
-          if ((error as any)?.status === 403) {
-            toast({
-              title: "Acción prohibida",
-              description: "No tienes permisos suficientes para modificar el estado (403).",
-              variant: "destructive",
-            });
-          }
-          throw error;
-        }
-        console.debug("Supabase user_roles upsert result:", data);
+        const { error: errPerfil } = await supabase
+          .from("profiles")
+          .update({ activo: nextState })
+          .eq("id", record.id);
+        if (errPerfil) console.warn("No se pudo sincronizar profiles.activo:", errPerfil.message);
       }
       // Refrescar la lista desde el backend para evitar inconsistencia entre tablas
       await loadUsers();

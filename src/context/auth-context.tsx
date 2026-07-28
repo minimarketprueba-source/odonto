@@ -53,6 +53,16 @@ export const MODULOS_SANIDAD: { key: string; label: string }[] = [
 
 const TODOS_LOS_PERMISOS = ["ver", "editar", "exportar", "eliminar"]
 
+/**
+ * Si `user_roles.status` habilita el acceso. Es el mismo estado que mira la
+ * base en `es_sanidad_activo()`, así que suspender ahí cierra la puerta de
+ * verdad. `null` se toma como activo: hay filas viejas sin estado.
+ */
+export function esEstadoActivo(status?: string | null): boolean {
+  if (status == null || status === "") return true
+  return ["activo", "active", "habilitado", "enabled"].includes(status.toLowerCase())
+}
+
 // Permisos por defecto cuando user_roles.permissions viene vacío.
 export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
@@ -302,7 +312,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Cargar Rol y Permisos despues de asegurar que el perfil existe
         const { data: roleData, error: roleError } = await supabase
           .from("user_roles")
-          .select("role, permissions")
+          .select("role, permissions, status")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -314,6 +324,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             hint: roleError.hint,
             status: (roleError as any).status
           });
+        } else if (roleData && !esEstadoActivo(roleData.status as string | null)) {
+          // Cuenta suspendida: se la trata como sin rol para que ProtectedRoute
+          // muestre "Sin acceso". Antes solo la frenaba el RLS, así que entraba
+          // igual y veía las pantallas vacías o con errores.
+          logger.warn("Cuenta suspendida: acceso denegado");
+          setRole(null);
+          setPermissions(null);
         } else if (roleData) {
           const rol = roleData.role ? roleData.role.toLowerCase() : null;
           setRole(rol);

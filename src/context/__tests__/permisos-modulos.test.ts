@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  DEFAULT_PERMISOS_SANIDAD, MODULOS_SANIDAD, ROLES_SANIDAD, ROLES_SANIDAD_OPCIONES,
+  DEFAULT_PERMISOS_SANIDAD, MODULOS_SANIDAD, ROLES_SANIDAD, ROLES_SANIDAD_OPCIONES, esEstadoActivo,
 } from "@/context/auth-context";
 
 /**
@@ -58,5 +58,30 @@ describe("módulos y roles de Sanidad", () => {
       expect(permisos, `faltan permisos por defecto de ${opcion.value}`).toBeDefined();
       expect(Object.keys(permisos).length).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * Suspender escribe `user_roles.status`, pero la lista leía `profiles.activo`
+ * (que devuelve la RPC) y auth-context ni siquiera miraba el estado: la cuenta
+ * suspendida seguía figurando "Activo" y podía entrar igual.
+ */
+describe("estado de la cuenta", () => {
+  it("suspendida no tiene acceso", () => {
+    expect(esEstadoActivo("Inactivo")).toBe(false);
+    expect(esEstadoActivo("suspendido")).toBe(false);
+  });
+
+  it("activa tiene acceso, sin importar cómo esté escrito", () => {
+    expect(esEstadoActivo("Activo")).toBe(true);
+    expect(esEstadoActivo("activo")).toBe(true);
+    expect(esEstadoActivo("ACTIVE")).toBe(true);
+    expect(esEstadoActivo("habilitado")).toBe(true);
+  });
+
+  it("sin estado se asume activa: hay filas viejas sin el campo", () => {
+    expect(esEstadoActivo(null)).toBe(true);
+    expect(esEstadoActivo(undefined)).toBe(true);
+    expect(esEstadoActivo("")).toBe(true);
   });
 });
