@@ -136,11 +136,14 @@ export function Sidebar() {
                   <Link
                     to={item.href}
                     className={cn(
-                      "group flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden px-4 py-3",
+                      "group flex items-center rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden py-3",
+                      // Colapsado: sin padding ni gap, si no el ícono queda corrido a la izquierda.
+                      isCollapsed ? "justify-center gap-0 px-0" : "gap-3 px-4",
                       isActive
                         ? "bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-lg scale-105"
                         : "text-foreground dark:text-white hover:text-foreground hover:bg-accent hover:scale-102",
                     )}
+                    title={isCollapsed ? item.name : undefined}
                     onClick={() => setIsOpen(false)}
                   >
                     {isActive && (
@@ -152,7 +155,7 @@ export function Sidebar() {
                     )} />
                     <span className={cn(
                       "relative z-10 transition-all duration-300 overflow-hidden whitespace-nowrap",
-                      isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                      isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100"
                     )}>
                       {item.name}
                     </span>
@@ -160,14 +163,16 @@ export function Sidebar() {
                     {/* Badge/Notification indicator */}
                     {item.badge && (
                       <div className={cn(
-                        "absolute flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-destructive text-destructive-foreground text-xs font-bold rounded-full shadow-lg transition-all duration-200 right-2 top-1/2 transform -translate-y-1/2",
+                        "absolute flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-destructive text-destructive-foreground text-xs font-bold rounded-full shadow-lg transition-all duration-200",
+                        // Colapsado el ícono va centrado: el contador se corre a la esquina.
+                        isCollapsed ? "right-0.5 top-0.5 scale-75" : "right-2 top-1/2 transform -translate-y-1/2",
                         isActive && "bg-white text-primary"
                       )}>
                         {item.badge}
                       </div>
                     )}
 
-                    {isActive && !item.badge && (
+                    {isActive && !item.badge && !isCollapsed && (
                       <div className="absolute right-2 w-2 h-2 bg-white rounded-full animate-pulse" />
                     )}
                   </Link>
