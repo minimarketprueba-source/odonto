@@ -32,7 +32,9 @@ import { toast } from "@/hooks/use-toast";
 import { showSwal } from "@/components/ui/swal";
 import { supabase } from "@/lib/supabase";
 import { recordAuditAction } from "@/lib/audit";
-import { useAuth } from "@/context/auth-context";
+import {
+  useAuth, DEFAULT_PERMISOS_SANIDAD, MODULOS_SANIDAD, ROLES_SANIDAD_OPCIONES,
+} from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -79,33 +81,29 @@ interface UserRecord {
   raw: RawProfile;
 }
 
-const ROLE_OPTIONS = [
-  { value: "admin", label: "Administrador" },
-  { value: "analyst", label: "Registro" },
-] as const;
+// Roles y módulos salen de auth-context: son los mismos que usan el menú, las
+// rutas y canView(). Antes esta pantalla tenía la lista de control de peso
+// (cadetes, ergometría, respaldo…) y roles que acá no dan acceso a nada, así
+// que guardar dejaba a la persona sin sistema.
+const ROLE_OPTIONS = ROLES_SANIDAD_OPCIONES;
 
-type RoleValue = (typeof ROLE_OPTIONS)[number]["value"];
-type RoleFilterValue = "all" | RoleValue;
+/** Roles de control de peso: no se asignan desde acá, pero hay que poder verlos
+ *  y filtrarlos porque la tabla `user_roles` es compartida con la otra app. */
+const ROLES_OTRA_APP = [
+  { value: "analyst", label: "Registro (control de peso)" },
+  { value: "viewer", label: "Solo lectura (control de peso)" },
+];
+
+type RoleValue = string;
+type RoleFilterValue = "all" | string;
 type StatusFilterValue = "all" | "active" | "inactive";
 
-const SYSTEM_MODULES = [
-  { key: "cadetes", label: "Cadetes" },
-  { key: "seguimiento", label: "Seguimiento" },
-  { key: "ergometria", label: "Ergometría" },
-  { key: "gestion_imc", label: "Gestión IMC" },
-  { key: "respaldo", label: "Respaldo" },
-  { key: "usuarios", label: "Usuarios" },
-  { key: "configuracion", label: "Configuración" },
-] as const;
+const SYSTEM_MODULES = MODULOS_SANIDAD;
 
 const PERMISSION_TYPES = ["ver", "editar", "eliminar", "exportar"] as const;
 type PermissionMap = Record<string, string[]>;
 
-const DEFAULT_PERMISSIONS: Record<string, PermissionMap> = {
-  admin: Object.fromEntries(SYSTEM_MODULES.map(m => [m.key, ["ver", "editar", "eliminar", "exportar"]])),
-  analyst: Object.fromEntries(SYSTEM_MODULES.map(m => [m.key, ["ver", "editar", "eliminar", "exportar"]])),
-  viewer: Object.fromEntries(SYSTEM_MODULES.map(m => [m.key, ["ver"]])),
-};
+const DEFAULT_PERMISSIONS: Record<string, PermissionMap> = DEFAULT_PERMISOS_SANIDAD;
 
 interface NewUserForm {
   email: string;
@@ -121,6 +119,8 @@ type SortOptionValue = "recent" | "name" | "role";
 const ROLE_FILTER_OPTIONS: { value: RoleFilterValue; label: string }[] = [
   { value: "all", label: "Todos" },
   ...ROLE_OPTIONS,
+  ...ROLES_OTRA_APP,
+  { value: "sin_rol", label: "Sin rol asignado" },
 ];
 const STATUS_FILTER_OPTIONS = [
   { value: "all", label: "Todos" },
@@ -134,12 +134,14 @@ const SORT_OPTIONS = [
 ] as const;
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrador",
-  analyst: "Registro",
-  viewer: "Solo lectura",
+  ...Object.fromEntries([...ROLE_OPTIONS, ...ROLES_OTRA_APP].map((r) => [r.value, r.label])),
+  sin_rol: "Sin rol asignado",
 };
 
 const getRoleLabel = (role: string) => ROLE_LABELS[role.toLowerCase()] ?? role;
+
+/** Solo los roles de Sanidad se pueden asignar desde esta pantalla. */
+const esRolAsignable = (role: string) => ROLE_OPTIONS.some((r) => r.value === role);
 
 const formatDate = (value?: string | null) => {
   if (!value) return null;
@@ -208,7 +210,9 @@ function buildUsers(profiles: RawProfile[], roles: RawRoleRow[]): UserRecord[] {
         profile?.updated_at ??
         roleRow?.updated_at ??
         null,
-      role: roleRow?.role ?? profile?.role ?? "viewer",
+      // Sin fila en user_roles no hay acceso a Sanidad: mostrarlo como
+      // "solo lectura" hacía creer que la persona podía entrar.
+      role: roleRow?.role ?? profile?.role ?? "sin_rol",
       statusLabel: isActive ? "Activo" : "Inactivo",
       isActive,
       seccion: profile?.seccion ?? profile?.area ?? null,
@@ -230,7 +234,7 @@ export default function Usuarios() {
   const [isUpdating, setIsUpdating] = useState(false);
   const isCurrentUserAdmin = isSystemAdmin;
   const [roleDialogUser, setRoleDialogUser] = useState<UserRecord | null>(null);
-  const [pendingRole, setPendingRole] = useState<string>(ROLE_OPTIONS[0].value);
+  const [pendingRole, setPendingRole] = useState<string>("");
   const [pendingPermissions, setPendingPermissions] = useState<PermissionMap>({});
   
   // Estado para cambio de contraseña
@@ -248,7 +252,7 @@ export default function Usuarios() {
     password: "",
     nombre: "",
     apellido: "",
-    role: "analyst",
+    role: "medico",
     seccion: "",
     telefono: "",
   });
@@ -340,7 +344,7 @@ export default function Usuarios() {
             displayName,
             createdAt: row.created_at ?? null,
             lastLoginAt: row.last_sign_in_at ?? row.role_updated_at ?? null,
-            role: row.role ?? "viewer",
+            role: row.role ?? "sin_rol",
             statusLabel: isActive ? "Activo" : "Inactivo",
             isActive,
             seccion: null,
@@ -383,21 +387,24 @@ export default function Usuarios() {
 
   const openRoleDialog = async (record: UserRecord) => {
     setRoleDialogUser(record);
-    setPendingRole(record.role ?? "viewer");
+    // Si el rol guardado no es de Sanidad (o no tiene), el desplegable queda
+    // vacío y Guardar deshabilitado: hay que elegir uno a propósito.
+    setPendingRole(esRolAsignable(record.role) ? record.role : "");
     // Cargar permisos existentes del usuario
+    const porDefecto = DEFAULT_PERMISSIONS[record.role] ?? {};
     try {
       const { data } = await supabase
         .from("user_roles")
         .select("permissions")
         .eq("user_id", record.id)
         .maybeSingle();
-      if (data?.permissions && typeof data.permissions === "object") {
-        setPendingPermissions(data.permissions as PermissionMap);
-      } else {
-        setPendingPermissions(DEFAULT_PERMISSIONS[record.role ?? "viewer"] ?? {});
-      }
+      // `permissions` trae `{}` por defecto en la base: eso no son permisos
+      // reales, así que se cae en los del rol.
+      const guardados = data?.permissions as PermissionMap | null | undefined;
+      const tieneGuardados = !!guardados && typeof guardados === "object" && Object.keys(guardados).length > 0;
+      setPendingPermissions(tieneGuardados ? guardados : porDefecto);
     } catch {
-      setPendingPermissions(DEFAULT_PERMISSIONS[record.role ?? "viewer"] ?? {});
+      setPendingPermissions(porDefecto);
     }
   };
 
@@ -420,7 +427,7 @@ export default function Usuarios() {
       password: "",
       nombre: "",
       apellido: "",
-      role: "analyst",
+      role: "medico",
       seccion: "",
       telefono: "",
     });
@@ -490,6 +497,29 @@ export default function Usuarios() {
         details: `Email: ${newUserForm.email}, Rol: ${newUserForm.role}`,
       }).catch(() => { /* auditoría no crítica */ });
 
+      // El alta la resuelve una función del servidor que es de control de peso:
+      // puede no guardar el rol de Sanidad y `permissions` nace en `{}`, que no
+      // son permisos y dejaría a la persona viendo solo el Dashboard. Se
+      // reescriben acá con los del rol elegido.
+      if (data?.user_id) {
+        const { error: errRol } = await supabase.from("user_roles").upsert(
+          {
+            user_id: data.user_id,
+            role: newUserForm.role,
+            status: "Activo",
+            permissions: DEFAULT_PERMISSIONS[newUserForm.role] ?? {},
+          },
+          { onConflict: "user_id" }
+        );
+        if (errRol) {
+          toast({
+            title: "Cuenta creada, permisos pendientes",
+            description: `No se pudieron asignar los permisos (${errRol.message}). Abrí «Rol y permisos» para completarlos.`,
+            variant: "destructive",
+          });
+        }
+      }
+
       // Agregar usuario al estado local inmediatamente (no depender solo de loadUsers)
       const newUser: UserRecord = {
         id: data?.user_id ?? "unknown",
@@ -523,6 +553,25 @@ export default function Usuarios() {
 
   const updateRole = async () => {
     if (!roleDialogUser) return;
+    if (!esRolAsignable(pendingRole)) {
+      toast({
+        title: "Falta el rol",
+        description: "Elegí un rol antes de guardar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Guardar sin ningún módulo tildado deja a la persona viendo solo el
+    // Dashboard: mejor avisar que dejarla encerrada sin saber por qué.
+    const sinModulos = Object.values(pendingPermissions).every((p) => !p?.length);
+    if (pendingRole !== "admin" && sinModulos) {
+      toast({
+        title: "Sin módulos habilitados",
+        description: "Tildá al menos un módulo o esta persona no verá nada más que el Dashboard.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsUpdating(true);
     try {
       if (!isCurrentUserAdmin) {
@@ -1046,7 +1095,7 @@ export default function Usuarios() {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Rol" />
+                    <SelectValue placeholder="Elegí un rol" />
                   </SelectTrigger>
                   <SelectContent>
                     {ROLE_OPTIONS.map((option) => (
@@ -1056,6 +1105,12 @@ export default function Usuarios() {
                     ))}
                   </SelectContent>
                 </Select>
+                {!esRolAsignable(roleDialogUser?.role ?? "") && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Esta cuenta hoy figura como «{getRoleLabel(roleDialogUser?.role ?? "")}», que no da acceso
+                    a Sanidad. Al elegir un rol de acá pasa a tener acceso.
+                  </p>
+                )}
               </div>
 
               <Separator />
@@ -1089,7 +1144,8 @@ export default function Usuarios() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Al cambiar el rol se resetean los permisos a los valores por defecto del rol. Podés personalizarlos individualmente.
+                  Al cambiar el rol se resetean los permisos a los valores por defecto del rol. Podés personalizarlos
+                  individualmente. El administrador entra a todos los módulos aunque no estén tildados.
                 </p>
               </div>
             </div>
@@ -1097,7 +1153,7 @@ export default function Usuarios() {
               <Button variant="outline" onClick={() => setRoleDialogUser(null)} disabled={isUpdating}>
                 Cancelar
               </Button>
-              <Button onClick={updateRole} disabled={isUpdating} className="gap-2">
+              <Button onClick={updateRole} disabled={isUpdating || !esRolAsignable(pendingRole)} className="gap-2">
                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Guardar
               </Button>

@@ -22,8 +22,40 @@ interface AuthContextType {
 // a ambos sistemas.
 export const ROLES_SANIDAD = ["admin", "medico", "recepcion"]
 
+/**
+ * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
+ * Es la única lista: si se agrega un rol acá, aparece en el alta y en el
+ * cuadro de permisos sin tocar nada más.
+ */
+export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
+  { value: "admin", label: "Administrador" },
+  { value: "medico", label: "Médico / Profesional" },
+  { value: "recepcion", label: "Enfermería / Recepción" },
+]
+
+/**
+ * Módulos del sistema, en el orden del menú. `permissions` de `user_roles` se
+ * indexa por estas claves y son las mismas que piden las rutas y `canView`.
+ * OJO: los módulos de control de peso (cadetes, ergometría, respaldo…) no van
+ * acá — son de la otra app aunque compartan la tabla `user_roles`.
+ */
+export const MODULOS_SANIDAD: { key: string; label: string }[] = [
+  { key: "pacientes", label: "Pacientes" },
+  { key: "citas", label: "Citas y horarios" },
+  { key: "consultas", label: "Consultas, urgencias y enfermería" },
+  { key: "recetas", label: "Recetas" },
+  { key: "nutricion", label: "Nutrición" },
+  { key: "lista_espera", label: "Lista de espera" },
+  { key: "reportes", label: "Reportes" },
+  { key: "mantenimiento", label: "Mantenimiento" },
+  { key: "usuarios", label: "Usuarios" },
+]
+
+const TODOS_LOS_PERMISOS = ["ver", "editar", "exportar", "eliminar"]
+
 // Permisos por defecto cuando user_roles.permissions viene vacío.
-const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
+export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
+  admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
   medico: {
     pacientes: ["ver", "editar"],
     citas: ["ver", "editar"],
