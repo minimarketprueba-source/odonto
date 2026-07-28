@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,10 @@ import {
   Trash2,
   SquarePen,
   Printer,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 
 export default function Nutricion() {
@@ -36,6 +40,10 @@ export default function Nutricion() {
   const [filtroSeccion, setFiltroSeccion] = useState<string>("todas");
   const [filtroClasificacion, setFiltroClasificacion] = useState<string>("todas");
   const [filtroCurso, setFiltroCurso] = useState<string>("todos");
+
+  // Estado de paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const [porPagina, setPorPagina] = useState(12);
 
   // Estado para el modal de pesada
   const [cadeteSeleccionado, setCadeteSeleccionado] = useState<CadeteNutricion | null>(null);
@@ -88,6 +96,20 @@ export default function Nutricion() {
       return true;
     });
   }, [cadetes, filtroEstado, busqueda, filtroSeccion, filtroClasificacion, filtroCurso]);
+
+  // Reset de página al cambiar filtros
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [busqueda, filtroEstado, filtroSeccion, filtroClasificacion, filtroCurso, porPagina]);
+
+  // Cálculos de paginación
+  const totalPaginas = Math.max(1, Math.ceil(cadetesFiltrados.length / porPagina));
+  const inicioIndex = (paginaActual - 1) * porPagina;
+  const finIndex = Math.min(inicioIndex + porPagina, cadetesFiltrados.length);
+
+  const cadetesPaginados = useMemo(() => {
+    return cadetesFiltrados.slice(inicioIndex, finIndex);
+  }, [cadetesFiltrados, inicioIndex, finIndex]);
 
   const handleAbrirPesada = (cadete: CadeteNutricion) => {
     setCadeteSeleccionado(cadete);
@@ -300,190 +322,299 @@ export default function Nutricion() {
           </div>
         ) : (
           /* Grilla de Tarjetas Antropométricas */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {cadetesFiltrados.map((cadete) => {
-              const pesada = cadete.ultima_pesada;
-              const altura = cadete.altura_cm || 170;
-              const imc = pesada?.imc || (pesada?.peso_kg ? Number((pesada.peso_kg / Math.pow(altura / 100, 2)).toFixed(2)) : null);
-              const colorImc = imc ? getColorIMC(imc) : "#6b7280";
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {cadetesPaginados.map((cadete) => {
+                const pesada = cadete.ultima_pesada;
+                const altura = cadete.altura_cm || 170;
+                const imc = pesada?.imc || (pesada?.peso_kg ? Number((pesada.peso_kg / Math.pow(altura / 100, 2)).toFixed(2)) : null);
+                const colorImc = imc ? getColorIMC(imc) : "#6b7280";
 
-              // Peso meta ideal
-              const pesoIdeal = Number((24.9 * Math.pow(altura / 100, 2)).toFixed(1));
-              const excesoPeso = pesada?.peso_kg ? Number((pesada.peso_kg - pesoIdeal).toFixed(1)) : 0;
+                // Peso meta ideal
+                const pesoIdeal = Number((24.9 * Math.pow(altura / 100, 2)).toFixed(1));
+                const excesoPeso = pesada?.peso_kg ? Number((pesada.peso_kg - pesoIdeal).toFixed(1)) : 0;
 
-              return (
-                <Card
-                  key={cadete.id}
-                  className="hover:shadow-lg transition-shadow h-full flex flex-col justify-between"
-                >
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-14 h-14 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0 border border-border">
-                        {cadete.foto_url ? (
-                          <img src={cadete.foto_url} alt={cadete.nombre} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-7 h-7 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="font-semibold text-base leading-tight mb-1 break-words">
-                          {cadete.nombre} {cadete.apellido}
-                        </CardTitle>
-                        <CardDescription className="text-muted-foreground flex flex-col gap-0.5 text-xs">
-                          <span>DNI: {cadete.dni}</span>
-                          <div className="flex items-center gap-1 text-[11px]">
-                            <Shield className="w-3 h-3 text-primary" />
-                            <span className="truncate">{cadete.rango || "Cadete"}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[11px]">
-                            <Users className="w-3 h-3 text-muted-foreground" />
-                            <span className="truncate">{cadete.curso} · {cadete.seccion}</span>
-                          </div>
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-3 flex-1 flex flex-col pt-0">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {cadete.sexo === "F" ? "♀ Femenino" : "♂ Masculino"}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{altura} cm</span>
-                    </div>
-
-                    {/* Caja de Datos Antropométricos (%MG, %MM, ICC, DX BIA, EGS) */}
-                    <div className="space-y-2 text-sm flex-1 p-3 bg-muted/30 rounded-lg border border-border/40">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground">Última pesada:</span>
-                        <span className="font-medium">{pesada?.fecha || "Sin registro"}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground">Peso / Talla:</span>
-                        <span className="font-semibold text-xs">
-                          {pesada?.peso_kg ? `${pesada.peso_kg} kg` : "—"} · {altura} cm
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground">IMC:</span>
-                        {imc ? (
-                          <Badge
-                            style={{
-                              borderColor: colorImc,
-                              color: colorImc,
-                              backgroundColor: colorImc + "15",
-                            }}
-                            className="text-xs font-semibold border"
-                          >
-                            {imc} - {pesada?.clasificacion || "Calculado"}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-
-                      {/* Parámetros de la Ficha Antropométrica Oficial ISEPOL */}
-                      <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-border/40 text-[11px]">
-                        <div>
-                          <span className="text-muted-foreground block">%MM (Muscular):</span>
-                          <span className="font-medium">{pesada?.porcentaje_mm ? `${pesada.porcentaje_mm}%` : "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">%MG (Grasa):</span>
-                          <span className="font-medium">{pesada?.porcentaje_mg ? `${pesada.porcentaje_mg}%` : "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">ICC:</span>
-                          <span className="font-medium">{pesada?.icc ? `${pesada.icc} (${pesada.dx_icc || "OK"})` : "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">DX BIA / EGS:</span>
-                          <span className="font-medium">{pesada?.dx_bia || "Normal"} · EGS {pesada?.egs || "A"}</span>
-                        </div>
-                      </div>
-
-                      {/* Caja de Meta Nutricional */}
-                      {pesada?.peso_kg && (
-                        <div className="mt-2 pt-2 border-t border-border/50 text-center">
-                          {excesoPeso > 0 ? (
-                            <>
-                              <span className="text-red-600 dark:text-red-400 font-semibold text-xs block">
-                                ⚠️ Bajar {excesoPeso} kg
-                              </span>
-                              <span className="text-[10px] text-muted-foreground block">
-                                Meta: {pesoIdeal} kg
-                              </span>
-                            </>
+                return (
+                  <Card
+                    key={cadete.id}
+                    className="hover:shadow-lg transition-shadow h-full flex flex-col justify-between"
+                  >
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-14 h-14 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0 border border-border">
+                          {cadete.foto_url ? (
+                            <img src={cadete.foto_url} alt={cadete.nombre} className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-green-600 dark:text-green-400 font-medium text-xs">
-                              ✅ Peso Saludable
-                            </span>
+                            <User className="w-7 h-7 text-muted-foreground" />
                           )}
                         </div>
-                      )}
-                    </div>
-
-                    {/* Situación médica */}
-                    <div className="p-3 bg-muted/30 rounded-lg space-y-1 border border-border/40">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground text-xs flex items-center gap-1">
-                          <Stethoscope className="w-3 h-3" /> Situación médica:
-                        </span>
-                        <Badge variant="outline" className="text-[10px] border-green-500 text-green-600 dark:text-green-400">
-                          {cadete.situacion_medica?.estado || "APTO"}
-                        </Badge>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="font-semibold text-base leading-tight mb-1 break-words">
+                            {cadete.nombre} {cadete.apellido}
+                          </CardTitle>
+                          <CardDescription className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+                            <span>DNI: {cadete.dni}</span>
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <Shield className="w-3 h-3 text-primary" />
+                              <span className="truncate">{cadete.rango || "Cadete"}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <Users className="w-3 h-3 text-muted-foreground" />
+                              <span className="truncate">{cadete.curso} · {cadete.seccion}</span>
+                            </div>
+                          </CardDescription>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-foreground/80 leading-snug">
-                        {cadete.situacion_medica?.descripcion || "Puede realizar actividad física"}
-                      </p>
-                    </div>
+                    </CardHeader>
 
-                    {/* Fila de botones de acción */}
-                    <div className="flex items-center gap-1.5 pt-3 border-t border-border mt-auto">
+                    <CardContent className="space-y-3 flex-1 flex flex-col pt-0">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {cadete.sexo === "F" ? "♀ Femenino" : "♂ Masculino"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{altura} cm</span>
+                      </div>
+
+                      {/* Caja de Datos Antropométricos (%MG, %MM, ICC, DX BIA, EGS) */}
+                      <div className="space-y-2 text-sm flex-1 p-3 bg-muted/30 rounded-lg border border-border/40">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">Última pesada:</span>
+                          <span className="font-medium">{pesada?.fecha || "Sin registro"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">Peso / Talla:</span>
+                          <span className="font-semibold text-xs">
+                            {pesada?.peso_kg ? `${pesada.peso_kg} kg` : "—"} · {altura} cm
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">IMC:</span>
+                          {imc ? (
+                            <Badge
+                              style={{
+                                borderColor: colorImc,
+                                color: colorImc,
+                                backgroundColor: colorImc + "15",
+                              }}
+                              className="text-xs font-semibold border"
+                            >
+                              {imc} - {pesada?.clasificacion || "Calculado"}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+
+                        {/* Parámetros de la Ficha Antropométrica Oficial ISEPOL */}
+                        <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-border/40 text-[11px]">
+                          <div>
+                            <span className="text-muted-foreground block">%MM (Muscular):</span>
+                            <span className="font-medium">{pesada?.porcentaje_mm ? `${pesada.porcentaje_mm}%` : "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">%MG (Grasa):</span>
+                            <span className="font-medium">{pesada?.porcentaje_mg ? `${pesada.porcentaje_mg}%` : "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">ICC:</span>
+                            <span className="font-medium">{pesada?.icc ? `${pesada.icc} (${pesada.dx_icc || "OK"})` : "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">DX BIA / EGS:</span>
+                            <span className="font-medium">{pesada?.dx_bia || "Normal"} · EGS {pesada?.egs || "A"}</span>
+                          </div>
+                        </div>
+
+                        {/* Caja de Meta Nutricional */}
+                        {pesada?.peso_kg && (
+                          <div className="mt-2 pt-2 border-t border-border/50 text-center">
+                            {excesoPeso > 0 ? (
+                              <>
+                                <span className="text-red-600 dark:text-red-400 font-semibold text-xs block">
+                                  ⚠️ Bajar {excesoPeso} kg
+                                </span>
+                                <span className="text-[10px] text-muted-foreground block">
+                                  Meta: {pesoIdeal} kg
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-green-600 dark:text-green-400 font-medium text-xs">
+                                ✅ Peso Saludable
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Situación médica */}
+                      <div className="p-3 bg-muted/30 rounded-lg space-y-1 border border-border/40">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground text-xs flex items-center gap-1">
+                            <Stethoscope className="w-3 h-3" /> Situación médica:
+                          </span>
+                          <Badge variant="outline" className="text-[10px] border-green-500 text-green-600 dark:text-green-400">
+                            {cadete.situacion_medica?.estado || "APTO"}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-foreground/80 leading-snug">
+                          {cadete.situacion_medica?.descripcion || "Puede realizar actividad física"}
+                        </p>
+                      </div>
+
+                      {/* Fila de botones de acción */}
+                      <div className="flex items-center gap-1.5 pt-3 border-t border-border mt-auto">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAbrirPesada(cadete)}
+                          className="flex-1 gap-1 h-8 text-xs"
+                          title="Registrar pesada"
+                        >
+                          <Scale className="w-3.5 h-3.5" />
+                          Pesar
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-primary"
+                          title="Imprimir Ficha Antropométrica"
+                          onClick={() => imprimirFichaAntropometrica(cadete)}
+                        >
+                          <Printer className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Editar cadete"
+                          onClick={() => showSwalInfo("La edición de fichas se realiza en la sección Pacientes")}
+                        >
+                          <SquarePen className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                          title="Eliminar cadete"
+                          onClick={() => showSwalError("Solo un administrador puede eliminar fichas de cadetes")}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Barra de Paginación */}
+            {cadetesFiltrados.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60 mt-6">
+                <div className="text-xs text-muted-foreground order-2 sm:order-1">
+                  Mostrando <strong className="text-foreground font-medium">{inicioIndex + 1}</strong> a{" "}
+                  <strong className="text-foreground font-medium">{finIndex}</strong> de{" "}
+                  <strong className="text-foreground font-medium">{cadetesFiltrados.length}</strong> cadetes
+                </div>
+
+                <div className="flex items-center gap-2 order-1 sm:order-2 flex-wrap justify-center">
+                  {/* Desplegable de items por página */}
+                  <div className="flex items-center gap-1.5 mr-2">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Mostrar:</span>
+                    <Select value={String(porPagina)} onValueChange={(val) => setPorPagina(Number(val))}>
+                      <SelectTrigger className="h-8 w-[105px] text-xs bg-card">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="12">12 por pág.</SelectItem>
+                        <SelectItem value="24">24 por pág.</SelectItem>
+                        <SelectItem value="48">48 por pág.</SelectItem>
+                        <SelectItem value="96">96 por pág.</SelectItem>
+                        <SelectItem value="5000">Todos ({cadetesFiltrados.length})</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Botones de Paginación */}
+                  {totalPaginas > 1 && (
+                    <div className="flex items-center gap-1">
                       <Button
-                        size="sm"
-                        onClick={() => handleAbrirPesada(cadete)}
-                        className="flex-1 gap-1 h-8 text-xs"
-                        title="Registrar pesada"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={paginaActual === 1}
+                        onClick={() => setPaginaActual(1)}
+                        title="Primera página"
                       >
-                        <Scale className="w-3.5 h-3.5" />
-                        Pesar
+                        <ChevronsLeft className="w-4 h-4" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={paginaActual === 1}
+                        onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
+                        title="Página anterior"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+
+                      {/* Números de página */}
+                      <div className="flex items-center gap-1 px-1">
+                        {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                          .filter((p) => p === 1 || p === totalPaginas || Math.abs(p - paginaActual) <= 1)
+                          .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                            if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                              acc.push("...");
+                            }
+                            acc.push(p);
+                            return acc;
+                          }, [])
+                          .map((p, idx) =>
+                            p === "..." ? (
+                              <span key={`dots-${idx}`} className="text-xs text-muted-foreground px-1">
+                                ...
+                              </span>
+                            ) : (
+                              <Button
+                                key={`page-${p}`}
+                                variant={p === paginaActual ? "default" : "outline"}
+                                size="icon"
+                                className="h-8 w-8 text-xs"
+                                onClick={() => setPaginaActual(Number(p))}
+                              >
+                                {p}
+                              </Button>
+                            )
+                          )}
+                      </div>
 
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-8 w-8 text-primary"
-                        title="Imprimir Ficha Antropométrica"
-                        onClick={() => imprimirFichaAntropometrica(cadete)}
+                        className="h-8 w-8"
+                        disabled={paginaActual === totalPaginas}
+                        onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
+                        title="Página siguiente"
                       >
-                        <Printer className="w-4 h-4" />
+                        <ChevronRight className="w-4 h-4" />
                       </Button>
-
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        title="Editar cadete"
-                        onClick={() => showSwalInfo("La edición de fichas se realiza en la sección Pacientes")}
+                        disabled={paginaActual === totalPaginas}
+                        onClick={() => setPaginaActual(totalPaginas)}
+                        title="Última página"
                       >
-                        <SquarePen className="w-4 h-4" />
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                        title="Eliminar cadete"
-                        onClick={() => showSwalError("Solo un administrador puede eliminar fichas de cadetes")}
-                      >
-                        <Trash2 className="w-4 h-4" />
+                        <ChevronsRight className="w-4 h-4" />
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
