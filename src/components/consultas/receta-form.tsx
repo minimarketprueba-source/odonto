@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { sanitizePlainText } from "@/lib/security";
+import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { fechaHoyISO } from "@/api/citas";
 import { useCreateReceta, type RecetaItem } from "@/api/recetas";
@@ -55,13 +55,13 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
         medico_id: Number(medicoId),
         fecha,
         diagnostico: sanitizePlainText(diagnostico) || null,
-        indicaciones: sanitizePlainText(indicaciones) || null,
+        indicaciones: sanitizeMultilineText(indicaciones) || null,
         items: validos.map((i) => ({
           medicamento: sanitizePlainText(i.medicamento),
           dosis: sanitizePlainText(i.dosis || "") || null,
           frecuencia: sanitizePlainText(i.frecuencia || "") || null,
           duracion: sanitizePlainText(i.duracion || "") || null,
-          indicaciones: sanitizePlainText(i.indicaciones || "") || null,
+          indicaciones: sanitizeMultilineText(i.indicaciones || "") || null,
         })),
       });
       toast.success("Receta emitida.");

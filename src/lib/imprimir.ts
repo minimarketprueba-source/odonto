@@ -893,9 +893,10 @@ export function imprimirFichaAntropometrica(cadete: {
   seccion?: string | null;
   altura_cm?: number | null;
   ultima_pesada?: {
-    fecha: string;
-    peso_kg: number;
-    imc: number;
+    fecha: string | null;
+    peso_kg: number | null;
+    imc: number | null;
+    masa_muscular_kg?: number | null;
     cintura_cm?: number | null;
     cadera_cm?: number | null;
     icc?: number | null;
@@ -907,6 +908,10 @@ export function imprimirFichaAntropometrica(cadete: {
   } | null;
 }) {
   const p = cadete.ultima_pesada;
+  // La ficha en papel no inventa nada: lo que no se midió sale con guión.
+  const fechaPesada = p?.fecha
+    ? new Date(p.fecha).toLocaleDateString('es-PY')
+    : null;
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: #000;">
       <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
@@ -934,7 +939,7 @@ export function imprimirFichaAntropometrica(cadete: {
         <tbody>
           <tr>
             <td style="padding: 8px; font-weight: bold; text-align: left;">FECHA</td>
-            <td style="padding: 8px;">${p?.fecha || new Date().toLocaleDateString('es-PY')}</td>
+            <td style="padding: 8px;">${fechaPesada || '—'}</td>
             <td style="padding: 8px; text-align: left;">Control Antropométrico</td>
           </tr>
           <tr>
@@ -944,8 +949,8 @@ export function imprimirFichaAntropometrica(cadete: {
           </tr>
           <tr style="background-color: #f9fafb;">
             <td style="padding: 8px; font-weight: bold; text-align: left;">IMC</td>
-            <td style="padding: 8px;">${p?.imc || '—'}</td>
-            <td style="padding: 8px; text-align: left;">${p?.imc ? 'Índice de Masa Corporal (OMS)' : '—'}</td>
+            <td style="padding: 8px;">${p?.imc ?? '—'}</td>
+            <td style="padding: 8px; text-align: left;">${p?.imc ? 'Índice de Masa Corporal (OMS)' : (cadete.altura_cm ? '—' : 'Sin talla registrada: no se puede calcular')}</td>
           </tr>
           <tr>
             <td style="padding: 8px; font-weight: bold; text-align: left;">CINTURA / CADERA</td>
@@ -959,7 +964,7 @@ export function imprimirFichaAntropometrica(cadete: {
           </tr>
           <tr>
             <td style="padding: 8px; font-weight: bold; text-align: left;">%MM (% Masa Muscular)</td>
-            <td style="padding: 8px;">${p?.porcentaje_mm ? `${p.porcentaje_mm}%` : '—'}</td>
+            <td style="padding: 8px;">${p?.porcentaje_mm ? `${p.porcentaje_mm}%${p.masa_muscular_kg ? ` (${p.masa_muscular_kg} kg)` : ''}` : '—'}</td>
             <td style="padding: 8px; text-align: left;">Porcentaje de Masa Muscular</td>
           </tr>
           <tr style="background-color: #f9fafb;">
@@ -969,12 +974,12 @@ export function imprimirFichaAntropometrica(cadete: {
           </tr>
           <tr>
             <td style="padding: 8px; font-weight: bold; text-align: left;">DX BIA</td>
-            <td style="padding: 8px;">—</td>
-            <td style="padding: 8px; text-align: left;">${p?.dx_bia || 'Diagnóstico Bioimpedancia / Grasa Visceral'}</td>
+            <td style="padding: 8px;">${p?.dx_bia || '—'}</td>
+            <td style="padding: 8px; text-align: left;">Diagnóstico Bioimpedancia / Grasa Visceral</td>
           </tr>
           <tr style="background-color: #f9fafb;">
             <td style="padding: 8px; font-weight: bold; text-align: left;">EGS</td>
-            <td style="padding: 8px;">${p?.egs || 'A'}</td>
+            <td style="padding: 8px;">${p?.egs || '—'}</td>
             <td style="padding: 8px; text-align: left;">Evaluación Global Subjetiva</td>
           </tr>
         </tbody>

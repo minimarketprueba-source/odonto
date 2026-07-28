@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
 import { Ambulance, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sanitizePlainText } from "@/lib/security";
+import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { fechaHoyISO } from "@/api/citas";
@@ -138,7 +138,7 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
         hora,
         destino,
         destino_detalle: sanitizePlainText(destinoDetalle) || null,
-        motivo: sanitizePlainText(motivo) || null,
+        motivo: sanitizeMultilineText(motivo) || null,
         urgente,
         acompanante: sanitizePlainText(acompanante) || null,
         retorno_fecha: retornoFecha || null,

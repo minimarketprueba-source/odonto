@@ -15,7 +15,7 @@ import {
 import { Combobox } from "@/components/ui/combobox";
 import { BedDouble, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { sanitizePlainText } from "@/lib/security";
+import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
@@ -153,7 +153,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
           hora_ingreso: horaAhora(),
           diagnostico_ingreso: sanitizePlainText(diagFinal) || null,
           cie10_id: cieLista[0]?.id ?? null,
-          motivo_observacion: sanitizePlainText(motivo) || null,
+          motivo_observacion: sanitizeMultilineText(motivo) || null,
         });
         internacionCreada.current = creada.id;
       }
@@ -163,11 +163,11 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
         medico_id: Number(medicoId),
         cita_id: cita?.id ?? null,
         fecha,
-        motivo_consulta: sanitizePlainText(motivo) || null,
-        examen_fisico: sanitizePlainText(examen) || null,
+        motivo_consulta: sanitizeMultilineText(motivo) || null,
+        examen_fisico: sanitizeMultilineText(examen) || null,
         cie10_id: cieLista[0]?.id ?? null,
         diagnostico: sanitizePlainText(diagFinal) || null,
-        tratamiento: sanitizePlainText(tratamiento) || null,
+        tratamiento: sanitizeMultilineText(tratamiento) || null,
         destino,
         reposo_tipo: reposoTipo,
         reposo_desde: reposoTipo ? fecha : null,

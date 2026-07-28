@@ -4,6 +4,9 @@ import { logger } from "./logger";
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]+/g;
+// Igual que el anterior pero dejando pasar el salto de línea (\n, \x0A).
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS_SIN_SALTO_REGEX = /[\x00-\x09\x0B-\x1F\x7F]+/g;
 const SCRIPT_TAG_REGEX = /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi;
 const STYLE_TAG_REGEX = /<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi;
 const TAG_REGEX = /<[^>]*>/g;
@@ -24,6 +27,36 @@ export function sanitizePlainText(value?: string | null): string {
   sanitized = sanitized.replace(TAG_REGEX, "");
 
   return sanitized.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Igual que sanitizePlainText pero conservando los saltos de línea.
+ *
+ * Para los campos largos de la historia clínica (motivo, examen físico,
+ * tratamiento, evolución, indicaciones de la receta): el médico los escribe en
+ * renglones o en lista y los impresos ya salen con `white-space: pre-wrap`.
+ * Con el limpiador de una sola línea todo llegaba aplastado en un párrafo.
+ *
+ * Sigue sacando etiquetas HTML y demás caracteres de control; solo respeta el
+ * \n. Los renglones se recortan a los costados y no se permiten más de dos
+ * saltos seguidos.
+ */
+export function sanitizeMultilineText(value?: string | null): string {
+  if (typeof value !== "string") return "";
+
+  let sanitized = value.replace(/\r\n?/g, "\n");
+  sanitized = sanitized.replace(CONTROL_CHARS_SIN_SALTO_REGEX, " ");
+  sanitized = sanitized.replace(SCRIPT_TAG_REGEX, "");
+  sanitized = sanitized.replace(STYLE_TAG_REGEX, "");
+  sanitized = sanitized.replace(EVENT_HANDLER_ATTR_REGEX, "");
+  sanitized = sanitized.replace(TAG_REGEX, "");
+
+  return sanitized
+    .split("\n")
+    .map((linea) => linea.replace(/[^\S\n]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**

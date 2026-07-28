@@ -11,7 +11,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { AlertTriangle, Loader2, Printer, Search, X, UserCheck, HeartPulse, Stethoscope, LogOut, FileText, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, matchPaciente } from "@/lib/utils";
-import { sanitizePlainText } from "@/lib/security";
+import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { imprimirFichaRac } from "@/lib/imprimir";
@@ -215,7 +215,7 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
         fr: numeroONull(form.fr),
         spo2: numeroONull(form.spo2),
         temp: numeroONull(form.temp),
-        motivo_consulta: sanitizePlainText(form.motivo_consulta) || null,
+        motivo_consulta: sanitizeMultilineText(form.motivo_consulta) || null,
         discriminante: sanitizePlainText(form.discriminante) || null,
         triaje: triajeSel,
         enfermero: sanitizePlainText(form.enfermero) || null,
@@ -258,7 +258,7 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
           fecha_ingreso: ficha.fecha,
           hora_ingreso: form.hora_destino || horaAhora(),
           diagnostico_ingreso: diagFinal,
-          motivo_observacion: sanitizePlainText(form.motivo_consulta) || null,
+          motivo_observacion: sanitizeMultilineText(form.motivo_consulta) || null,
           enfermero_cargo: sanitizePlainText(form.enfermero) || null,
         });
         internacionCreada.current = creada.id;
@@ -270,16 +270,16 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
         fecha: ficha.fecha,
         hora_medico: form.hora_medico || horaAhora(),
         medico_id: Number(medicoId),
-        patologia_previa: sanitizePlainText(form.patologia_previa) || null,
-        alergias: sanitizePlainText(form.alergias) || null,
-        examen_fisico: sanitizePlainText(form.examen_fisico) || null,
-        laboratorio: sanitizePlainText(form.laboratorio) || null,
-        radiologia: sanitizePlainText(form.radiologia) || null,
+        patologia_previa: sanitizeMultilineText(form.patologia_previa) || null,
+        alergias: sanitizeMultilineText(form.alergias) || null,
+        examen_fisico: sanitizeMultilineText(form.examen_fisico) || null,
+        laboratorio: sanitizeMultilineText(form.laboratorio) || null,
+        radiologia: sanitizeMultilineText(form.radiologia) || null,
         diagnostico: diagFinal,
         cie10_id: cieLista[0]?.id ?? null,
-        tratamiento: sanitizePlainText(form.tratamiento) || null,
-        evolucion: sanitizePlainText(form.evolucion) || null,
-        plan: sanitizePlainText(form.plan) || null,
+        tratamiento: sanitizeMultilineText(form.tratamiento) || null,
+        evolucion: sanitizeMultilineText(form.evolucion) || null,
+        plan: sanitizeMultilineText(form.plan) || null,
         hora_destino: form.hora_destino || horaAhora(),
         destino,
         destino_dias: numeroONull(form.destino_dias),

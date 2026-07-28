@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Scale, Activity, HeartPulse } from "lucide-react";
 import { useCrearPesada, CadeteNutricion, calcularDxICC } from "@/api/nutricion";
-import { calcularIMC, clasificarIMC } from "@/lib/utils/imc-utils";
+import { calcularIMC, calcularPesoIdeal, clasificarIMC } from "@/lib/utils/imc-utils";
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
+
+/** Valor de los desplegables cuando el parámetro no se evaluó en esta pesada. */
+const SIN_EVALUAR = "sin_evaluar";
 
 interface PesadaDialogProps {
   cadete: CadeteNutricion | null;
@@ -24,28 +27,42 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
   const [cadera, setCadera] = useState<string>("");
   const [porcentajeMM, setPorcentajeMM] = useState<string>("");
   const [porcentajeMG, setPorcentajeMG] = useState<string>("");
-  const [dxBia, setDxBia] = useState<string>("Normal");
-  const [egs, setEgs] = useState<string>("A");
+  const [dxBia, setDxBia] = useState<string>(SIN_EVALUAR);
+  const [egs, setEgs] = useState<string>(SIN_EVALUAR);
   const [observaciones, setObservaciones] = useState<string>("");
 
   const crearPesada = useCrearPesada();
+  // El foco va al peso al abrir: es el único campo obligatorio y ahora arranca
+  // vacío. Se hace por ref y no con autoFocus (que además pelea con el Dialog).
+  const pesoRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => pesoRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [open]);
 
   useEffect(() => {
     if (cadete) {
-      setPeso(cadete.ultima_pesada?.peso_kg ? String(cadete.ultima_pesada.peso_kg) : "");
-      setAltura(cadete.altura_cm ? String(cadete.altura_cm) : "170");
-      setCintura(cadete.ultima_pesada?.cintura_cm ? String(cadete.ultima_pesada.cintura_cm) : "");
-      setCadera(cadete.ultima_pesada?.cadera_cm ? String(cadete.ultima_pesada.cadera_cm) : "");
-      setPorcentajeMM(cadete.ultima_pesada?.porcentaje_mm ? String(cadete.ultima_pesada.porcentaje_mm) : "");
-      setPorcentajeMG(cadete.ultima_pesada?.porcentaje_mg ? String(cadete.ultima_pesada.porcentaje_mg) : "");
-      setDxBia(cadete.ultima_pesada?.dx_bia || "Normal");
-      setEgs(cadete.ultima_pesada?.egs || "A");
+      // Los campos que se MIDEN hoy arrancan vacíos. Antes venía cargado el
+      // peso de la pesada anterior y, si no se lo cambiaba, quedaba registrado
+      // el peso viejo con la fecha de hoy.
+      setPeso("");
+      setCintura("");
+      setCadera("");
+      setPorcentajeMM("");
+      setPorcentajeMG("");
+      // La talla sí se arrastra: cambia poco y es un dato de la ficha, no de
+      // la pesada. Si no está registrada queda vacía, no se supone 170 cm.
+      setAltura(cadete.altura_cm ? String(cadete.altura_cm) : "");
+      setDxBia(SIN_EVALUAR);
+      setEgs(SIN_EVALUAR);
       setObservaciones("");
     }
   }, [cadete]);
 
   const numPeso = parseFloat(peso) || 0;
-  const numAltura = parseFloat(altura) || 170;
+  const numAltura = parseFloat(altura) || 0;
   const numCintura = parseFloat(cintura) || 0;
   const numCadera = parseFloat(cadera) || 0;
 
@@ -56,9 +73,13 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
   const iccCalculado = numCintura > 0 && numCadera > 0 ? Number((numCintura / numCadera).toFixed(2)) : null;
   const dxIccCalculado = iccCalculado && cadete ? calcularDxICC(iccCalculado, cadete.sexo) : null;
 
-  // Peso ideal sugerido (IMC 24.9)
-  const pesoIdealMax = Number((24.9 * Math.pow(numAltura / 100, 2)).toFixed(1));
-  const diferenciaPeso = numPeso > 0 ? Number((numPeso - pesoIdealMax).toFixed(1)) : 0;
+  // Rango de peso saludable (IMC 18,5 a 24,9). Sin talla no hay rango.
+  const rangoSaludable = numAltura > 0 ? calcularPesoIdeal(numAltura) : null;
+  const excesoPeso = rangoSaludable && numPeso > 0 ? Number((numPeso - rangoSaludable.max).toFixed(1)) : 0;
+  const faltaPeso = rangoSaludable && numPeso > 0 ? Number((rangoSaludable.min - numPeso).toFixed(1)) : 0;
+
+  const pesoAnterior = cadete?.ultima_pesada?.peso_kg ?? null;
+  const diferenciaConAnterior = pesoAnterior && numPeso > 0 ? Number((numPeso - pesoAnterior).toFixed(1)) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,13 +93,15 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
       await crearPesada.mutateAsync({
         cadete_id: cadete.id,
         peso_kg: numPeso,
-        altura_cm: numAltura,
+        altura_cm: numAltura || undefined,
         cintura_cm: numCintura || undefined,
         cadera_cm: numCadera || undefined,
         porcentaje_mm: porcentajeMM ? parseFloat(porcentajeMM) : undefined,
         porcentaje_mg: porcentajeMG ? parseFloat(porcentajeMG) : undefined,
-        dx_bia: dxBia,
-        egs: egs,
+        // "Sin evaluar" no se guarda: es la diferencia entre no haberlo mirado
+        // y haber diagnosticado que está normal.
+        dx_bia: dxBia === SIN_EVALUAR ? undefined : dxBia,
+        egs: egs === SIN_EVALUAR ? undefined : egs,
         observaciones: observaciones || undefined,
       });
 
@@ -100,7 +123,7 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
             Ficha Antropométrica - ISEPOL
           </DialogTitle>
           <DialogDescription>
-            Paciente: <strong className="text-foreground">{cadete.nombre} {cadete.apellido}</strong> (DNI: {cadete.dni}) · Curso: {cadete.curso}
+            Paciente: <strong className="text-foreground">{cadete.nombre} {cadete.apellido}</strong> (DNI: {cadete.dni}){cadete.curso ? ` · Curso: ${cadete.curso}` : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -117,7 +140,7 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
                 value={peso}
                 onChange={(e) => setPeso(e.target.value)}
                 required
-                autoFocus
+                ref={pesoRef}
               />
             </div>
             <div className="space-y-1.5">
@@ -130,6 +153,11 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
                 value={altura}
                 onChange={(e) => setAltura(e.target.value)}
               />
+              {!altura && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Sin talla no se puede calcular el IMC.
+                </p>
+              )}
             </div>
           </div>
 
@@ -152,14 +180,28 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
                 </Badge>
               </div>
 
-              {diferenciaPeso > 0 ? (
+              {rangoSaludable && excesoPeso > 0 ? (
                 <div className="text-xs text-red-600 dark:text-red-400 font-medium flex justify-between pt-1 border-t border-primary/10">
-                  <span>⚠️ Sobrepeso: Bajar {diferenciaPeso} kg</span>
-                  <span className="text-muted-foreground">Meta: {pesoIdealMax} kg</span>
+                  <span>⚠️ Sobrepeso: bajar {excesoPeso} kg</span>
+                  <span className="text-muted-foreground">Rango: {rangoSaludable.min} a {rangoSaludable.max} kg</span>
+                </div>
+              ) : rangoSaludable && faltaPeso > 0 ? (
+                <div className="text-xs text-blue-600 dark:text-blue-400 font-medium flex justify-between pt-1 border-t border-primary/10">
+                  <span>⚠️ Bajo peso: subir {faltaPeso} kg</span>
+                  <span className="text-muted-foreground">Rango: {rangoSaludable.min} a {rangoSaludable.max} kg</span>
                 </div>
               ) : (
                 <div className="text-xs text-green-600 dark:text-green-400 font-medium pt-1 border-t border-primary/10">
-                  ✅ Peso Saludable dentro del rango OMS
+                  ✅ Peso saludable dentro del rango OMS
+                </div>
+              )}
+
+              {diferenciaConAnterior !== null && (
+                <div className="text-xs text-muted-foreground pt-1">
+                  Pesada anterior: {pesoAnterior} kg ·{" "}
+                  {diferenciaConAnterior === 0
+                    ? "sin cambios"
+                    : `${diferenciaConAnterior > 0 ? "+" : ""}${diferenciaConAnterior} kg`}
                 </div>
               )}
             </div>
@@ -237,6 +279,7 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
                   <SelectValue placeholder="Seleccionar DX BIA" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={SIN_EVALUAR}>Sin evaluar</SelectItem>
                   <SelectItem value="Normal">Normal (1-9)</SelectItem>
                   <SelectItem value="Elevada">Grasa Visceral Elevada (10-14)</SelectItem>
                   <SelectItem value="Muy Elevada">Grasa Visceral Muy Elevada (15+)</SelectItem>
@@ -251,6 +294,7 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
                   <SelectValue placeholder="Seleccionar EGS" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={SIN_EVALUAR}>Sin evaluar</SelectItem>
                   <SelectItem value="A">A - Bien nutrido</SelectItem>
                   <SelectItem value="B">B - Sospecha / Desnutrición moderada</SelectItem>
                   <SelectItem value="C">C - Desnutrición severa</SelectItem>

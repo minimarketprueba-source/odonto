@@ -7,29 +7,29 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PesadaDialog } from "@/components/nutricion/pesada-dialog";
 import { useCadetesNutricion, CadeteNutricion } from "@/api/nutricion";
-import { getColorIMC } from "@/lib/utils/imc-utils";
-import { showSwalInfo, showSwalError } from "@/lib/swal";
+import { calcularPesoIdeal, getColorIMC } from "@/lib/utils/imc-utils";
 import { imprimirFichaAntropometrica } from "@/lib/imprimir";
 import {
   Search,
   Users,
-  Plus,
   Scale,
-  Stethoscope,
   Filter,
-  FileSpreadsheet,
-  CalendarRange,
   User,
   Shield,
   Minus,
-  Trash2,
-  SquarePen,
   Printer,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+
+/** La fecha llega en ISO desde la base; sin pesada no se inventa ninguna. */
+function fmtFechaPesada(fecha?: string | null): string {
+  if (!fecha) return "Sin registro";
+  const d = new Date(fecha);
+  return Number.isNaN(d.getTime()) ? "Sin registro" : d.toLocaleDateString("es-PY");
+}
 
 export default function Nutricion() {
   const { data: cadetes = [], isLoading, isError, refetch } = useCadetesNutricion();
@@ -116,10 +116,6 @@ export default function Nutricion() {
     setDialogOpen(true);
   };
 
-  const handleExportar = (formato: string) => {
-    showSwalInfo(`Generando exportación en formato ${formato}...`);
-  };
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -132,40 +128,6 @@ export default function Nutricion() {
             <p className="text-sm sm:text-base text-muted-foreground text-pretty">
               Control antropométrico y seguimiento nutricional de cadetes del instituto
             </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="El cierre anual ya fue ejecutado este año"
-              className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950 gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <CalendarRange className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Cierre de año</span>
-              <span className="sm:hidden">Cierre</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => showSwalInfo("Importación en desarrollo")}
-              className="gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Importar CSV</span>
-              <span className="sm:hidden">CSV</span>
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => showSwalInfo("Para agregar cadetes, vaya a la sección de Pacientes")}
-              className="gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Nuevo Cadete</span>
-              <span className="sm:hidden">Nuevo</span>
-            </Button>
           </div>
         </div>
 
@@ -264,33 +226,6 @@ export default function Nutricion() {
 
         {/* Acciones de exportación y estadísticas */}
         <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 items-center justify-between sm:justify-end">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExportar("PDF")}
-              className="h-8 text-xs sm:text-sm"
-            >
-              <span className="hidden sm:inline">Exportar </span>PDF
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExportar("Word")}
-              className="h-8 text-xs sm:text-sm"
-            >
-              <span className="hidden sm:inline">Exportar </span>Word
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExportar("Excel")}
-              className="h-8 text-xs sm:text-sm text-green-700 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-950 gap-1.5"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Exportar </span>Excel
-            </Button>
-          </div>
           {conteoSobrepeso > 0 && (
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
               ⚠️ {conteoSobrepeso} con Sobrepeso / Obesidad
@@ -326,13 +261,17 @@ export default function Nutricion() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {cadetesPaginados.map((cadete) => {
                 const pesada = cadete.ultima_pesada;
-                const altura = cadete.altura_cm || 170;
-                const imc = pesada?.imc || (pesada?.peso_kg ? Number((pesada.peso_kg / Math.pow(altura / 100, 2)).toFixed(2)) : null);
+                // Sin talla medida no hay IMC ni peso meta: antes se suponían
+                // 170 cm y salía un IMC que parecía real.
+                const altura = cadete.altura_cm;
+                const imc = pesada?.imc ?? null;
                 const colorImc = imc ? getColorIMC(imc) : "#6b7280";
 
-                // Peso meta ideal
-                const pesoIdeal = Number((24.9 * Math.pow(altura / 100, 2)).toFixed(1));
-                const excesoPeso = pesada?.peso_kg ? Number((pesada.peso_kg - pesoIdeal).toFixed(1)) : 0;
+                // Rango de peso saludable (IMC 18,5 a 24,9)
+                const rango = altura ? calcularPesoIdeal(altura) : null;
+                const peso = pesada?.peso_kg ?? null;
+                const excesoPeso = rango && peso ? Number((peso - rango.max).toFixed(1)) : 0;
+                const faltaPeso = rango && peso ? Number((rango.min - peso).toFixed(1)) : 0;
 
                 return (
                   <Card
@@ -372,19 +311,21 @@ export default function Nutricion() {
                         <Badge variant="outline" className="text-xs">
                           {cadete.sexo === "F" ? "♀ Femenino" : "♂ Masculino"}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">{altura} cm</span>
+                        <span className="text-xs text-muted-foreground">
+                          {altura ? `${altura} cm` : "Sin talla"}
+                        </span>
                       </div>
 
                       {/* Caja de Datos Antropométricos (%MG, %MM, ICC, DX BIA, EGS) */}
                       <div className="space-y-2 text-sm flex-1 p-3 bg-muted/30 rounded-lg border border-border/40">
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-muted-foreground">Última pesada:</span>
-                          <span className="font-medium">{pesada?.fecha || "Sin registro"}</span>
+                          <span className="font-medium">{fmtFechaPesada(pesada?.fecha)}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-muted-foreground">Peso / Talla:</span>
                           <span className="font-semibold text-xs">
-                            {pesada?.peso_kg ? `${pesada.peso_kg} kg` : "—"} · {altura} cm
+                            {peso ? `${peso} kg` : "—"} · {altura ? `${altura} cm` : "sin talla"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
@@ -398,10 +339,12 @@ export default function Nutricion() {
                               }}
                               className="text-xs font-semibold border"
                             >
-                              {imc} - {pesada?.clasificacion || "Calculado"}
+                              {imc} - {pesada?.clasificacion}
                             </Badge>
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">
+                              {peso && !altura ? "Falta la talla" : "—"}
+                            </span>
                           )}
                         </div>
 
@@ -417,16 +360,19 @@ export default function Nutricion() {
                           </div>
                           <div>
                             <span className="text-muted-foreground block">ICC:</span>
-                            <span className="font-medium">{pesada?.icc ? `${pesada.icc} (${pesada.dx_icc || "OK"})` : "—"}</span>
+                            <span className="font-medium">{pesada?.icc ? `${pesada.icc}${pesada.dx_icc ? ` (${pesada.dx_icc})` : ""}` : "—"}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground block">DX BIA / EGS:</span>
-                            <span className="font-medium">{pesada?.dx_bia || "Normal"} · EGS {pesada?.egs || "A"}</span>
+                            <span className="font-medium">
+                              {pesada?.dx_bia || "—"} · EGS {pesada?.egs || "—"}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Caja de Meta Nutricional */}
-                        {pesada?.peso_kg && (
+                        {/* Caja de Meta Nutricional. Sin talla no hay rango
+                            saludable que comparar, así que no se muestra. */}
+                        {peso && rango && (
                           <div className="mt-2 pt-2 border-t border-border/50 text-center">
                             {excesoPeso > 0 ? (
                               <>
@@ -434,7 +380,16 @@ export default function Nutricion() {
                                   ⚠️ Bajar {excesoPeso} kg
                                 </span>
                                 <span className="text-[10px] text-muted-foreground block">
-                                  Meta: {pesoIdeal} kg
+                                  Rango saludable: {rango.min} a {rango.max} kg
+                                </span>
+                              </>
+                            ) : faltaPeso > 0 ? (
+                              <>
+                                <span className="text-blue-600 dark:text-blue-400 font-semibold text-xs block">
+                                  ⚠️ Bajo peso: subir {faltaPeso} kg
+                                </span>
+                                <span className="text-[10px] text-muted-foreground block">
+                                  Rango saludable: {rango.min} a {rango.max} kg
                                 </span>
                               </>
                             ) : (
@@ -444,21 +399,6 @@ export default function Nutricion() {
                             )}
                           </div>
                         )}
-                      </div>
-
-                      {/* Situación médica */}
-                      <div className="p-3 bg-muted/30 rounded-lg space-y-1 border border-border/40">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground text-xs flex items-center gap-1">
-                            <Stethoscope className="w-3 h-3" /> Situación médica:
-                          </span>
-                          <Badge variant="outline" className="text-[10px] border-green-500 text-green-600 dark:text-green-400">
-                            {cadete.situacion_medica?.estado || "APTO"}
-                          </Badge>
-                        </div>
-                        <p className="text-[11px] text-foreground/80 leading-snug">
-                          {cadete.situacion_medica?.descripcion || "Puede realizar actividad física"}
-                        </p>
                       </div>
 
                       {/* Fila de botones de acción */}
@@ -481,26 +421,6 @@ export default function Nutricion() {
                           onClick={() => imprimirFichaAntropometrica(cadete)}
                         >
                           <Printer className="w-4 h-4" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Editar cadete"
-                          onClick={() => showSwalInfo("La edición de fichas se realiza en la sección Pacientes")}
-                        >
-                          <SquarePen className="w-4 h-4" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                          title="Eliminar cadete"
-                          onClick={() => showSwalError("Solo un administrador puede eliminar fichas de cadetes")}
-                        >
-                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </CardContent>

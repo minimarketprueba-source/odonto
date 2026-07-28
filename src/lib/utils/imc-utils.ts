@@ -45,7 +45,9 @@ export const RANGOS_IMC: RangoIMC[] = [
   },
   {
     min: 40,
-    max: 100,
+    // Sin tope: con max 100 un IMC absurdo caía en el `|| RANGOS_IMC[1]` de
+    // clasificarIMC y se mostraba como "Peso normal".
+    max: Infinity,
     clasificacion: 'obesidad_iii',
     label: 'Obesidad III',
     color: '#991b1b' // red-800

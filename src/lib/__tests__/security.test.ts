@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizePlainText, sanitizeIdentifier, requireSanitizedValue } from '../security'
+import { sanitizePlainText, sanitizeIdentifier, requireSanitizedValue, sanitizeMultilineText } from '../security'
 
 describe('sanitizePlainText', () => {
     it('elimina tags <script>', () => {
@@ -24,6 +24,46 @@ describe('sanitizePlainText', () => {
 
     it('preserva texto normal', () => {
         expect(sanitizePlainText('Juan Pérez')).toBe('Juan Pérez')
+    })
+})
+
+describe('sanitizeMultilineText', () => {
+    it('conserva los saltos de línea del tratamiento', () => {
+        const receta = 'Ibuprofeno 600mg c/8hs\nReposo relativo 48hs\nControl en 3 días'
+        expect(sanitizeMultilineText(receta)).toBe(receta)
+    })
+
+    it('sanitizePlainText en cambio los aplasta (por eso existe este otro)', () => {
+        expect(sanitizePlainText('linea 1\nlinea 2')).toBe('linea 1 linea 2')
+    })
+
+    it('sigue eliminando tags <script>', () => {
+        expect(sanitizeMultilineText('<script>alert(1)</script>uno\ndos')).toBe('uno\ndos')
+    })
+
+    it('elimina event handlers', () => {
+        expect(sanitizeMultilineText('<div onclick="evil()">hola</div>\nchau')).toBe('hola\nchau')
+    })
+
+    it('limpia caracteres de control pero no el salto', () => {
+        expect(sanitizeMultilineText('uno\x00dos\ntres')).toBe('uno dos\ntres')
+    })
+
+    it('normaliza los saltos de Windows', () => {
+        expect(sanitizeMultilineText('uno\r\ndos')).toBe('uno\ndos')
+    })
+
+    it('recorta los renglones y limita los saltos seguidos', () => {
+        expect(sanitizeMultilineText('  uno  \n\n\n\n  dos  ')).toBe('uno\n\ndos')
+    })
+
+    it('colapsa los espacios repetidos dentro del renglón', () => {
+        expect(sanitizeMultilineText('uno    dos\ttres')).toBe('uno dos tres')
+    })
+
+    it('retorna vacío para null o undefined', () => {
+        expect(sanitizeMultilineText(null)).toBe('')
+        expect(sanitizeMultilineText(undefined)).toBe('')
     })
 })
 
