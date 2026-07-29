@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance,
+  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance, HeartPulse,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
 import { HistoriaClinicaDialog } from "@/components/consultas/historia-clinica-dialog";
 import { SalvoconductoForm } from "@/components/consultas/salvoconducto-form";
+import { AtencionAmbulatoriaForm } from "@/components/enfermeria/atencion-ambulatoria-form";
 import {
   TIPOS_PACIENTE, labelTipoPaciente, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
@@ -55,6 +56,8 @@ export default function Pacientes() {
   const veHistoria = canView("consultas");
   // El salvoconducto lo expide el profesional o la enfermera de turno.
   const puedeExpedirSalvoconducto = hasPermission("consultas", "editar");
+  // La atención ambulatoria la registra enfermería (mismo permiso que el panel).
+  const puedeRegistrarAtencion = hasPermission("consultas", "editar");
 
   const { data: pacientes = [], isLoading } = usePacientes();
   const cambiarEstado = useCambiarEstadoPaciente();
@@ -74,6 +77,7 @@ export default function Pacientes() {
   const [historiaOpen, setHistoriaOpen] = useState(false);
   const [pacienteHistoria, setPacienteHistoria] = useState<Paciente | null>(null);
   const [pacienteSalvoconducto, setPacienteSalvoconducto] = useState<Paciente | null>(null);
+  const [pacienteAtencion, setPacienteAtencion] = useState<Paciente | null>(null);
 
   const busquedaDebounced = useDebounce(busqueda, 300);
 
@@ -248,6 +252,16 @@ export default function Pacientes() {
                           <Stethoscope className="w-4 h-4" />
                         </Button>
                       )}
+                      {puedeRegistrarAtencion && (
+                        <Button
+                          variant="ghost" size="sm"
+                          title="Registrar atención de enfermería (curación, medicación, control)"
+                          className="text-teal-600 hover:text-teal-700"
+                          onClick={() => setPacienteAtencion(p)}
+                        >
+                          <HeartPulse className="w-4 h-4" />
+                        </Button>
+                      )}
                       {puedeExpedirSalvoconducto && (
                         <Button
                           variant="ghost" size="sm"
@@ -312,6 +326,11 @@ export default function Pacientes() {
         open={!!pacienteSalvoconducto}
         onOpenChange={(abierto) => { if (!abierto) setPacienteSalvoconducto(null); }}
         paciente={pacienteSalvoconducto}
+      />
+      <AtencionAmbulatoriaForm
+        open={!!pacienteAtencion}
+        onOpenChange={(abierto) => { if (!abierto) setPacienteAtencion(null); }}
+        pacienteInicial={pacienteAtencion}
       />
     </AppLayout>
   );

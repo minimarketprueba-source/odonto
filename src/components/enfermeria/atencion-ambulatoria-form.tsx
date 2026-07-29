@@ -16,7 +16,7 @@ import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { usePacientes } from "@/api/pacientes";
+import { usePacientes, type Paciente } from "@/api/pacientes";
 import { fechaHoyISO } from "@/api/citas";
 import {
   DESTINOS_AMBULATORIO, TIPOS_ATENCION, useCrearAtencion,
@@ -39,9 +39,11 @@ function numeroONull(texto: string): number | null {
 interface AtencionAmbulatoriaFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Si se abre desde la tarjeta de un paciente, ya viene seleccionado. */
+  pacienteInicial?: Paciente | null;
 }
 
-export function AtencionAmbulatoriaForm({ open, onOpenChange }: AtencionAmbulatoriaFormProps) {
+export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }: AtencionAmbulatoriaFormProps) {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
   const puedeCrearPaciente = hasPermission("pacientes", "editar");
@@ -68,8 +70,15 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange }: AtencionAmbulato
 
   useEffect(() => {
     if (open) {
-      setPacienteId("");
-      setBusquedaPaciente("");
+      if (pacienteInicial) {
+        setPacienteId(String(pacienteInicial.id));
+        setBusquedaPaciente(
+          `${pacienteInicial.apellidos}, ${pacienteInicial.nombres} (CI: ${pacienteInicial.documento || "—"})`
+        );
+      } else {
+        setPacienteId("");
+        setBusquedaPaciente("");
+      }
       setFecha(fechaHoyISO());
       setHora(horaAhora());
       setTipo("curacion");
@@ -82,7 +91,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange }: AtencionAmbulato
       setEnfermero("");
       setPaSistolica(""); setPaDiastolica(""); setFc(""); setFr(""); setTemp(""); setSpo2("");
     }
-  }, [open]);
+  }, [open, pacienteInicial]);
 
   const pacientesFiltrados = useMemo(() => {
     if (!busquedaPaciente.trim()) return [];
