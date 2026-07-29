@@ -22,7 +22,7 @@ import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
 import {
   DESTINOS_ATENCION, destinoAtencion, useCreateConsulta, useSearchCie10,
-  type Cie10, type DestinoAtencion,
+  type Cie10, type Consulta, type DestinoAtencion,
 } from "@/api/consultas";
 import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
 import { imprimirCertificadoReposo, documentoReposo, cleanQrText } from "@/lib/imprimir";
@@ -56,9 +56,15 @@ interface ConsultaFormProps {
   pacienteNombre: string;
   /** Si viene de la agenda: precarga médico/fecha/motivo y marca la cita como atendida. */
   cita?: Cita | null;
+  /** Precarga el motivo cuando no hay cita (ej. desde una atención de enfermería). */
+  motivoInicial?: string;
+  /** Se llama con la consulta recién creada (para vincularla donde se la pidió). */
+  onCreated?: (consulta: Consulta) => void;
 }
 
-export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, cita }: ConsultaFormProps) {
+export function ConsultaForm({
+  open, onOpenChange, pacienteId, pacienteNombre, cita, motivoInicial, onCreated,
+}: ConsultaFormProps) {
   const { user } = useAuth();
   const { data: medicos = [] } = useMedicosActivos();
   const { data: camas = [] } = useEnfermeriaCamas();
@@ -89,7 +95,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
     if (open) {
       setMedicoId(cita ? String(cita.medico_id) : "");
       setFecha(cita?.fecha || fechaHoyISO());
-      setMotivo(cita?.motivo || "");
+      setMotivo(cita?.motivo || motivoInicial || "");
       setExamen("");
       setDiagnostico("");
       setTratamiento("");
@@ -101,7 +107,7 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
       setCamaId("");
       internacionCreada.current = null;
     }
-  }, [open, cita]);
+  }, [open, cita, motivoInicial]);
 
   const medicoSeleccionado = useMemo(
     () => medicos.find((m) => String(m.id) === medicoId) || null,
@@ -173,6 +179,9 @@ export function ConsultaForm({ open, onOpenChange, pacienteId, pacienteNombre, c
         reposo_desde: reposoTipo ? fecha : null,
         reposo_hasta: reposoTipo ? reposoHasta || null : null,
       });
+
+      // Antes de la bifurcación de impresión: cubre los dos caminos.
+      onCreated?.(res);
 
       if (opts?.eImprimirReposo && reposoTipo) {
         const qrSvgHtml = renderToStaticMarkup(

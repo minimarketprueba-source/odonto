@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance } from "lucide-react";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance, HeartPulse } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { labelDestinoAtencion, useConsultasPaciente, type Consulta } from "@/api/consultas";
@@ -20,6 +20,7 @@ import {
 } from "@/api/anulaciones";
 import { AnularDialog } from "./anular-dialog";
 import { useInternacionesPaciente } from "@/api/enfermeria";
+import { labelTipoAtencion, useAtencionesPaciente } from "@/api/atenciones-enfermeria";
 import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } from "@/api/rac";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
@@ -143,6 +144,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const { data: recetas = [] } = useRecetasPaciente(open && veRecetas ? (paciente?.id ?? null) : null, isAdmin);
   const { data: internaciones = [] } = useInternacionesPaciente(open ? (paciente?.id ?? null) : null);
   const { data: fichasRac = [] } = useFichasRacPaciente(open ? (paciente?.id ?? null) : null);
+  const { data: atencionesEnfermeria = [] } = useAtencionesPaciente(open ? (paciente?.id ?? null) : null);
   const anularConsulta = useAnularConsulta();
   const anularReceta = useAnularReceta();
   const restaurarConsulta = useRestaurarConsulta();
@@ -385,6 +387,59 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {atencionesEnfermeria.length > 0 && servicioFiltro === "todos" && (
+                <div className="rounded-lg border border-teal-300 dark:border-teal-800 overflow-hidden">
+                  <div className="px-3 py-1.5 bg-teal-50 dark:bg-teal-950/40 flex items-center gap-2">
+                    <HeartPulse className="w-4 h-4 text-teal-700 dark:text-teal-300" />
+                    <span className="text-sm font-semibold text-teal-800 dark:text-teal-200">
+                      Atenciones ambulatorias de enfermería ({atencionesEnfermeria.length})
+                    </span>
+                  </div>
+                  <div className="divide-y">
+                    {atencionesEnfermeria.map((a) => {
+                      const signos = [
+                        a.pa_sistolica && a.pa_diastolica && `PA ${a.pa_sistolica}/${a.pa_diastolica}`,
+                        a.fc && `FC ${a.fc}`,
+                        a.fr && `FR ${a.fr}`,
+                        a.spo2 && `SpO2 ${a.spo2}%`,
+                        a.temp && `T° ${a.temp}`,
+                      ].filter(Boolean).join(" · ");
+                      return (
+                        <div key={a.id} className="px-3 py-2 text-sm">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{fmtFecha(a.fecha)} · {a.hora?.slice(0, 5)} hs</span>
+                            <Badge variant="outline">{labelTipoAtencion(a.tipo_atencion)}</Badge>
+                            {a.revisada_at ? (
+                              <Badge className="bg-green-100 text-green-700 border-0 dark:bg-green-900/40 dark:text-green-200">
+                                Revisada{a.medico_revisor ? ` por Dr(a). ${a.medico_revisor.apellidos}` : ""}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/40 dark:text-amber-200">
+                                Pendiente de revisión médica
+                              </Badge>
+                            )}
+                          </div>
+                          {a.motivo && (
+                            <p className="text-muted-foreground text-xs mt-0.5 whitespace-pre-wrap">{a.motivo}</p>
+                          )}
+                          {a.procedimiento && (
+                            <p className="text-muted-foreground text-xs whitespace-pre-wrap">Se hizo: {a.procedimiento}</p>
+                          )}
+                          {a.observaciones && (
+                            <p className="text-muted-foreground text-xs whitespace-pre-wrap">Obs.: {a.observaciones}</p>
+                          )}
+                          {signos && <p className="text-muted-foreground text-xs">{signos}</p>}
+                          <p className="text-muted-foreground text-xs">
+                            Atendió: {a.enfermero || a.registrado_por?.split("@")[0] || "—"}
+                            {a.nota_revision ? ` · Nota del médico: ${a.nota_revision}` : ""}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

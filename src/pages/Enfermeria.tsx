@@ -30,6 +30,8 @@ import {
 } from "@/api/enfermeria";
 import { imprimirHojaEnfermeria, cleanQrText } from "@/lib/imprimir";
 import { useAuth } from "@/context/auth-context";
+import { useAtencionesPendientes } from "@/api/atenciones-enfermeria";
+import { AtencionAmbulatoriaPanel } from "@/components/enfermeria/atencion-ambulatoria-panel";
 
 export default function Enfermeria() {
   const { user } = useAuth();
@@ -37,11 +39,15 @@ export default function Enfermeria() {
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: ingresos = [] } = useEnfermeriaIngresos();
   const { data: pacientes = [] } = usePacientes();
+  // Solo para el contador de la pestaña: comparte caché con el panel.
+  const { data: ambulatoriasPendientes = [] } = useAtencionesPendientes();
 
   const ingresarMut = useIngresarPacienteCama();
   const vitalesMut = useRegistrarSignosVitales();
   const egresarMut = useEgresarPacienteCama();
 
+  // Vista: gestión de camas (internación) o atención ambulatoria.
+  const [vista, setVista] = useState<"camas" | "ambulatorio">("camas");
   const [salaFiltro, setSalaFiltro] = useState<string>("todas");
   const [busqueda, setBusqueda] = useState("");
 
@@ -330,16 +336,38 @@ export default function Enfermeria() {
               Control de internación, observación de cadetes y personal, constantes vitales y disponibilidad de salas en tiempo real.
             </p>
           </div>
-          <Button
-            size="lg"
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg gap-2 shrink-0 border border-emerald-400/50"
-            onClick={() => handleAbrirIngreso()}
-          >
-            <Plus className="w-5 h-5" />
-            Ingresar Paciente a Cama
-          </Button>
+          {vista === "camas" && (
+            <Button
+              size="lg"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg gap-2 shrink-0 border border-emerald-400/50"
+              onClick={() => handleAbrirIngreso()}
+            >
+              <Plus className="w-5 h-5" />
+              Ingresar Paciente a Cama
+            </Button>
+          )}
         </div>
 
+        {/* Conmutador Camas / Atención ambulatoria */}
+        <Tabs value={vista} onValueChange={(v) => setVista(v as "camas" | "ambulatorio")}>
+          <TabsList className="flex flex-wrap h-auto p-1 bg-muted/60">
+            <TabsTrigger value="camas" className="gap-1.5 text-sm font-semibold px-4 py-1.5">
+              <BedDouble className="w-4 h-4" /> Camas e internación
+            </TabsTrigger>
+            <TabsTrigger value="ambulatorio" className="gap-1.5 text-sm font-semibold px-4 py-1.5">
+              <HeartPulse className="w-4 h-4" /> Atención ambulatoria
+              {ambulatoriasPendientes.length > 0 && (
+                <Badge className="ml-1 bg-amber-500 text-white border-0 px-1.5">
+                  {ambulatoriasPendientes.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {vista === "ambulatorio" && <AtencionAmbulatoriaPanel />}
+
+        {vista === "camas" && (<>
         {/* Tarjetas KPI de Estado de Camas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border shadow-xs bg-card">
@@ -595,6 +623,7 @@ export default function Enfermeria() {
             );
           })}
         </div>
+        </>)}
 
         {/* MODAL 1: Ingresar Paciente a Cama */}
         <Dialog open={modalIngresoOpen} onOpenChange={setModalIngresoOpen}>

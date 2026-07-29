@@ -120,12 +120,16 @@ export const queryKeys = {
     all: ['recetas'] as const,
     porPaciente: (pacienteId: number) => [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
   },
-  // Enfermería: salas, camas e internaciones
+  // Enfermería: salas, camas, internaciones y atención ambulatoria
   enfermeria: {
     all: ['enfermeria'] as const,
     salas: () => [...queryKeys.enfermeria.all, 'salas'] as const,
     camas: () => [...queryKeys.enfermeria.all, 'camas'] as const,
     internaciones: () => [...queryKeys.enfermeria.all, 'internaciones'] as const,
+    ambulatoriasPendientes: () => [...queryKeys.enfermeria.all, 'ambulatorias', 'pendientes'] as const,
+    ambulatoriasRecientes: () => [...queryKeys.enfermeria.all, 'ambulatorias', 'recientes'] as const,
+    ambulatoriasPaciente: (pacienteId: number) =>
+      [...queryKeys.enfermeria.all, 'ambulatorias', 'paciente', pacienteId] as const,
   },
   // Salvoconductos (autorización de traslado)
   salvoconductos: {

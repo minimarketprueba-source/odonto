@@ -44,6 +44,7 @@ import { useAuth } from "@/context/auth-context"
 import { usePacientes } from "@/api/pacientes"
 import { useCitasDelDia, useCitasRango, useMiMedico, fechaHoyISO } from "@/api/citas"
 import { useAtenciones } from "@/api/consultas"
+import { useAtencionesPendientes } from "@/api/atenciones-enfermeria"
 
 function pacientesDistintos(regs: { paciente_id: number; fecha: string }[], desde?: string): number {
   const ids = new Set<number>()
@@ -91,6 +92,9 @@ export default function Dashboard() {
   const { data: citasHoy = [], isLoading: loadingCitasHoy } = useCitasDelDia(hoy)
   const { data: citasSemana = [], isLoading: loadingCitasSemana } = useCitasRango(hace7Dias, hoy)
   const { data: miMedico, isLoading: loadingMedico } = useMiMedico(user?.id)
+  // Aviso a los médicos: atenciones de enfermería sin revisar. Solo se pide
+  // cuando la cuenta tiene ficha de médico.
+  const { data: atencionesPorRevisar = [] } = useAtencionesPendientes(!!miMedico)
   const { data: atenciones = [], isLoading: loadingAtenciones } = useAtenciones()
 
   const isLoading = loadingPacientes || loadingCitasHoy || loadingCitasSemana || loadingMedico || loadingAtenciones
@@ -286,6 +290,26 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Atenciones de enfermería que esperan revisión médica */}
+        {miMedico && atencionesPorRevisar.length > 0 && (
+          <Link
+            to="/enfermeria"
+            className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3.5 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+          >
+            <HeartPulse className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-amber-800 dark:text-amber-200">
+                {atencionesPorRevisar.length === 1
+                  ? "Hay 1 atención de enfermería esperando revisión médica"
+                  : `Hay ${atencionesPorRevisar.length} atenciones de enfermería esperando revisión médica`}
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Enfermería atendió sin médico de guardia. Toque para revisarlas.
+              </p>
+            </div>
+          </Link>
+        )}
 
         {/* Panel del Médico en Sesión ("Mi Día") */}
         {miMedico && (

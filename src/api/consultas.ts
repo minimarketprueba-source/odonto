@@ -245,6 +245,7 @@ export function useCreateConsulta() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createConsulta,
+    retry: 0, // no reintentar: crearía una segunda consulta en la historia clínica
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.consultas.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.citas.all });
