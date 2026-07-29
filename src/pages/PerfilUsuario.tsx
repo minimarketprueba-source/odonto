@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { KeyRound, Loader2, Phone, UserCircle2 } from "lucide-react";
+import { IdCard, KeyRound, Loader2, Phone, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { useMiMedico } from "@/api/citas";
+import { useNombrePerfil, guardarNombrePerfil } from "@/api/perfil";
 import { updateMedico } from "@/api/mantenimiento";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-client";
@@ -24,6 +25,39 @@ export default function PerfilUsuario() {
 
   const [telefono, setTelefono] = useState("");
   const [guardandoTel, setGuardandoTel] = useState(false);
+
+  // Nombre propio de la cuenta: prellena "quién atiende" en enfermería.
+  // Los médicos lo toman de su ficha; enfermería y admin lo cargan acá.
+  const { data: nombrePerfil } = useNombrePerfil(user);
+  const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
+
+  useEffect(() => {
+    if (!miMedico && nombrePerfil) {
+      const partes = nombrePerfil.split(/\s+/);
+      setNombre((prev) => prev || partes.slice(0, Math.ceil(partes.length / 2)).join(" "));
+      setApellido((prev) => prev || partes.slice(Math.ceil(partes.length / 2)).join(" "));
+    }
+  }, [miMedico, nombrePerfil]);
+
+  const guardarNombre = async () => {
+    if (!user?.id) return;
+    if (!nombre.trim() || !apellido.trim()) {
+      toast.error("Complete nombre y apellido.");
+      return;
+    }
+    setGuardandoNombre(true);
+    try {
+      await guardarNombrePerfil(user.id, nombre, apellido);
+      queryClient.invalidateQueries({ queryKey: queryKeys.perfil.all });
+      toast.success("Nombre guardado. Va a aparecer prellenado al registrar atenciones.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setGuardandoNombre(false);
+    }
+  };
 
   useEffect(() => {
     if (miMedico) setTelefono((miMedico as { telefono?: string | null }).telefono ?? "");
@@ -87,6 +121,36 @@ export default function PerfilUsuario() {
             )}
           </CardContent>
         </Card>
+
+        {/* Los médicos ya tienen su nombre en la ficha; el resto lo carga acá. */}
+        {!miMedico && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <IdCard className="w-5 h-5 text-primary" /> Mi nombre y apellido
+              </CardTitle>
+              <CardDescription>
+                Se usa para prellenar «quién atiende» al registrar atenciones de enfermería.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+                <div className="space-y-1">
+                  <Label htmlFor="p-nombre">Nombre</Label>
+                  <Input id="p-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="p-apellido">Apellido</Label>
+                  <Input id="p-apellido" value={apellido} onChange={(e) => setApellido(e.target.value)} />
+                </div>
+              </div>
+              <Button onClick={guardarNombre} disabled={guardandoNombre || !nombre.trim() || !apellido.trim()}>
+                {guardandoNombre ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Guardar nombre
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {miMedico && (
           <Card>
