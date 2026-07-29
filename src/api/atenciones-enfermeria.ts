@@ -98,7 +98,9 @@ export interface CrearAtencionInput {
 
 export interface RevisarAtencionInput {
   id: number;
-  medico_revisor_id: number;
+  /** Ficha del médico que firma. Null cuando revisa el administrador
+   *  (el trigger de la base solo lo acepta para cuentas admin). */
+  medico_revisor_id?: number | null;
   revisada_por?: string | null;
   nota_revision?: string | null;
   /** Si el médico registró una consulta a partir de la atención. */
@@ -230,7 +232,7 @@ export async function revisarAtencion(input: RevisarAtencionInput): Promise<void
     .from("atenciones_enfermeria")
     .update({
       revisada_at: new Date().toISOString(),
-      medico_revisor_id: input.medico_revisor_id,
+      medico_revisor_id: input.medico_revisor_id ?? null,
       revisada_por: input.revisada_por ?? null,
       nota_revision: input.nota_revision ?? null,
       ...(input.consulta_id ? { consulta_id: input.consulta_id } : {}),

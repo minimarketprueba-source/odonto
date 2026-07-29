@@ -96,9 +96,11 @@ function TarjetaAtencion({
             <span className="font-medium">{labelDestinoAmbulatorio(atencion.destino)} · </span>
           )}
           Atendió: {atencion.enfermero || atencion.registrado_por?.split("@")[0] || "—"}
-          {atencion.medico_revisor && (
+          {atencion.medico_revisor ? (
             <> · Revisó: Dr(a). {atencion.medico_revisor.apellidos}, {atencion.medico_revisor.nombres}</>
-          )}
+          ) : atencion.revisada_at && atencion.revisada_por ? (
+            <> · Revisó: {atencion.revisada_por.split("@")[0]} (administración)</>
+          ) : null}
         </p>
         {acciones}
       </div>
@@ -111,9 +113,12 @@ function TarjetaAtencion({
 
 export function AtencionAmbulatoriaPanel() {
   const { user } = useAuth();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isAdmin } = usePermissions();
   const puedeRegistrar = hasPermission("consultas", "editar");
   const { data: miMedico } = useMiMedico(user?.id);
+  // Revisan los médicos con su propia ficha y también el administrador (la
+  // base lo acepta: el trigger permite firmar a es_sanidad_admin()).
+  const puedeRevisar = !!miMedico || isAdmin;
 
   const pendientesQuery = useAtencionesPendientes();
   const revisadasQuery = useAtencionesRevisadas();
@@ -133,11 +138,12 @@ export function AtencionAmbulatoriaPanel() {
   );
 
   const handleMarcarRevisada = async () => {
-    if (!paraRevisar || !miMedico) return;
+    if (!paraRevisar || !puedeRevisar) return;
     try {
       await revisar.mutateAsync({
         id: paraRevisar.id,
-        medico_revisor_id: miMedico.id,
+        // Admin sin ficha: queda su cuenta en revisada_por, sin médico.
+        medico_revisor_id: miMedico?.id ?? null,
         revisada_por: user?.email ?? null,
         nota_revision: sanitizeMultilineText(notaRevision) || null,
       });
@@ -216,7 +222,7 @@ export function AtencionAmbulatoriaPanel() {
             <TarjetaAtencion
               key={a.id}
               atencion={a}
-              acciones={miMedico ? (
+              acciones={puedeRevisar ? (
                 <div className="flex gap-1.5">
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
                     onClick={() => { setParaRevisar(a); setNotaRevision(""); }}>
@@ -231,9 +237,9 @@ export function AtencionAmbulatoriaPanel() {
             />
           ))
         )}
-        {!miMedico && pendientes.length > 0 && (
+        {!puedeRevisar && pendientes.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            La revisión la hace un médico desde su propia cuenta.
+            La revisión la hace un médico desde su propia cuenta, o el administrador.
           </p>
         )}
       </div>
