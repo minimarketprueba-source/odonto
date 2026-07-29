@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
+import { emitirConNumero, esConflictoDeNumero } from "./numeracion";
 
 // `label` es lo que se ve en la lista desplegable (corto, para que no estire el
 // formulario); `oficial` es el nombre completo que sale impreso en el documento.
@@ -102,19 +103,20 @@ export async function fetchSalvoconductosDelDia(fecha: string): Promise<Salvocon
 }
 
 export async function createSalvoconducto(input: CreateSalvoconductoInput): Promise<Salvoconducto> {
-  // Número correlativo simple (institución única), igual que las recetas.
-  const { count, error: errorCount } = await supabase
-    .from("salvoconductos")
-    .select("id", { count: "exact", head: true });
-  if (errorCount) throw new Error(`No se pudo numerar el salvoconducto: ${errorCount.message}`);
-  const numero = `SC-${String((count ?? 0) + 1).padStart(5, "0")}`;
-
-  const { data, error } = await supabase
-    .from("salvoconductos")
-    .insert({ ...input, numero, clinica_id: CLINICA_ID })
-    .select(SELECT)
-    .single();
-  if (error) throw new Error(`No se pudo expedir el salvoconducto: ${error.message}`);
+  // Correlativo sobre el último emitido (institución única), igual que las
+  // recetas: si dos puestos expiden a la vez, se reintenta con el siguiente.
+  const data = await emitirConNumero("salvoconductos", "SC", async (numero) => {
+    const { data, error } = await supabase
+      .from("salvoconductos")
+      .insert({ ...input, numero, clinica_id: CLINICA_ID })
+      .select(SELECT)
+      .single();
+    if (error) {
+      if (esConflictoDeNumero(error)) throw error;
+      throw new Error(`No se pudo expedir el salvoconducto: ${error.message}`);
+    }
+    return data;
+  });
   return data as unknown as Salvoconducto;
 }
 

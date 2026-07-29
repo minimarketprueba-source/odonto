@@ -52,12 +52,30 @@ export interface CreateEsperaInput {
 const ESPERA_SELECT =
   "*, paciente:pacientes(id, nombres, apellidos, documento), especialidad:especialidades(id, nombre, color), medico:medicos(id, nombres, apellidos)";
 
-export async function fetchListaEspera(): Promise<RegistroEspera[]> {
-  const { data, error } = await supabase
-    .from("lista_espera")
-    .select(ESPERA_SELECT)
-    .order("created_at", { ascending: true })
-    .limit(500);
+/** Estados que siguen en la sala de espera. */
+export const ESTADOS_ACTIVOS: EstadoEspera[] = ["esperando", "llamado"];
+
+/**
+ * Lista de espera. `filtro` es el que elige la pantalla.
+ *
+ * OJO con el límite: antes se pedían los 500 registros MÁS VIEJOS sin filtrar
+ * por estado, así que el día que la tabla pasara los 500 la sala de espera se
+ * habría llenado de atendidos de meses atrás y los pacientes nuevos habrían
+ * dejado de aparecer, en silencio. Los que están esperando se piden por
+ * separado (nunca son muchos) y el historial se trae de los más recientes.
+ */
+export async function fetchListaEspera(filtro = "activos"): Promise<RegistroEspera[]> {
+  let query = supabase.from("lista_espera").select(ESPERA_SELECT);
+
+  if (filtro === "activos") {
+    query = query.in("estado", ESTADOS_ACTIVOS).order("created_at", { ascending: true });
+  } else {
+    if (filtro !== "todos") query = query.eq("estado", filtro);
+    // Historial: los más recientes primero para que el corte deje afuera lo viejo.
+    query = query.order("created_at", { ascending: false });
+  }
+
+  const { data, error } = await query.limit(500);
   if (error) throw new Error(`Error al cargar la lista de espera: ${error.message}`);
   const registros = (data as unknown as RegistroEspera[]) || [];
   // Urgentes primero, y dentro de cada prioridad por orden de llegada.
@@ -78,8 +96,13 @@ export async function cambiarEstadoEspera(id: number, estado: EstadoEspera): Pro
   if (error) throw new Error(`No se pudo cambiar el estado: ${error.message}`);
 }
 
-export function useListaEspera() {
-  return useQuery({ queryKey: queryKeys.listaEspera.list(), queryFn: fetchListaEspera });
+export function useListaEspera(filtro = "activos") {
+  return useQuery({
+    // El filtro va en la clave: si no, al cambiar de vista se devolvería la
+    // caché de la anterior.
+    queryKey: [...queryKeys.listaEspera.list(), filtro],
+    queryFn: () => fetchListaEspera(filtro),
+  });
 }
 
 export function useCreateRegistroEspera() {

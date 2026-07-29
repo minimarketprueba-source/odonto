@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
+import { emitirConNumero, esConflictoDeNumero } from "./numeracion";
 
 export interface RecetaItem {
   id?: number;
@@ -63,21 +64,24 @@ export async function fetchRecetasPaciente(
 }
 
 export async function createReceta(input: CreateRecetaInput): Promise<Receta> {
-  // Numero correlativo sobre el total, incluidas las anuladas: una receta
-  // anulada conserva su número, como en un talonario de papel.
-  const { count, error: errorCount } = await supabase
-    .from("recetas")
-    .select("id", { count: "exact", head: true });
-  if (errorCount) throw new Error(`No se pudo numerar la receta: ${errorCount.message}`);
-  const numero = `R-${String((count ?? 0) + 1).padStart(5, "0")}`;
-
   const { items, ...cabecera } = input;
-  const { data, error } = await supabase
-    .from("recetas")
-    .insert({ ...cabecera, numero, clinica_id: CLINICA_ID })
-    .select()
-    .single();
-  if (error) throw new Error(`No se pudo crear la receta: ${error.message}`);
+
+  // Correlativo sobre el último número emitido, incluidas las anuladas: una
+  // receta anulada conserva el suyo, como en un talonario de papel. Si dos
+  // profesionales guardan a la vez, se reintenta con el siguiente.
+  const data = await emitirConNumero("recetas", "R", async (numero) => {
+    const { data, error } = await supabase
+      .from("recetas")
+      .insert({ ...cabecera, numero, clinica_id: CLINICA_ID })
+      .select()
+      .single();
+    if (error) {
+      // El choque de números lo resuelve emitirConNumero reintentando.
+      if (esConflictoDeNumero(error)) throw error;
+      throw new Error(`No se pudo crear la receta: ${error.message}`);
+    }
+    return data;
+  });
 
   const filas = items
     .filter((i) => i.medicamento.trim())

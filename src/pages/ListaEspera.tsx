@@ -35,13 +35,14 @@ export default function ListaEspera() {
   const canEdit = hasPermission("lista_espera", "editar");
   const puedeCrearPaciente = hasPermission("pacientes", "editar");
 
-  const { data: registros = [], isLoading } = useListaEspera();
+  const [estadoSel, setEstadoSel] = useState("activos");
+
+  const { data: registros = [], isLoading } = useListaEspera(estadoSel);
   const { data: pacientes = [] } = usePacientes();
   const { data: especialidades = [] } = useEspecialidades();
   const crear = useCreateRegistroEspera();
   const cambiarEstado = useCambiarEstadoEspera();
 
-  const [estadoSel, setEstadoSel] = useState("activos");
   const [altaOpen, setAltaOpen] = useState(false);
   const [altaPacienteOpen, setAltaPacienteOpen] = useState(false);
 
@@ -58,11 +59,8 @@ export default function ListaEspera() {
     }
   }, [altaOpen]);
 
-  const visibles = useMemo(() => registros.filter((r) => {
-    if (estadoSel === "activos") return r.estado === "esperando" || r.estado === "llamado";
-    if (estadoSel === "todos") return true;
-    return r.estado === estadoSel;
-  }), [registros, estadoSel]);
+  // El filtro ya lo aplica la consulta; acá no hace falta volver a filtrar.
+  const visibles = registros;
 
   const sugerencias = useMemo(() => {
     if (!busqueda.trim() || busqueda.trim().length < 2) return [];
@@ -74,6 +72,15 @@ export default function ListaEspera() {
 
   const handleAgregar = async () => {
     if (!paciente) { toast.error("Selecciona el paciente."); return; }
+    // Solo se puede comparar contra lo que está a la vista: si se está mirando
+    // el historial, el aviso no aplica.
+    if (
+      estadoSel === "activos" &&
+      registros.some((r) => r.paciente_id === paciente.id)
+    ) {
+      toast.error(`${paciente.apellidos}, ${paciente.nombres} ya está en la lista de espera.`);
+      return;
+    }
     try {
       await crear.mutateAsync({
         paciente_id: paciente.id,
