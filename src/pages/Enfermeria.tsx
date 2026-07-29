@@ -31,10 +31,12 @@ import {
 import { imprimirHojaEnfermeria, cleanQrText } from "@/lib/imprimir";
 import { useAuth } from "@/context/auth-context";
 import { useAtencionesPendientes } from "@/api/atenciones-enfermeria";
+import { useNombrePerfil } from "@/api/perfil";
 import { AtencionAmbulatoriaPanel } from "@/components/enfermeria/atencion-ambulatoria-panel";
 
 export default function Enfermeria() {
   const { user } = useAuth();
+  const { data: nombrePerfil } = useNombrePerfil(user);
   const { data: salas = [] } = useSalas();
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: ingresos = [] } = useEnfermeriaIngresos();
@@ -138,7 +140,8 @@ export default function Enfermeria() {
     setCieSel(null);
     setMotivoObs("");
     setMedicoTratante("");
-    setEnfermeroCargo("");
+    // Prellenado con el nombre real de la cuenta; editable por si atiende otra persona.
+    setEnfermeroCargo(nombrePerfil ?? "");
     setModalIngresoOpen(true);
   };
 
@@ -184,7 +187,7 @@ export default function Enfermeria() {
     setSpo2("");
     setGlucemia("");
     setObsVitales("");
-    setEnfermeroVitales("");
+    setEnfermeroVitales(nombrePerfil ?? "");
     setModalVitalesOpen(true);
   };
 

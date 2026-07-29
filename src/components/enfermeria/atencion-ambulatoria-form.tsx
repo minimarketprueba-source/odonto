@@ -17,6 +17,7 @@ import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePacientes, type Paciente } from "@/api/pacientes";
+import { useNombrePerfil } from "@/api/perfil";
 import { fechaHoyISO } from "@/api/citas";
 import {
   DESTINOS_AMBULATORIO, TIPOS_ATENCION, useCrearAtencion,
@@ -48,6 +49,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const { hasPermission } = usePermissions();
   const puedeCrearPaciente = hasPermission("pacientes", "editar");
   const { data: pacientes = [] } = usePacientes();
+  const { data: nombrePerfil } = useNombrePerfil(user);
   const crear = useCrearAtencion();
 
   const [pacienteId, setPacienteId] = useState("");
@@ -86,12 +88,22 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
       setProcedimiento("");
       setObservaciones("");
       setDestino("alta");
-      // Arranca vacío a propósito: en una computadora compartida la cuenta
-      // logueada puede no ser quien atendió. La cuenta queda en registrado_por.
-      setEnfermero("");
+      // Se prellena con el nombre y apellido reales de la cuenta (perfil).
+      // Queda editable: en una computadora compartida puede atender otra
+      // persona; la cuenta siempre queda registrada aparte en registrado_por.
+      setEnfermero(nombrePerfil ?? "");
       setPaSistolica(""); setPaDiastolica(""); setFc(""); setFr(""); setTemp(""); setSpo2("");
     }
+    // nombrePerfil NO va en las dependencias: si llegara tarde, no debe
+    // resetear un formulario que ya se está llenando (lo cubre el efecto de abajo).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pacienteInicial]);
+
+  // Si el nombre del perfil llega después de abrir, completa el campo solo
+  // mientras siga vacío (no pisa nada que la enfermera haya escrito).
+  useEffect(() => {
+    if (open && nombrePerfil) setEnfermero((prev) => prev || nombrePerfil);
+  }, [open, nombrePerfil]);
 
   const pacientesFiltrados = useMemo(() => {
     if (!busquedaPaciente.trim()) return [];

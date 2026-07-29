@@ -131,6 +131,11 @@ export const queryKeys = {
     ambulatoriasPaciente: (pacienteId: number) =>
       [...queryKeys.enfermeria.all, 'ambulatorias', 'paciente', pacienteId] as const,
   },
+  // Perfil de la cuenta logueada
+  perfil: {
+    all: ['perfil'] as const,
+    nombre: (userId: string) => [...queryKeys.perfil.all, 'nombre', userId] as const,
+  },
   // Salvoconductos (autorización de traslado)
   salvoconductos: {
     all: ['salvoconductos'] as const,

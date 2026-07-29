@@ -14,6 +14,7 @@ import { cn, matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
+import { useNombrePerfil } from "@/api/perfil";
 import { imprimirFichaRac } from "@/lib/imprimir";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
@@ -74,6 +75,7 @@ interface RacFormProps {
 
 export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormProps) {
   const { user } = useAuth();
+  const { data: nombrePerfil } = useNombrePerfil(user);
   const { data: pacientes = [] } = usePacientes();
   const { data: medicos = [] } = useMedicosActivos();
   const { data: camas = [] } = useEnfermeriaCamas();
@@ -162,9 +164,10 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
       jerarquia: p?.grado ?? "",
       domicilio: p?.direccion ?? "",
       telefono: p?.telefono ?? "",
-      enfermero: user?.email ?? "",
+      // Nombre real de la cuenta; si el perfil no lo tiene, la cuenta.
+      enfermero: nombrePerfil || user?.email || "",
     });
-  }, [open, ficha, pacienteInicial, user?.email]);
+  }, [open, ficha, pacienteInicial, user?.email, nombrePerfil]);
 
   const set = (campo: keyof typeof VACIO) => (valor: string) =>
     setForm((f) => ({ ...f, [campo]: valor }));
