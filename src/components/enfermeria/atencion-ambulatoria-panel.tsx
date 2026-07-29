@@ -224,11 +224,11 @@ export function AtencionAmbulatoriaPanel() {
               atencion={a}
               acciones={puedeRevisar ? (
                 <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
+                  <Button variant="outline" size="sm" className="h-9 sm:h-7 px-2.5 text-xs gap-1"
                     onClick={() => { setParaRevisar(a); setNotaRevision(""); }}>
                     <CheckCircle2 className="w-3.5 h-3.5" /> Marcar revisada
                   </Button>
-                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
+                  <Button variant="outline" size="sm" className="h-9 sm:h-7 px-2.5 text-xs gap-1"
                     onClick={() => setParaConsulta(a)}>
                     <Stethoscope className="w-3.5 h-3.5" /> Registrar consulta
                   </Button>
@@ -270,7 +270,7 @@ export function AtencionAmbulatoriaPanel() {
 
       {/* Diálogo de revisión */}
       <Dialog open={!!paraRevisar} onOpenChange={(o) => { if (!o) setParaRevisar(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Marcar como revisada</DialogTitle>
             <DialogDescription>

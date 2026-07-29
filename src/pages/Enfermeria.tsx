@@ -627,7 +627,7 @@ export default function Enfermeria() {
 
         {/* MODAL 1: Ingresar Paciente a Cama */}
         <Dialog open={modalIngresoOpen} onOpenChange={setModalIngresoOpen}>
-          <DialogContent className="max-w-xl">
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
                 <BedDouble className="w-5 h-5 text-blue-600" />
@@ -733,7 +733,7 @@ export default function Enfermeria() {
                       <strong className="font-mono font-bold mr-1">{cieSel.codigo}:</strong>
                       {cieSel.descripcion}
                     </span>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setCieSel(null)}>Quitar</Button>
+                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setCieSel(null)}>Quitar</Button>
                   </div>
                 ) : (
                   <Input
@@ -779,7 +779,7 @@ export default function Enfermeria() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
+            <div className="flex flex-wrap justify-end gap-2 pt-4 border-t">
               <Button variant="outline" onClick={() => setModalIngresoOpen(false)}>Cancelar</Button>
               <Button className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold" onClick={handleGuardarIngreso}>
                 Confirmar Ingreso a Cama
@@ -858,7 +858,7 @@ export default function Enfermeria() {
               <div className="space-y-3">
                 <h4 className="font-bold text-sm text-foreground">Historial de Controles en Cama</h4>
                 {ingresoSeleccionado?.signos_vitales && ingresoSeleccionado.signos_vitales.length > 0 ? (
-                  <div className="border rounded-md overflow-hidden">
+                  <div className="border rounded-md overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead className="bg-muted font-bold">
                         <tr>
@@ -898,7 +898,7 @@ export default function Enfermeria() {
 
         {/* MODAL 3: Alta o Egreso de Cama */}
         <Dialog open={modalEgresoOpen} onOpenChange={setModalEgresoOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
                 <LogOut className="w-5 h-5 text-emerald-600" />
@@ -934,7 +934,7 @@ export default function Enfermeria() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
+            <div className="flex flex-wrap justify-end gap-2 pt-4 border-t">
               <Button variant="outline" onClick={() => setModalEgresoOpen(false)}>Cancelar</Button>
               <Button className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold" onClick={handleConfirmarEgreso}>
                 Confirmar Alta y Liberar Cama

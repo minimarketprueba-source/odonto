@@ -342,7 +342,7 @@ export function ConsultaForm({
                         <span className="max-w-[220px] truncate">{c.descripcion}</span>
                         <button
                           type="button"
-                          className="ml-1 text-blue-600 hover:text-red-600 font-bold hover:bg-blue-100 dark:hover:bg-blue-900 rounded px-1 text-xs"
+                          className="ml-1 text-blue-600 hover:text-red-600 font-bold hover:bg-blue-100 dark:hover:bg-blue-900 rounded px-2.5 py-2 -my-2 -mr-1 text-xs"
                           onClick={() => setCieLista((prev) => prev.filter((item) => item.id !== c.id))}
                           title="Quitar este diagnóstico"
                         >

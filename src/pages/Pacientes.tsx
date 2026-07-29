@@ -246,7 +246,7 @@ export default function Pacientes() {
                     <div className="flex items-center gap-1 pt-2 border-t">
                       {veHistoria && (
                         <Button
-                          variant="ghost" size="sm" title="Historia clínica"
+                          variant="ghost" size="icon" title="Historia clínica"
                           onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
                         >
                           <Stethoscope className="w-4 h-4" />
@@ -254,7 +254,7 @@ export default function Pacientes() {
                       )}
                       {puedeRegistrarAtencion && (
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="icon"
                           title="Registrar atención de enfermería (curación, medicación, control)"
                           className="text-teal-600 hover:text-teal-700"
                           onClick={() => setPacienteAtencion(p)}
@@ -264,7 +264,7 @@ export default function Pacientes() {
                       )}
                       {puedeExpedirSalvoconducto && (
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="icon"
                           title="Expedir salvoconducto (traslado al hospital o a estudios)"
                           className="text-red-600 hover:text-red-700"
                           onClick={() => setPacienteSalvoconducto(p)}
@@ -274,7 +274,7 @@ export default function Pacientes() {
                       )}
                       {canEdit && (
                         <Button
-                          variant="ghost" size="sm" title="Editar paciente"
+                          variant="ghost" size="icon" title="Editar paciente"
                           onClick={() => { setSeleccionado(p); setFormOpen(true); }}
                         >
                           <Edit className="w-4 h-4" />
@@ -282,7 +282,7 @@ export default function Pacientes() {
                       )}
                       {puedeDarDeBaja && (
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="icon"
                           title={p.activo ? "Dar de baja" : "Reactivar"}
                           onClick={() => handleToggleActivo(p)}
                         >

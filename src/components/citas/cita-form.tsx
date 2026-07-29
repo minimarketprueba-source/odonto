@@ -105,7 +105,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Agendar cita</DialogTitle>
           <DialogDescription>La cita se crea en estado «Pendiente».</DialogDescription>
@@ -184,7 +184,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                   variant="ghost"
                   size="sm"
                   type="button"
-                  className="h-7 text-xs"
+                  className="h-9 text-xs"
                   onClick={() => {
                     setMedicoId("");
                     setBusquedaMedico("");

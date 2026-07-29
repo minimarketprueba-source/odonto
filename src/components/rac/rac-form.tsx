@@ -661,7 +661,7 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
                         {cieLista.map((c) => (
                           <Badge key={c.id} variant="secondary" className="gap-1.5 py-1 px-2.5">
                             <span className="font-mono font-bold">{c.codigo}</span> {c.descripcion}
-                            <button type="button" onClick={() => setCieLista((l) => l.filter((x) => x.id !== c.id))}>
+                            <button type="button" className="p-1.5 -m-1" onClick={() => setCieLista((l) => l.filter((x) => x.id !== c.id))}>
                               <X className="w-3.5 h-3.5 hover:text-destructive transition-colors" />
                             </button>
                           </Badge>

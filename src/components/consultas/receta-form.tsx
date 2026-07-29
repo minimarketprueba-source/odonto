@@ -107,20 +107,20 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
                     onChange={(e) => setItem(i, "medicamento", e.target.value)}
                   />
                   {items.length > 1 && (
-                    <Button variant="ghost" size="sm" className="text-red-500 flex-shrink-0"
+                    <Button variant="ghost" size="icon" className="text-red-500 flex-shrink-0"
                       onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Input placeholder="Dosis (1 comp.)" value={item.dosis ?? ""} onChange={(e) => setItem(i, "dosis", e.target.value)} />
                   <Input placeholder="Frecuencia (c/8 h)" value={item.frecuencia ?? ""} onChange={(e) => setItem(i, "frecuencia", e.target.value)} />
                   <Input placeholder="Duración (5 días)" value={item.duracion ?? ""} onChange={(e) => setItem(i, "duracion", e.target.value)} />
                 </div>
               </div>
             ))}
-            <Button variant="outline" size="sm" className="gap-2"
+            <Button variant="outline" size="sm" className="gap-2 h-9 sm:h-8"
               onClick={() => setItems((prev) => [...prev, { ...ITEM_VACIO }])}>
               <Plus className="w-4 h-4" /> Agregar medicamento
             </Button>

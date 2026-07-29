@@ -1101,7 +1101,7 @@ export default function Usuarios() {
                 inmediata.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
               <div className="space-y-2">
                 <Label>Selecciona un rol</Label>
                 <Select
@@ -1137,14 +1137,14 @@ export default function Usuarios() {
                   <KeyRound className="h-4 w-4" />
                   Permisos por módulo
                 </Label>
-                <div className="rounded-lg border overflow-hidden">
-                  <div className="grid grid-cols-5 bg-muted/50 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
+                <div className="rounded-lg border overflow-x-auto">
+                  <div className="grid grid-cols-5 min-w-[420px] bg-muted/50 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
                     <span>Módulo</span>
                     {PERMISSION_TYPES.map((perm) => (
                       <span key={perm} className="text-center capitalize">{perm}</span>
                     ))}
                   </div>
-                  <div className="divide-y">
+                  <div className="divide-y min-w-[420px]">
                     {SYSTEM_MODULES.map((mod) => (
                       <div key={mod.key} className="grid grid-cols-5 items-center px-3 py-2 text-sm hover:bg-muted/20">
                         <span>{mod.label}</span>

@@ -329,10 +329,10 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
 
           <Tabs defaultValue="consultas" className="flex-1 flex flex-col min-h-0">
             <TabsList className={`grid w-full ${GRID_PESTANAS[cantidadPestanas]}`}>
-              <TabsTrigger value="consultas">Consultas ({vigentes.length})</TabsTrigger>
-              {veRecetas && <TabsTrigger value="recetas">Recetas ({recetasVigentes.length})</TabsTrigger>}
+              <TabsTrigger value="consultas" className="min-w-0 text-xs sm:text-sm">Consultas ({vigentes.length})</TabsTrigger>
+              {veRecetas && <TabsTrigger value="recetas" className="min-w-0 text-xs sm:text-sm">Recetas ({recetasVigentes.length})</TabsTrigger>}
               {isAdmin && (
-                <TabsTrigger value="anuladas">
+                <TabsTrigger value="anuladas" className="min-w-0 text-xs sm:text-sm">
                   Anuladas ({anuladas.length + recetasAnuladas.length})
                 </TabsTrigger>
               )}
@@ -521,12 +521,12 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
                           {c.reposo_tipo && (
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 px-2 text-xs gap-1 text-red-700 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800"
+                              className="h-9 sm:h-7 px-2 text-xs gap-1 text-red-700 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800"
                               onClick={() => handleImprimir({ type: "reposo", consulta: c })}
                               title="Imprimir Certificado de Reposo Médico con Código QR"
                             >
@@ -536,7 +536,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                            className="h-9 sm:h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
                             onClick={() => handleImprimir({ type: "consulta", consulta: c })}
                             title="Imprimir o guardar en PDF esta consulta"
                           >
@@ -546,7 +546,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
+                              className="h-9 sm:h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
                               title="Anular esta consulta (quedó mal cargada)"
                               onClick={() => setAnularTarget({
                                 tipo: "consulta",
@@ -607,7 +607,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                         {isAdmin && (
                           <Button
                             variant="ghost" size="sm"
-                            className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700 ml-auto"
+                            className="h-9 sm:h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700 ml-auto"
                             title="Anular esta receta (quedó mal emitida)"
                             onClick={() => setAnularTarget({
                               tipo: "receta",
@@ -669,7 +669,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                             {c.reposo_tipo && <Badge variant="outline">Tenía reposo</Badge>}
                           </div>
                           <Button
-                            variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
+                            variant="outline" size="sm" className="h-9 sm:h-7 px-2 text-xs gap-1"
                             onClick={() => handleRestaurar("consulta", c.id, c.cita_id)}
                           >
                             <RotateCcw className="w-3.5 h-3.5" /> Restaurar
@@ -701,7 +701,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                             <span className="text-sm">{fmtFecha(r.fecha)}</span>
                           </div>
                           <Button
-                            variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
+                            variant="outline" size="sm" className="h-9 sm:h-7 px-2 text-xs gap-1"
                             onClick={() => handleRestaurar("receta", r.id)}
                           >
                             <RotateCcw className="w-3.5 h-3.5" /> Restaurar

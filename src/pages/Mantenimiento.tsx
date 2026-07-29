@@ -152,7 +152,7 @@ export default function Mantenimiento() {
               <p className="text-sm text-muted-foreground">
                 {medicosVisibles.length} médico{medicosVisibles.length !== 1 ? "s" : ""}
                 {soloActivos ? " activos" : " en total"} ·{" "}
-                <button className="underline" onClick={() => setSoloActivos(!soloActivos)}>
+                <button className="underline py-2 -my-2" onClick={() => setSoloActivos(!soloActivos)}>
                   {soloActivos ? "ver todos" : "ver solo activos"}
                 </button>
               </p>
@@ -171,7 +171,7 @@ export default function Mantenimiento() {
                         {m.apellidos}, {m.nombres}
                         {!m.activo && <Badge variant="destructive" className="ml-2">Inactivo</Badge>}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         {[m.especialidad?.nombre, m.numero_colegiatura && `Colegiatura ${m.numero_colegiatura}`, m.email]
                           .filter(Boolean).join(" · ") || "Sin especialidad"}
                         {m.user_id && " · cuenta vinculada"}
@@ -247,7 +247,7 @@ export default function Mantenimiento() {
       </div>
 
       <Dialog open={medicoOpen} onOpenChange={setMedicoOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{medicoSel ? "Editar médico" : "Registrar médico"}</DialogTitle>
           </DialogHeader>

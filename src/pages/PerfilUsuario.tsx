@@ -73,7 +73,7 @@ export default function PerfilUsuario() {
             </CardTitle>
             <CardDescription>Sus datos de acceso y su ficha en la Sanidad.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-2 text-sm break-words">
             <p><span className="text-muted-foreground">Usuario:</span> <span className="font-medium">{user?.email ?? "—"}</span></p>
             <p><span className="text-muted-foreground">Rol:</span> <span className="font-medium">{rolLabel}</span></p>
             {miMedico && (

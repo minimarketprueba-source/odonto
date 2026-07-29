@@ -152,7 +152,7 @@ export default function ListaEspera() {
                     {[r.especialidad?.nombre, r.motivo].filter(Boolean).join(" · ") || "Sin especialidad indicada"}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
                   <Badge className={`border-0 ${COLOR_PRIORIDAD[r.prioridad] || ""}`}>
                     {PRIORIDADES.find((p) => p.value === r.prioridad)?.label ?? r.prioridad}
                   </Badge>
@@ -160,13 +160,13 @@ export default function ListaEspera() {
                     {ESTADOS_ESPERA.find((e) => e.value === r.estado)?.label ?? r.estado}
                   </Badge>
                   {canEdit && r.estado === "esperando" && (
-                    <Button variant="outline" size="sm" className="gap-1" onClick={() => handleEstado(r.id, "llamado")}>
+                    <Button variant="outline" size="sm" className="gap-1 h-9 sm:h-8" onClick={() => handleEstado(r.id, "llamado")}>
                       <Megaphone className="w-3.5 h-3.5" /> Llamar
                     </Button>
                   )}
                   {canEdit && (r.estado === "esperando" || r.estado === "llamado") && (
                     <>
-                      <Button variant="outline" size="sm" className="gap-1" onClick={() => handleEstado(r.id, "atendido")}>
+                      <Button variant="outline" size="sm" className="gap-1 h-9 sm:h-8" onClick={() => handleEstado(r.id, "atendido")}>
                         <CheckCircle2 className="w-3.5 h-3.5" /> Atendido
                       </Button>
                       <Button
@@ -185,7 +185,7 @@ export default function ListaEspera() {
       </div>
 
       <Dialog open={altaOpen} onOpenChange={setAltaOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Agregar a la lista de espera</DialogTitle>
             <DialogDescription>El paciente entra en estado «Esperando».</DialogDescription>

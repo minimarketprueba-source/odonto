@@ -193,11 +193,11 @@ export default function Citas() {
         : `Hoy ${posesivo} ${plural(citasDeHoy.length, "cita", "citas")}: ${detalleDia}.`;
 
   const accionesCita = (c: Cita) => (
-    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap no-print">
+    <div className="flex items-center gap-1.5 flex-wrap no-print">
       {isAdmin && (
         <Button
-          variant="ghost" size="sm"
-          className="text-muted-foreground hover:text-red-600 gap-1"
+          variant="ghost" size="icon"
+          className="text-muted-foreground hover:text-red-600"
           title="Borrar esta cita (se cargó por error)"
           onClick={() => handleBorrarCita(c)}
         >
@@ -228,8 +228,8 @@ export default function Citas() {
           </Button>
           {atiendeConsultas && (
             <Button
-              variant="ghost" size="sm"
-              className="text-red-600 hover:text-red-700 gap-1"
+              variant="ghost" size="icon"
+              className="text-red-600 hover:text-red-700"
               title="Expedir salvoconducto (traslado al hospital o a estudios)"
               onClick={() => {
                 const p = pacientes.find((x) => x.id === c.paciente_id);
@@ -242,8 +242,8 @@ export default function Citas() {
           )}
           {(c.estado === "pendiente" || c.estado === "confirmada") && (
             <Button
-              variant="ghost" size="sm"
-              className="text-gray-500 hover:text-gray-700 gap-1"
+              variant="ghost" size="icon"
+              className="text-gray-500 hover:text-gray-700"
               onClick={() => handleEstado(c, "no_acudio")}
               title="El paciente no acudió a la cita"
             >
@@ -251,8 +251,8 @@ export default function Citas() {
             </Button>
           )}
           <Button
-            variant="ghost" size="sm"
-            className="text-red-500 hover:text-red-600 gap-1"
+            variant="ghost" size="icon"
+            className="text-red-500 hover:text-red-600"
             onClick={() => handleEstado(c, "cancelada")}
             title="Cancelar cita"
           >
@@ -287,7 +287,7 @@ export default function Citas() {
           {c.agendado_por ? ` · agendó: ${c.agendado_por.split("@")[0]}` : ""}
         </p>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
         <Badge className={`border-0 ${COLOR_ESTADO[c.estado] || ""}`}>
           {ESTADOS_CITA.find((e) => e.value === c.estado)?.label ?? c.estado}
         </Badge>
