@@ -25,14 +25,38 @@ export const TIPOS_ATENCION = [
   { value: "otro", label: "Otro" },
 ] as const;
 
+/**
+ * Cómo termina la atención. Cuando no hay médico de guardia, enfermería puede
+ * dejar al paciente con los mismos destinos del papel (pedido del usuario
+ * 2026-07-29): son PROVISORIOS — la atención queda pendiente de revisión y el
+ * médico después la convalida o registra la consulta formal.
+ *
+ * `reposo`: qué tipo de reposo implica (para la constancia impresa).
+ * `pideDias`: si pide cantidad de días / fecha hasta.
+ * `pideCama`: la observación interna de verdad (crea la internación).
+ */
 export const DESTINOS_AMBULATORIO = [
-  { value: "alta", label: "Se retira (alta de enfermería)" },
-  { value: "cita_medico", label: "Queda citado con el médico" },
-  { value: "derivado", label: "Derivado a urgencias / hospital" },
+  { value: "alta", label: "Se retira (alta de enfermería)", pideDias: false, reposo: null, pideCama: false },
+  { value: "cita_medico", label: "Queda citado con el médico", pideDias: false, reposo: null, pideCama: false },
+  { value: "enfermo_local", label: "Enfermo local (en la unidad)", pideDias: true, reposo: "local", pideCama: false },
+  { value: "sin_servicio", label: "Parte sin servicio", pideDias: true, reposo: "local", pideCama: false },
+  { value: "reposo_domiciliario", label: "Reposo domiciliario", pideDias: true, reposo: "domiciliario", pideCama: false },
+  { value: "observacion", label: "Queda en observación (cama de enfermería)", pideDias: false, reposo: null, pideCama: true },
+  { value: "derivado", label: "Derivado a urgencias / hospital", pideDias: false, reposo: null, pideCama: false },
 ] as const;
 
 export type TipoAtencion = (typeof TIPOS_ATENCION)[number]["value"];
 export type DestinoAmbulatorio = (typeof DESTINOS_AMBULATORIO)[number]["value"];
+
+export function destinoAmbulatorio(value?: string | null) {
+  return DESTINOS_AMBULATORIO.find((d) => d.value === value) ?? null;
+}
+
+/** Destinos que se imprimen como constancia provisoria de enfermería. */
+export function esDestinoImprimible(value?: string | null): boolean {
+  const d = destinoAmbulatorio(value);
+  return !!d && (d.pideDias || d.pideCama);
+}
 
 export function labelTipoAtencion(tipo?: string | null): string {
   return TIPOS_ATENCION.find((t) => t.value === tipo)?.label ?? (tipo || "Atención");
@@ -57,6 +81,8 @@ export interface AtencionEnfermeria {
   procedimiento: string | null;
   observaciones: string | null;
   destino: DestinoAmbulatorio | string | null;
+  /** Hasta cuándo (inclusive) rige el reposo provisorio; desde = fecha. */
+  reposo_hasta: string | null;
   pa_sistolica: number | null;
   pa_diastolica: number | null;
   fc: number | null;
@@ -73,6 +99,7 @@ export interface AtencionEnfermeria {
   created_at?: string;
   paciente?: {
     id: number; nombres: string; apellidos: string; documento: string | null; tipo: string;
+    grado?: string | null; unidad?: string | null;
   } | null;
   medico_revisor?: { id: number; nombres: string; apellidos: string } | null;
 }
@@ -88,6 +115,7 @@ export interface CrearAtencionInput {
   procedimiento?: string | null;
   observaciones?: string | null;
   destino?: string | null;
+  reposo_hasta?: string | null;
   pa_sistolica?: number | null;
   pa_diastolica?: number | null;
   fc?: number | null;
@@ -108,7 +136,7 @@ export interface RevisarAtencionInput {
 }
 
 const ATENCION_SELECT =
-  "*, paciente:pacientes(id, nombres, apellidos, documento, tipo), " +
+  "*, paciente:pacientes(id, nombres, apellidos, documento, tipo, grado, unidad), " +
   "medico_revisor:medicos(id, nombres, apellidos)";
 
 // --- Errores ----------------------------------------------------------------
@@ -146,6 +174,13 @@ export function traducirErrorAtencion(
   if (error.code === "23514") {
     return errorConCodigo(
       "Hay un valor fuera de rango. Revise los signos vitales (por ejemplo, la temperatura o la saturación).",
+      error.code
+    );
+  }
+  if (error.code === "PGRST204" && /reposo_hasta/.test(error.message)) {
+    return errorConCodigo(
+      "Falta aplicar la actualización de la base para los destinos con reposo " +
+        "(archivo SQL_Atencion_Reposo.txt del Escritorio). Avise al administrador.",
       error.code
     );
   }
@@ -213,9 +248,12 @@ export async function fetchAtencionesPaciente(pacienteId: number): Promise<Atenc
 }
 
 export async function crearAtencion(input: CrearAtencionInput): Promise<AtencionEnfermeria> {
+  const { reposo_hasta, ...resto } = input;
   const { data, error } = await supabase
     .from("atenciones_enfermeria")
-    .insert({ ...input, clinica_id: CLINICA_ID })
+    // reposo_hasta solo viaja cuando hay reposo: así los demás destinos siguen
+    // funcionando aunque la columna todavía no exista en la base.
+    .insert({ ...resto, clinica_id: CLINICA_ID, ...(reposo_hasta ? { reposo_hasta } : {}) })
     .select(ATENCION_SELECT)
     .single();
   if (error) throw traducirErrorAtencion(error, "No se pudo registrar la atención");

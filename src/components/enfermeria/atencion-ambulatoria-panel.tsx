@@ -7,17 +7,18 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertCircle, CheckCircle2, ClipboardCheck, HeartPulse, Loader2, Plus, Stethoscope,
+  AlertCircle, CheckCircle2, ClipboardCheck, HeartPulse, Loader2, Plus, Printer, Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useMiMedico } from "@/api/citas";
 import {
-  esTablaFaltante, labelDestinoAmbulatorio, labelTipoAtencion,
+  esDestinoImprimible, esTablaFaltante, labelDestinoAmbulatorio, labelTipoAtencion,
   useAtencionesPendientes, useAtencionesRevisadas, useRevisarAtencion,
   type AtencionEnfermeria,
 } from "@/api/atenciones-enfermeria";
+import { imprimirConstanciaDeAtencion } from "./imprimir-constancia";
 import { sanitizeMultilineText } from "@/lib/security";
 import { AtencionAmbulatoriaForm } from "./atencion-ambulatoria-form";
 import { ConsultaForm } from "@/components/consultas/consulta-form";
@@ -37,6 +38,19 @@ function resumenVitales(a: AtencionEnfermeria): string | null {
   if (a.spo2) partes.push(`SpO2 ${a.spo2}%`);
   if (a.temp) partes.push(`T° ${a.temp}`);
   return partes.length ? partes.join(" · ") : null;
+}
+
+/**
+ * Con qué destino arranca la consulta formal que convalida la atención: los
+ * reposos se trasladan tal cual; la observación NO se mapea a internación
+ * (el paciente ya está internado por enfermería y se duplicaría la cama).
+ */
+function destinoConsultaInicial(a: AtencionEnfermeria | null) {
+  if (!a) return undefined;
+  if (a.destino === "enfermo_local" || a.destino === "sin_servicio" || a.destino === "reposo_domiciliario") {
+    return a.destino;
+  }
+  return undefined;
 }
 
 function nombrePaciente(a: AtencionEnfermeria): string {
@@ -93,7 +107,11 @@ function TarjetaAtencion({
       <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
         <p className="text-xs text-muted-foreground">
           {atencion.destino && atencion.destino !== "alta" && (
-            <span className="font-medium">{labelDestinoAmbulatorio(atencion.destino)} · </span>
+            <span className="font-medium">
+              {labelDestinoAmbulatorio(atencion.destino)}
+              {atencion.reposo_hasta ? ` hasta ${fmtFecha(atencion.reposo_hasta)}` : ""}
+              {" · "}
+            </span>
           )}
           Atendió: {atencion.enfermero || atencion.registrado_por?.split("@")[0] || "—"}
           {atencion.medico_revisor ? (
@@ -102,7 +120,19 @@ function TarjetaAtencion({
             <> · Revisó: {atencion.revisada_por.split("@")[0]} (administración)</>
           ) : null}
         </p>
-        {acciones}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {esDestinoImprimible(atencion.destino) && (
+            <Button
+              variant="ghost" size="sm"
+              className="h-9 sm:h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              title="Reimprimir la constancia provisoria"
+              onClick={() => imprimirConstanciaDeAtencion(atencion)}
+            >
+              <Printer className="w-3.5 h-3.5" /> Constancia
+            </Button>
+          )}
+          {acciones}
+        </div>
       </div>
       {atencion.nota_revision && (
         <p className="text-xs mt-1 text-muted-foreground italic">Nota del médico: {atencion.nota_revision}</p>
@@ -281,6 +311,12 @@ export function AtencionAmbulatoriaPanel() {
           {/* Todo lo que anotó enfermería, a la vista antes de firmar. */}
           {paraRevisar && (
             <div className="rounded-lg border bg-muted/20 p-3 space-y-1 text-sm">
+              {paraRevisar.destino && paraRevisar.destino !== "alta" && (
+                <p className="text-xs font-bold text-red-700 dark:text-red-300">
+                  {labelDestinoAmbulatorio(paraRevisar.destino)}
+                  {paraRevisar.reposo_hasta ? ` hasta ${fmtFecha(paraRevisar.reposo_hasta)}` : ""}
+                </p>
+              )}
               {paraRevisar.motivo && <p className="whitespace-pre-wrap">{paraRevisar.motivo}</p>}
               {paraRevisar.procedimiento && (
                 <p className="text-xs text-muted-foreground whitespace-pre-wrap">
@@ -296,6 +332,13 @@ export function AtencionAmbulatoriaPanel() {
                 <p className="text-xs font-mono text-muted-foreground">{resumenVitales(paraRevisar)}</p>
               )}
             </div>
+          )}
+          {paraRevisar && esDestinoImprimible(paraRevisar.destino) && (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Esta atención otorga un reposo provisorio. «Marcar revisada» solo deja
+              constancia de que usted la vio; si corresponde mantener el reposo, use
+              «Registrar consulta» para emitir el certificado médico.
+            </p>
           )}
           <div className="space-y-1.5">
             <Label htmlFor="aa-nota" className="text-sm font-semibold">Nota (opcional)</Label>
@@ -323,6 +366,8 @@ export function AtencionAmbulatoriaPanel() {
         pacienteId={paraConsulta?.paciente_id ?? null}
         pacienteNombre={paraConsulta ? nombrePaciente(paraConsulta) : ""}
         motivoInicial={paraConsulta?.motivo ?? undefined}
+        destinoInicial={destinoConsultaInicial(paraConsulta)}
+        reposoHastaInicial={paraConsulta?.reposo_hasta ?? undefined}
         onCreated={(consulta) => {
           const atencion = paraConsulta;
           if (!atencion) return;

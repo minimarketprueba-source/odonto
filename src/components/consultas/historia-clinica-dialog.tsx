@@ -20,7 +20,7 @@ import {
 } from "@/api/anulaciones";
 import { AnularDialog } from "./anular-dialog";
 import { useInternacionesPaciente } from "@/api/enfermeria";
-import { labelTipoAtencion, useAtencionesPaciente } from "@/api/atenciones-enfermeria";
+import { labelDestinoAmbulatorio, labelTipoAtencion, useAtencionesPaciente } from "@/api/atenciones-enfermeria";
 import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } from "@/api/rac";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
@@ -413,6 +413,12 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{fmtFecha(a.fecha)} · {a.hora?.slice(0, 5)} hs</span>
                             <Badge variant="outline">{labelTipoAtencion(a.tipo_atencion)}</Badge>
+                            {a.destino && !["alta", "cita_medico", "derivado"].includes(a.destino) && (
+                              <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
+                                {labelDestinoAmbulatorio(a.destino)}
+                                {a.reposo_hasta ? ` hasta ${fmtFecha(a.reposo_hasta)}` : ""}
+                              </Badge>
+                            )}
                             {a.revisada_at ? (
                               <Badge className="bg-green-100 text-green-700 border-0 dark:bg-green-900/40 dark:text-green-200">
                                 Revisada{a.medico_revisor ? ` por Dr(a). ${a.medico_revisor.apellidos}` : ""}

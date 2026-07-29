@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { HeartPulse, Loader2, Search, UserPlus } from "lucide-react";
+import { BedDouble, HeartPulse, Loader2, Printer, Search, ShieldAlert, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
@@ -20,9 +20,24 @@ import { usePacientes, type Paciente } from "@/api/pacientes";
 import { useNombrePerfil } from "@/api/perfil";
 import { fechaHoyISO } from "@/api/citas";
 import {
-  DESTINOS_AMBULATORIO, TIPOS_ATENCION, useCrearAtencion,
+  DESTINOS_AMBULATORIO, TIPOS_ATENCION, destinoAmbulatorio, useCrearAtencion,
 } from "@/api/atenciones-enfermeria";
+import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
+import { imprimirConstanciaDeAtencion } from "./imprimir-constancia";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
+
+function sumarDiasISO(fecha: string, dias: number): string {
+  const d = new Date(`${fecha}T00:00:00`);
+  d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Cantidad de días contando ambos extremos (desde y hasta inclusive).
+function diasEntre(desde: string, hasta: string): number {
+  const a = new Date(`${desde}T00:00:00`).getTime();
+  const b = new Date(`${hasta}T00:00:00`).getTime();
+  return Math.round((b - a) / 86400000) + 1;
+}
 
 function horaAhora(): string {
   const d = new Date();
@@ -50,7 +65,12 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const puedeCrearPaciente = hasPermission("pacientes", "editar");
   const { data: pacientes = [] } = usePacientes();
   const { data: nombrePerfil } = useNombrePerfil(user);
+  const { data: camas = [] } = useEnfermeriaCamas();
+  const { data: internaciones = [] } = useEnfermeriaIngresos();
   const crear = useCrearAtencion();
+  const internar = useIngresarPacienteCama();
+  // Si la internación se creó y después falló la atención, no se crea de nuevo.
+  const internacionCreada = useRef<number | null>(null);
 
   const [pacienteId, setPacienteId] = useState("");
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
@@ -62,6 +82,9 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const [procedimiento, setProcedimiento] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [destino, setDestino] = useState("alta");
+  const [reposoDias, setReposoDias] = useState("");
+  const [reposoHasta, setReposoHasta] = useState("");
+  const [camaId, setCamaId] = useState("");
   const [enfermero, setEnfermero] = useState("");
   const [paSistolica, setPaSistolica] = useState("");
   const [paDiastolica, setPaDiastolica] = useState("");
@@ -88,6 +111,10 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
       setProcedimiento("");
       setObservaciones("");
       setDestino("alta");
+      setReposoDias("");
+      setReposoHasta("");
+      setCamaId("");
+      internacionCreada.current = null;
       // Se prellena con el nombre y apellido reales de la cuenta (perfil).
       // Queda editable: en una computadora compartida puede atender otra
       // persona; la cuenta siempre queda registrada aparte en registrado_por.
@@ -113,11 +140,29 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
       .slice(0, 8);
   }, [pacientes, busquedaPaciente]);
 
-  const handleGuardar = async () => {
+  const destinoSel = destinoAmbulatorio(destino);
+  const guardando = crear.isPending || internar.isPending;
+
+  // Camas sin internación activa, para el destino "queda en observación".
+  const camasLibres = useMemo(() => {
+    const ocupadas = new Set(internaciones.filter((i) => i.estado === "activo").map((i) => i.cama_id));
+    return camas.filter((c) => !c.fuera_de_servicio && !ocupadas.has(c.id));
+  }, [camas, internaciones]);
+
+  const handleGuardar = async (opts?: { eImprimir?: boolean }) => {
     if (!pacienteId) { toast.error("Selecciona el paciente atendido."); return; }
     if (!motivo.trim()) { toast.error("Indica el motivo de la atención."); return; }
     if (!enfermero.trim()) { toast.error("Indica quién atendió (nombre y apellido)."); return; }
+    if (!fecha) { toast.error("Indica la fecha de la atención."); return; }
     if (!hora) { toast.error("Indica la hora de la atención."); return; }
+    if (destinoSel?.pideDias && reposoHasta && reposoHasta < fecha) {
+      toast.error("La fecha 'hasta' no puede ser anterior a la atención.");
+      return;
+    }
+    if (destinoSel?.pideCama && !camaId && !internacionCreada.current) {
+      toast.error("Elija la cama donde queda en observación.");
+      return;
+    }
 
     // Un signo vital mal tecleado no se descarta en silencio: se avisa.
     const vitales: { etiqueta: string; texto: string; entero: boolean }[] = [
@@ -142,7 +187,25 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
     };
 
     try {
-      await crear.mutateAsync({
+      // La observación interna de verdad. Va primero: es lo único que puede
+      // chocar (cama ocupada); si después falla la atención, el reintento no
+      // vuelve a ocupar la cama.
+      if (destinoSel?.pideCama && !internacionCreada.current) {
+        const creada = await internar.mutateAsync({
+          paciente_id: Number(pacienteId),
+          cama_id: Number(camaId),
+          medico_id: null,
+          ingresado_por: user?.email ?? null,
+          fecha_ingreso: fecha,
+          hora_ingreso: hora,
+          diagnostico_ingreso: sanitizeMultilineText(motivo) || "En observación",
+          motivo_observacion: sanitizeMultilineText(motivo) || null,
+          enfermero_cargo: sanitizePlainText(enfermero) || null,
+        });
+        internacionCreada.current = creada.id;
+      }
+
+      const atencion = await crear.mutateAsync({
         paciente_id: Number(pacienteId),
         fecha,
         hora,
@@ -153,6 +216,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
         procedimiento: sanitizeMultilineText(procedimiento) || null,
         observaciones: sanitizeMultilineText(observaciones) || null,
         destino,
+        reposo_hasta: destinoSel?.pideDias ? reposoHasta || null : null,
         pa_sistolica: entero(paSistolica),
         pa_diastolica: entero(paDiastolica),
         fc: entero(fc),
@@ -160,7 +224,14 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
         temp: numeroONull(temp),
         spo2: entero(spo2),
       });
-      toast.success("Atención registrada. Queda pendiente de revisión médica.");
+
+      if (opts?.eImprimir) imprimirConstanciaDeAtencion(atencion);
+
+      toast.success(
+        destinoSel?.pideCama
+          ? "Atención registrada y paciente en observación. Ya aparece en las camas."
+          : "Atención registrada. Queda pendiente de revisión médica."
+      );
       if (destino === "cita_medico") {
         toast.info("Recuerde anotar al paciente en la Lista de espera para que el médico lo llame.");
       }
@@ -212,6 +283,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
                       onClick={() => {
                         setPacienteId(String(p.id));
                         setBusquedaPaciente(`${p.apellidos}, ${p.nombres} (CI: ${p.documento || "—"})`);
+                        internacionCreada.current = null;
                       }}
                     >
                       <span className="font-semibold">{p.apellidos}, {p.nombres}</span>
@@ -240,7 +312,20 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
               <div className="space-y-1.5">
                 <Label htmlFor="aa-fecha" className="font-semibold text-sm">Fecha *</Label>
                 <Input id="aa-fecha" type="date" className="h-10" value={fecha}
-                  onChange={(e) => setFecha(e.target.value)} />
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFecha(v);
+                    // El reposo corre desde la fecha de la atención: si esta
+                    // cambia, los días/hasta se recalculan para no guardar un
+                    // rango distinto del que se ve en pantalla.
+                    const n = Number(reposoDias);
+                    if (v && reposoDias && Number.isInteger(n) && n >= 1) {
+                      setReposoHasta(sumarDiasISO(v, n - 1));
+                    } else if (v && reposoHasta) {
+                      if (reposoHasta >= v) setReposoDias(String(diasEntre(v, reposoHasta)));
+                      else { setReposoDias(""); setReposoHasta(""); }
+                    }
+                  }} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="aa-hora" className="font-semibold text-sm">Hora *</Label>
@@ -319,7 +404,13 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="aa-destino" className="font-semibold text-sm">Cómo terminó *</Label>
-                <Select value={destino} onValueChange={setDestino}>
+                <Select value={destino} onValueChange={(v) => {
+                  setDestino(v);
+                  // Si tras un fallo parcial se cambia el destino, la próxima
+                  // guardada no debe reutilizar una internación creada para
+                  // otra cosa (la huérfana queda visible en camas).
+                  internacionCreada.current = null;
+                }}>
                   <SelectTrigger id="aa-destino" className="h-10"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {DESTINOS_AMBULATORIO.map((d) => (
@@ -335,6 +426,96 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
               </div>
             </div>
 
+            {/* Reposo provisorio: desde la fecha de la atención hasta la elegida */}
+            {destinoSel?.pideDias && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border p-3.5 bg-muted/20">
+                <div className="space-y-1.5">
+                  <Label htmlFor="aa-reposo-dias" className="font-semibold text-sm">Cantidad de días</Label>
+                  <Input
+                    id="aa-reposo-dias" type="number" className="h-10" min={1} placeholder="Ej: 2"
+                    value={reposoDias}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setReposoDias(v);
+                      const n = Number(v);
+                      if (fecha && v && Number.isInteger(n) && n >= 1) {
+                        setReposoHasta(sumarDiasISO(fecha, n - 1));
+                      } else {
+                        // Valor vacío o inválido: no dejar un "hasta" viejo
+                        // que ya no corresponde a lo que se ve.
+                        setReposoHasta("");
+                      }
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="aa-reposo-hasta" className="font-semibold text-sm">Hasta qué fecha (inclusive)</Label>
+                  <Input
+                    id="aa-reposo-hasta" type="date" className="h-10" min={fecha}
+                    value={reposoHasta}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setReposoHasta(v);
+                      setReposoDias(v && v >= fecha ? String(diasEntre(fecha, v)) : "");
+                    }}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Si queda vacío, rige hasta la revisión del médico.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Observación: elige la cama y el paciente queda internado */}
+            {destinoSel?.pideCama && (
+              <div className="space-y-1.5 rounded-lg border p-3.5 bg-muted/20">
+                <Label htmlFor="aa-cama" className="font-semibold text-sm flex items-center gap-1.5">
+                  <BedDouble className="w-4 h-4 text-cyan-600" /> Cama de observación *
+                </Label>
+                <Select value={camaId} onValueChange={(v) => { setCamaId(v); internacionCreada.current = null; }}>
+                  <SelectTrigger id="aa-cama" className="h-10">
+                    <SelectValue placeholder={camasLibres.length ? "Elegir cama libre" : "No hay camas libres"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {camasLibres.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.codigo}{c.sala_nombre ? ` — ${c.sala_nombre}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Al guardar, el paciente aparece internado en la pestaña de camas.
+                </p>
+              </div>
+            )}
+
+            {/* Constancia provisoria para que el paciente muestre a sus superiores */}
+            {destinoSel && (destinoSel.pideDias || destinoSel.pideCama) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-900">
+                <div className="flex items-start gap-2.5 text-amber-900 dark:text-amber-200">
+                  <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-sm">Constancia provisoria de enfermería</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                      Sale firmada por enfermería y marcada «pendiente de revisión médica»:
+                      el médico la convalida en la próxima jornada.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 px-3 gap-1.5 font-semibold text-xs text-amber-800 border-amber-300 bg-white hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-100 shrink-0"
+                  onClick={() => handleGuardar({ eImprimir: true })}
+                  disabled={guardando}
+                >
+                  <Printer className="w-4 h-4" />
+                  Registrar e imprimir constancia
+                </Button>
+              </div>
+            )}
+
             {/* Observaciones */}
             <div className="space-y-1.5">
               <Label htmlFor="aa-obs" className="font-semibold text-sm">Observaciones</Label>
@@ -343,8 +524,8 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
                 value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
             </div>
 
-            <Button onClick={handleGuardar} disabled={crear.isPending} className="w-full h-11 font-semibold">
-              {crear.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            <Button onClick={() => handleGuardar()} disabled={guardando} className="w-full h-11 font-semibold">
+              {guardando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Registrar atención
             </Button>
           </div>

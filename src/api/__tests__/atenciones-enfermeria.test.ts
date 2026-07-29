@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  DESTINOS_AMBULATORIO, TIPOS_ATENCION, esTablaFaltante,
-  labelDestinoAmbulatorio, labelTipoAtencion, traducirErrorAtencion,
+  DESTINOS_AMBULATORIO, TIPOS_ATENCION, destinoAmbulatorio, esDestinoImprimible,
+  esTablaFaltante, labelDestinoAmbulatorio, labelTipoAtencion, traducirErrorAtencion,
 } from "@/api/atenciones-enfermeria";
 
 /**
@@ -101,7 +101,43 @@ describe("catálogos", () => {
       "curacion", "medicacion", "control", "primeros_auxilios", "otro",
     ]);
     expect(DESTINOS_AMBULATORIO.map((d) => d.value)).toEqual([
-      "alta", "cita_medico", "derivado",
+      "alta", "cita_medico", "enfermo_local", "sin_servicio", "reposo_domiciliario",
+      "observacion", "derivado",
     ]);
+  });
+});
+
+describe("destinos con reposo provisorio (sin médico de guardia)", () => {
+  it("los destinos de reposo piden días y los demás no", () => {
+    expect(destinoAmbulatorio("enfermo_local")?.pideDias).toBe(true);
+    expect(destinoAmbulatorio("sin_servicio")?.pideDias).toBe(true);
+    expect(destinoAmbulatorio("reposo_domiciliario")?.pideDias).toBe(true);
+    expect(destinoAmbulatorio("alta")?.pideDias).toBe(false);
+    expect(destinoAmbulatorio("observacion")?.pideDias).toBe(false);
+  });
+
+  it("solo la observación pide cama (interna de verdad)", () => {
+    for (const d of DESTINOS_AMBULATORIO) {
+      expect(d.pideCama, d.value).toBe(d.value === "observacion");
+    }
+  });
+
+  it("se imprime constancia para reposos y observación, no para el resto", () => {
+    expect(esDestinoImprimible("enfermo_local")).toBe(true);
+    expect(esDestinoImprimible("sin_servicio")).toBe(true);
+    expect(esDestinoImprimible("reposo_domiciliario")).toBe(true);
+    expect(esDestinoImprimible("observacion")).toBe(true);
+    expect(esDestinoImprimible("alta")).toBe(false);
+    expect(esDestinoImprimible("cita_medico")).toBe(false);
+    expect(esDestinoImprimible("derivado")).toBe(false);
+    expect(esDestinoImprimible(null)).toBe(false);
+  });
+
+  it("la columna nueva faltante se explica con su archivo SQL", () => {
+    const e = traducirErrorAtencion(
+      { code: "PGRST204", message: "Could not find the 'reposo_hasta' column of 'atenciones_enfermeria'" },
+      "No se pudo registrar la atención"
+    );
+    expect(e.message).toMatch(/SQL_Atencion_Reposo/);
   });
 });

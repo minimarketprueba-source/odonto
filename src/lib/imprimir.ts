@@ -185,6 +185,139 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
   ejecutarImpresionIframe(tituloDoc, html);
 }
 
+export interface DatosConstanciaEnfermeria {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteTipo?: string | null;
+  pacienteGrado?: string | null;
+  pacienteUnidad?: string | null;
+  /** Destino ambulatorio que genera constancia. */
+  destino: "enfermo_local" | "sin_servicio" | "reposo_domiciliario" | "observacion";
+  fechaDesde: string; // dd/mm/yyyy
+  fechaHasta?: string | null; // dd/mm/yyyy, inclusive
+  motivo?: string | null;
+  procedimiento?: string | null;
+  enfermeroNombre: string;
+  atencionId: number | string;
+  /** dd/mm/yyyy si un médico ya la revisó (reimpresión). */
+  revisadaEl?: string | null;
+  revisadaPor?: string | null;
+  qrSvgHtml?: string;
+}
+
+/**
+ * Constancia PROVISORIA expedida por enfermería cuando no hay médico de
+ * guardia. Usa los mismos textos oficiales de cada conducta, pero se
+ * distingue a propósito del certificado médico: lo firma el enfermero/a y
+ * lleva bien visible que queda pendiente de revisión médica.
+ */
+export function imprimirConstanciaEnfermeria(datos: DatosConstanciaEnfermeria) {
+  // La observación en cama de enfermería usa el texto de internación.
+  const doc = DOCUMENTOS_REPOSO[datos.destino === "observacion" ? "internacion" : datos.destino];
+  // Nunca la palabra CERTIFICADO: eso es del documento que firma el médico.
+  const tituloDoc = "CONSTANCIA PROVISORIA DE ENFERMERÍA";
+  const refCod = `ENF-${doc.ref}-${datos.pacienteDocumento || "0"}-${datos.atencionId}`;
+
+  const html = `
+    <div class="header">
+      <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+      <p class="sub">Gral. José E. Díaz</p>
+      <h2>${tituloDoc}</h2>
+      <p class="sub" style="font-weight:bold;">${doc.condicion}</p>
+      <p class="meta">Emisión: ${new Date().toLocaleDateString("es-PY")} — ${new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs</p>
+    </div>
+
+    <div class="box-paciente">
+      <div>
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
+      </div>
+      <div>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${datos.pacienteTipo || "Cadete"} ${datos.pacienteGrado ? `— ${datos.pacienteGrado}` : ""}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+      </div>
+    </div>
+
+    ${datos.revisadaEl ? `
+    <div style="border: 2px solid #16a34a; background: #f0fdf4; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;">
+      <p style="margin:0; font-size:11px; font-weight:bold; color:#166534;">
+        ATENCIÓN DE ENFERMERÍA — YA REVISADA POR EL MÉDICO
+      </p>
+      <p style="margin:2px 0 0 0; font-size:10.5px; color:#166534;">
+        Revisada el ${datos.revisadaEl}${datos.revisadaPor ? ` por ${datos.revisadaPor}` : ""}.
+        Si se emitió certificado médico, ese documento reemplaza a esta constancia.
+      </p>
+    </div>` : `
+    <div style="border: 2px solid #d97706; background: #fffbeb; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;">
+      <p style="margin:0; font-size:11px; font-weight:bold; color:#92400e;">
+        CONSTANCIA PROVISORIA — ATENCIÓN DE ENFERMERÍA SIN MÉDICO DE GUARDIA
+      </p>
+      <p style="margin:2px 0 0 0; font-size:10.5px; color:#92400e;">
+        Queda pendiente de revisión médica: será convalidada o reemplazada por el
+        certificado del profesional médico en la próxima jornada de atención.
+      </p>
+    </div>`}
+
+    <div class="box-reposo">
+      <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #fecaca; padding-bottom: 6px; margin-bottom: 10px; font-weight:bold; color: #991b1b;">
+        <span>REF: ${refCod}</span>
+        <span>FECHA DE EMISIÓN: ${datos.fechaDesde}</span>
+      </div>
+
+      <div class="badge-reposo">
+        <p style="margin:0; font-size:11px; font-weight:bold; color:#791616;">CONDICIÓN OTORGADA (PROVISORIA):</p>
+        <p class="tipo">• ${doc.condicion}</p>
+        <p style="margin:4px 0 0 0; font-size:11px; color:#991b1b;">${doc.detalle}</p>
+      </div>
+
+      <div class="dates-grid">
+        <div>
+          <p style="margin:0; font-size:11px; font-weight:bold; color:#475569;">FECHA DE INICIO:</p>
+          <p style="margin:2px 0 0 0; font-size:14px; font-weight:bold;">${datos.fechaDesde}</p>
+        </div>
+        <div>
+          <p style="margin:0; font-size:11px; font-weight:bold; color:#475569;">HASTA (INCLUSIVE):</p>
+          <p style="margin:2px 0 0 0; font-size:14px; font-weight:bold;">${datos.fechaHasta || "Hasta revisión médica"}</p>
+        </div>
+      </div>
+
+      ${datos.motivo ? `
+        <div style="margin-bottom:12px;">
+          <p style="margin:0; font-weight:bold; color:#1e293b;">MOTIVO DE LA ATENCIÓN:</p>
+          <p style="margin:2px 0 0 8px; white-space:pre-wrap;">${datos.motivo}</p>
+        </div>
+      ` : ""}
+
+      ${datos.procedimiento ? `
+        <div style="margin-bottom:12px;">
+          <p style="margin:0; font-weight:bold; color:#1e293b;">PROCEDIMIENTO REALIZADO:</p>
+          <p style="margin:2px 0 0 8px; white-space:pre-wrap;">${datos.procedimiento}</p>
+        </div>
+      ` : ""}
+
+      <div class="footer-qr">
+        <div style="display:flex; align-items:center; gap: 12px;">
+          ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
+          <div style="font-size:10px; color:#475569;">
+            <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
+            <p style="margin:1px 0;">Sanidad ANP — Constancia de Enfermería</p>
+            <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
+            <p style="margin:1px 0; color:#64748b;">Escanee para verificar validez</p>
+          </div>
+        </div>
+
+        <div class="firmas">
+          <div class="linea-firma"></div>
+          <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.enfermeroNombre}</p>
+          <p style="margin:0; font-size:10px; color:#64748b;">Firma del Enfermero/a — Sección Sanidad</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
 export function imprimirInformeConsulta(datos: DatosImpresionConsulta) {
   const tituloDoc = "INFORME DE CONSULTA MÉDICA";
   const refCod = `CON-${datos.pacienteDocumento || "0"}-${datos.consultaId}`;

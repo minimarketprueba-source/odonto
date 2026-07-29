@@ -58,12 +58,16 @@ interface ConsultaFormProps {
   cita?: Cita | null;
   /** Precarga el motivo cuando no hay cita (ej. desde una atención de enfermería). */
   motivoInicial?: string;
+  /** Precarga de la conducta (ej. el reposo provisorio que otorgó enfermería). */
+  destinoInicial?: DestinoAtencion;
+  reposoHastaInicial?: string;
   /** Se llama con la consulta recién creada (para vincularla donde se la pidió). */
   onCreated?: (consulta: Consulta) => void;
 }
 
 export function ConsultaForm({
-  open, onOpenChange, pacienteId, pacienteNombre, cita, motivoInicial, onCreated,
+  open, onOpenChange, pacienteId, pacienteNombre, cita, motivoInicial,
+  destinoInicial, reposoHastaInicial, onCreated,
 }: ConsultaFormProps) {
   const { user } = useAuth();
   const { data: medicos = [] } = useMedicosActivos();
@@ -101,13 +105,19 @@ export function ConsultaForm({
       setTratamiento("");
       setCieBusqueda("");
       setCieLista([]);
-      setDestino("alta");
-      setReposoHasta("");
-      setReposoDias("");
+      // El reposo provisorio de enfermería llega precargado; el médico decide.
+      const fechaBase = cita?.fecha || fechaHoyISO();
+      const hastaInicial =
+        destinoInicial && reposoHastaInicial && reposoHastaInicial >= fechaBase
+          ? reposoHastaInicial
+          : "";
+      setDestino(destinoInicial ?? "alta");
+      setReposoHasta(hastaInicial);
+      setReposoDias(hastaInicial ? String(diasEntre(fechaBase, hastaInicial)) : "");
       setCamaId("");
       internacionCreada.current = null;
     }
-  }, [open, cita, motivoInicial]);
+  }, [open, cita, motivoInicial, destinoInicial, reposoHastaInicial]);
 
   const medicoSeleccionado = useMemo(
     () => medicos.find((m) => String(m.id) === medicoId) || null,
