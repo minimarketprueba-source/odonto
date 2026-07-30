@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IdCard, KeyRound, Loader2, Phone, UserCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { useMiMedico } from "@/api/citas";
@@ -44,16 +44,18 @@ export default function PerfilUsuario() {
   const guardarNombre = async () => {
     if (!user?.id) return;
     if (!nombre.trim() || !apellido.trim()) {
-      toast.error("Complete nombre y apellido.");
+      await showSwalError("Complete nombre y apellido.");
       return;
     }
     setGuardandoNombre(true);
     try {
       await guardarNombrePerfil(user.id, nombre, apellido);
       queryClient.invalidateQueries({ queryKey: queryKeys.perfil.all });
-      toast.success("Nombre guardado. Va a aparecer prellenado al registrar atenciones.");
+      await showSwalSuccess(
+        `Nombre guardado: ${nombre.trim()} ${apellido.trim()}. Va a aparecer prellenado al registrar atenciones.`
+      );
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     } finally {
       setGuardandoNombre(false);
     }
@@ -64,17 +66,17 @@ export default function PerfilUsuario() {
   }, [miMedico]);
 
   const cambiarPassword = async () => {
-    if (pass1.length < 6) { toast.error("La contraseña nueva debe tener al menos 6 caracteres."); return; }
-    if (pass1 !== pass2) { toast.error("Las contraseñas no coinciden."); return; }
+    if (pass1.length < 6) { await showSwalError("La contraseña nueva debe tener al menos 6 caracteres."); return; }
+    if (pass1 !== pass2) { await showSwalError("Las contraseñas no coinciden."); return; }
     setGuardandoPass(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: pass1 });
       if (error) throw new Error(error.message);
       setPass1("");
       setPass2("");
-      toast.success("Contraseña cambiada. Úsela desde su próximo ingreso.");
+      await showSwalSuccess("Contraseña cambiada correctamente. Úsela desde su próximo ingreso.");
     } catch (e) {
-      toast.error(`No se pudo cambiar la contraseña: ${(e as Error).message}`);
+      await showSwalError(`No se pudo cambiar la contraseña: ${(e as Error).message}`);
     } finally {
       setGuardandoPass(false);
     }
@@ -86,9 +88,9 @@ export default function PerfilUsuario() {
     try {
       await updateMedico(miMedico.id, { telefono: telefono.trim() || null });
       queryClient.invalidateQueries({ queryKey: queryKeys.medicos.all });
-      toast.success("Teléfono actualizado en su ficha.");
+      await showSwalSuccess("Teléfono actualizado en su ficha.");
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     } finally {
       setGuardandoTel(false);
     }
