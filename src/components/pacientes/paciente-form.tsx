@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { sanitizePlainText } from "@/lib/security";
 import { normalizeDocumento } from "@/lib/utils";
 import {
@@ -98,23 +98,23 @@ export function PacienteForm({
 
   const handleGuardar = async () => {
     if (!form.nombres.trim() || !form.apellidos.trim()) {
-      toast.error("Nombres y apellidos son obligatorios.");
+      await showSwalError("Nombres y apellidos son obligatorios.");
       return;
     }
     if (!form.tipo) {
-      toast.error("Elija el tipo de paciente (cadete, policía, familiar o civil).");
+      await showSwalError("Elija el tipo de paciente (cadete, policía, familiar o civil).");
       return;
     }
     if (!externo && !form.documento.trim()) {
-      toast.error("La cédula es obligatoria para cadetes y policías.");
+      await showSwalError("La cédula es obligatoria para cadetes y policías.");
       return;
     }
     if (externo && !form.documento.trim() && !form.fecha_nacimiento) {
-      toast.error("Si no tiene cédula, indique la fecha de nacimiento para poder identificarlo.");
+      await showSwalError("Si no tiene cédula, indique la fecha de nacimiento para poder identificarlo.");
       return;
     }
     if (duplicado) {
-      toast.error(
+      await showSwalError(
         `Esa cédula ya es de ${duplicado.apellidos}, ${duplicado.nombres}${duplicado.activo ? "" : " (ficha dada de baja)"}. Use esa ficha en vez de crear otra.`
       );
       return;
@@ -143,15 +143,18 @@ export function PacienteForm({
     try {
       if (paciente) {
         await actualizar.mutateAsync({ id: paciente.id, cambios: payload });
-        toast.success("Paciente actualizado.");
+        onOpenChange(false);
+        await showSwalSuccess(`Paciente actualizado: ${payload.apellidos}, ${payload.nombres}.`);
       } else {
         const nuevo = await crear.mutateAsync(payload);
-        toast.success("Paciente registrado.");
+        onOpenChange(false);
         onCreated?.(nuevo);
+        await showSwalSuccess(
+          `Paciente registrado: ${nuevo.apellidos}, ${nuevo.nombres} (CI: ${nuevo.documento || `P${nuevo.id}`}).`
+        );
       }
-      onOpenChange(false);
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 
