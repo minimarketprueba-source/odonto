@@ -49,11 +49,13 @@ function fechaHaceDias(dias: number): string {
 }
 
 export default function Pacientes() {
-  const { hasPermission, canView, canDelete } = usePermissions();
+  const { hasPermission, canView, canDelete, isMedico, isAdmin } = usePermissions();
   const canEdit = hasPermission("pacientes", "editar");
   // Dar de baja es una decisión de padrón (afecta a control de peso): solo admin.
   const puedeDarDeBaja = canDelete("pacientes");
-  const veHistoria = canView("consultas");
+  // La historia médica (botón Stethoscope) es exclusiva para médicos y doctores (y administradores)
+  const esMedicoODoctor = isMedico || isAdmin;
+  const veHistoria = esMedicoODoctor && canView("consultas");
   // El salvoconducto lo expide el profesional o la enfermera de turno.
   const puedeExpedirSalvoconducto = hasPermission("consultas", "editar");
   // La atención ambulatoria la registra enfermería (mismo permiso que el panel).
@@ -242,7 +244,7 @@ export default function Pacientes() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">{detalle(p)}</p>
-                  {(canEdit || veHistoria || puedeDarDeBaja) && (
+                  {(canEdit || veHistoria || puedeDarDeBaja || puedeRegistrarAtencion || puedeExpedirSalvoconducto) && (
                     <div className="flex items-center gap-1 pt-2 border-t">
                       {veHistoria && (
                         <Button

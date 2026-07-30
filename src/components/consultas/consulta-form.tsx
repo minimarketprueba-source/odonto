@@ -20,6 +20,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
+import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import {
   DESTINOS_ATENCION, destinoAtencion, useCreateConsulta, useSearchCie10,
   type Cie10, type Consulta, type DestinoAtencion,
@@ -54,6 +55,8 @@ interface ConsultaFormProps {
   onOpenChange: (open: boolean) => void;
   pacienteId: number | null;
   pacienteNombre: string;
+  /** Objeto de paciente si se tiene a mano */
+  paciente?: Paciente | null;
   /** Si viene de la agenda: precarga médico/fecha/motivo y marca la cita como atendida. */
   cita?: Cita | null;
   /** Precarga el motivo cuando no hay cita (ej. desde una atención de enfermería). */
@@ -65,16 +68,45 @@ interface ConsultaFormProps {
   onCreated?: (consulta: Consulta) => void;
 }
 
+const FISIOTERAPIA_PRESETS: Cie10[] = [
+  { id: -1, codigo: "Z50.1", descripcion: "Fisioterapia y ejercicios terapéuticos / Rehabilitación" },
+  { id: -2, codigo: "M54.5", descripcion: "Lumbalgia (Lumbago no especificado / Dolor lumbar)" },
+  { id: -3, codigo: "M54.2", descripcion: "Cervicalgia (Dolor cervical)" },
+  { id: -4, codigo: "M54.6", descripcion: "Dorsalgia (Dolor dorsal / espalda)" },
+  { id: -5, codigo: "M75.1", descripcion: "Síndrome del manguito rotatorio (Hombro doloroso)" },
+  { id: -6, codigo: "M62.4", descripcion: "Contractura muscular" },
+  { id: -7, codigo: "S93.4", descripcion: "Esguince y torcedura de tobillo" },
+  { id: -8, codigo: "S83.5", descripcion: "Esguince y torcedura de rodilla" },
+  { id: -9, codigo: "M77.1", descripcion: "Epicondilitis lateral (Codo de tenista)" },
+  { id: -10, codigo: "M72.2", descripcion: "Fascitis plantar" },
+  { id: -11, codigo: "M79.1", descripcion: "Mialgia (Dolor muscular generalizado / localizado)" },
+  { id: -12, codigo: "M25.5", descripcion: "Artralgia (Dolor articular)" },
+  { id: -13, codigo: "M17.9", descripcion: "Gonartrosis (Artrosis de rodilla)" },
+  { id: -14, codigo: "M16.9", descripcion: "Coxartrosis (Artrosis de cadera)" },
+  { id: -15, codigo: "M70.6", descripcion: "Bursitis trocantérea (Cadera)" },
+  { id: -16, codigo: "T14.6", descripcion: "Traumatismo de músculo y tendón" },
+  { id: -17, codigo: "M75.0", descripcion: "Capsulitis adhesiva de hombro (Hombro congelado)" },
+  { id: -18, codigo: "Z50.8", descripcion: "Atención para otras medidas de rehabilitación" },
+];
+
 export function ConsultaForm({
-  open, onOpenChange, pacienteId, pacienteNombre, cita, motivoInicial,
+  open, onOpenChange, pacienteId, pacienteNombre, paciente, cita, motivoInicial,
   destinoInicial, reposoHastaInicial, onCreated,
 }: ConsultaFormProps) {
   const { user } = useAuth();
   const { data: medicos = [] } = useMedicosActivos();
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: internaciones = [] } = useEnfermeriaIngresos();
+  const { data: pacientes = [] } = usePacientes();
   const crear = useCreateConsulta();
   const internar = useIngresarPacienteCama();
+
+  const pacienteActual = useMemo(() => {
+    if (paciente) return paciente;
+    if (cita?.paciente) return cita.paciente;
+    if (pacienteId) return pacientes.find((p) => p.id === pacienteId) || null;
+    return null;
+  }, [paciente, cita, pacienteId, pacientes]);
 
   const [medicoId, setMedicoId] = useState("");
   const [fecha, setFecha] = useState(fechaHoyISO());
@@ -94,6 +126,42 @@ export function ConsultaForm({
 
   const cieDebounced = useDebounce(cieBusqueda, 300);
   const { data: cieOpciones = [] } = useSearchCie10(cieDebounced);
+
+  const cieOpcionesCombinadas = useMemo(() => {
+    const qLower = cieDebounced.trim().toLowerCase();
+    if (!qLower) return [];
+
+    const map = new Map<string, Cie10>();
+    for (const c of cieOpciones) {
+      map.set(c.codigo.toLowerCase(), c);
+    }
+
+    const esBusquedaFisio =
+      "fisioterapia".includes(qLower) ||
+      "kinesiologia".includes(qLower) ||
+      "rehabilitacion".includes(qLower) ||
+      "ejercicio".includes(qLower) ||
+      "lumbalgia".includes(qLower) ||
+      "lumbago".includes(qLower) ||
+      "esguince".includes(qLower) ||
+      "cervicalgia".includes(qLower) ||
+      "contractura".includes(qLower) ||
+      "manguito".includes(qLower) ||
+      "tendinitis".includes(qLower) ||
+      "artrosis".includes(qLower);
+
+    for (const preset of FISIOTERAPIA_PRESETS) {
+      const match =
+        preset.codigo.toLowerCase().includes(qLower) ||
+        preset.descripcion.toLowerCase().includes(qLower) ||
+        esBusquedaFisio;
+      if (match && !map.has(preset.codigo.toLowerCase())) {
+        map.set(preset.codigo.toLowerCase(), preset);
+      }
+    }
+
+    return Array.from(map.values());
+  }, [cieOpciones, cieDebounced]);
 
   useEffect(() => {
     if (open) {
@@ -136,12 +204,8 @@ export function ConsultaForm({
   const handleGuardar = async (opts?: { eImprimirReposo?: boolean }) => {
     if (!pacienteId) return;
     if (!medicoId) { toast.error("Selecciona el médico que atendió."); return; }
-    if (cieLista.length === 0 && !diagnostico.trim() && !motivo.trim()) {
-      toast.error("Registra al menos un diagnóstico CIE-10, motivo o descripción.");
-      return;
-    }
-    if (cieLista.length === 0) {
-      toast.error("Selecciona al menos un diagnóstico CIE-10 (es obligatorio).");
+    if (cieLista.length === 0 && !diagnostico.trim() && !motivo.trim() && !examen.trim() && !tratamiento.trim()) {
+      toast.error("Registra al menos un diagnóstico, motivo o descripción de la consulta.");
       return;
     }
     if (reposoTipo && reposoHasta && reposoHasta < fecha) {
@@ -154,7 +218,8 @@ export function ConsultaForm({
     }
 
     const cieTexto = cieLista.map((c) => `[${c.codigo}] ${c.descripcion}`).join(" / ");
-    const diagFinal = diagnostico.trim() ? `${cieTexto} — ${diagnostico.trim()}` : cieTexto;
+    const diagFinal = [cieTexto, diagnostico.trim()].filter(Boolean).join(" — ");
+    const primerCieId = cieLista[0]?.id && cieLista[0]?.id > 0 ? cieLista[0].id : null;
 
     try {
       // La internación va primero: es lo único que puede chocar (cama ocupada).
@@ -168,7 +233,7 @@ export function ConsultaForm({
           fecha_ingreso: fecha,
           hora_ingreso: horaAhora(),
           diagnostico_ingreso: sanitizePlainText(diagFinal) || null,
-          cie10_id: cieLista[0]?.id ?? null,
+          cie10_id: primerCieId,
           motivo_observacion: sanitizeMultilineText(motivo) || null,
         });
         internacionCreada.current = creada.id;
@@ -181,7 +246,7 @@ export function ConsultaForm({
         fecha,
         motivo_consulta: sanitizeMultilineText(motivo) || null,
         examen_fisico: sanitizeMultilineText(examen) || null,
-        cie10_id: cieLista[0]?.id ?? null,
+        cie10_id: primerCieId,
         diagnostico: sanitizePlainText(diagFinal) || null,
         tratamiento: sanitizeMultilineText(tratamiento) || null,
         destino,
@@ -201,7 +266,7 @@ export function ConsultaForm({
               `DOCUMENTO: ${tituloDocumento(destino)}`,
               `Paciente: ${pacienteNombre}`,
               `Desde: ${fecha.split("-").reverse().join("/")} Hasta: ${reposoHasta ? reposoHasta.split("-").reverse().join("/") : "Nueva orden"}`,
-              `Dx: ${cieLista.map((c) => c.codigo).join(", ")}`,
+              `Dx: ${cieLista.map((c) => c.codigo).join(", ") || diagnostico.trim() || "Consulta"}`,
               `Medico: Dr(a). ${medicoSeleccionado?.apellidos || ""} ${medicoSeleccionado?.nombres || ""}`,
             ].join("\n"))}
             size={105}
@@ -211,13 +276,16 @@ export function ConsultaForm({
 
         imprimirCertificadoReposo({
           pacienteNombre,
-          pacienteDocumento: String(pacienteId),
+          pacienteDocumento: pacienteActual?.documento || (pacienteId ? String(pacienteId) : null),
+          pacienteTipo: pacienteActual?.tipo ? labelTipoPaciente(pacienteActual.tipo) : null,
+          pacienteGrado: (pacienteActual && "grado" in pacienteActual ? pacienteActual.grado : null) || null,
+          pacienteUnidad: (pacienteActual && "unidad" in pacienteActual ? pacienteActual.unidad : null) || "ANP",
           tipoReposo: reposoTipo,
           destino: destino as "sin_servicio" | "enfermo_local" | "reposo_domiciliario" | "internacion",
           fechaDesde: fecha.split("-").reverse().join("/"),
           fechaHasta: reposoHasta ? reposoHasta.split("-").reverse().join("/") : null,
-          cieCodigo: cieLista.map((c) => c.codigo).join(", "),
-          cieDescripcion: cieLista.map((c) => `${c.codigo}: ${c.descripcion}`).join(" | "),
+          cieCodigo: cieLista.map((c) => c.codigo).join(", ") || "",
+          cieDescripcion: cieLista.map((c) => `${c.codigo}: ${c.descripcion}`).join(" | ") || diagnostico,
           diagnosticoDetalle: diagnostico,
           tratamiento,
           medicoNombre: medicoSeleccionado ? `Dr(a). ${medicoSeleccionado.apellidos}, ${medicoSeleccionado.nombres}` : "Profesional Médico",
@@ -294,7 +362,7 @@ export function ConsultaForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2 relative">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="co-cie" className="font-semibold text-sm">Diagnósticos CIE-10 *</Label>
+                  <Label htmlFor="co-cie" className="font-semibold text-sm">Diagnósticos CIE-10 (opcional)</Label>
                   <span className="text-xs text-muted-foreground font-normal">
                     {cieLista.length} seleccionado{cieLista.length !== 1 ? "s" : ""}
                   </span>
@@ -305,17 +373,17 @@ export function ConsultaForm({
                   <Input
                     id="co-cie"
                     className="pl-9 h-10"
-                    placeholder="Buscar y seleccionar diagnósticos (ej. Caries, Necrosis)..."
+                    placeholder="Buscar y seleccionar diagnósticos (ej. Caries, Fisioterapia, Lumbalgia)..."
                     value={cieBusqueda}
                     onChange={(e) => setCieBusqueda(e.target.value)}
                   />
-                  {cieOpciones.length > 0 && cieBusqueda.trim() && (
+                  {cieOpcionesCombinadas.length > 0 && cieBusqueda.trim() && (
                     <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-52 overflow-y-auto divide-y">
-                      {cieOpciones.map((c) => {
-                        const yaSeleccionado = cieLista.some((item) => item.id === c.id);
+                      {cieOpcionesCombinadas.map((c) => {
+                        const yaSeleccionado = cieLista.some((item) => item.codigo === c.codigo);
                         return (
                           <button
-                            key={c.id}
+                            key={c.codigo}
                             type="button"
                             className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 ${
                               yaSeleccionado ? "bg-blue-50 text-blue-900 font-semibold dark:bg-blue-950 dark:text-blue-100" : "hover:bg-accent"
@@ -339,12 +407,46 @@ export function ConsultaForm({
                   )}
                 </div>
 
+                {/* Chips de Fisioterapia / Kinesiología frecuentes */}
+                <div className="space-y-1 pt-0.5">
+                  <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1">
+                    <span>💡 Opciones rápidas de Fisioterapia / Kinesiología:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {FISIOTERAPIA_PRESETS.slice(0, 8).map((preset) => {
+                      const yaSeleccionado = cieLista.some((c) => c.codigo === preset.codigo);
+                      return (
+                        <button
+                          key={preset.codigo}
+                          type="button"
+                          onClick={() => {
+                            if (yaSeleccionado) {
+                              setCieLista((prev) => prev.filter((c) => c.codigo !== preset.codigo));
+                            } else {
+                              const realFromDb = cieOpciones.find((c) => c.codigo === preset.codigo);
+                              setCieLista((prev) => [...prev, realFromDb || preset]);
+                            }
+                          }}
+                          className={`text-[11px] px-2 py-0.5 rounded-md border transition-colors ${
+                            yaSeleccionado
+                              ? "bg-blue-600 text-white border-blue-600 font-semibold"
+                              : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/80"
+                          }`}
+                        >
+                          <span className="font-mono font-bold mr-1">{preset.codigo}</span>
+                          {preset.descripcion.split("(")[0].trim()}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Lista de Diagnósticos CIE-10 Seleccionados */}
                 {cieLista.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {cieLista.map((c) => (
                       <Badge
-                        key={c.id}
+                        key={c.codigo}
                         variant="outline"
                         className="px-2.5 py-1 text-xs bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 flex items-center gap-1.5 shadow-xs"
                       >
@@ -353,7 +455,7 @@ export function ConsultaForm({
                         <button
                           type="button"
                           className="ml-1 text-blue-600 hover:text-red-600 font-bold hover:bg-blue-100 dark:hover:bg-blue-900 rounded px-2.5 py-2 -my-2 -mr-1 text-xs"
-                          onClick={() => setCieLista((prev) => prev.filter((item) => item.id !== c.id))}
+                          onClick={() => setCieLista((prev) => prev.filter((item) => item.codigo !== c.codigo))}
                           title="Quitar este diagnóstico"
                         >
                           ✕

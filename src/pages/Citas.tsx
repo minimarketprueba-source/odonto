@@ -85,6 +85,8 @@ export default function Citas() {
   const { hasPermission, isMedico, isAdmin } = usePermissions();
   const { user } = useAuth();
   const canEdit = hasPermission("citas", "editar");
+  const esMedicoODoctor = isMedico || isAdmin;
+  const puedeRegistrarConsulta = esMedicoODoctor && hasPermission("consultas", "editar");
   const atiendeConsultas = hasPermission("consultas", "editar");
 
   const [vista, setVista] = useState<"dia" | "mes">("dia");
@@ -218,7 +220,7 @@ export default function Citas() {
         <>
           <Button
             variant="outline" size="sm" className="gap-1"
-            onClick={() => atiendeConsultas ? setConsultaCita(c) : handleEstado(c, "atendida")}
+            onClick={() => puedeRegistrarConsulta ? setConsultaCita(c) : handleEstado(c, "atendida")}
             title={atiendeConsultas ? "Registrar consulta y marcar atendida" : "Marcar atendida"}
           >
             <Stethoscope className="w-3.5 h-3.5" /> Atender
@@ -436,7 +438,7 @@ export default function Citas() {
                       </div>
                       {canEdit && (
                         <Button size="sm" className="gap-1 no-print"
-                          onClick={() => atiendeConsultas ? setConsultaCita(c) : handleEstado(c, "atendida")}>
+                          onClick={() => puedeRegistrarConsulta ? setConsultaCita(c) : handleEstado(c, "atendida")}>
                           <Stethoscope className="w-3.5 h-3.5" /> Atender
                         </Button>
                       )}

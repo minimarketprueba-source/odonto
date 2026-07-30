@@ -235,7 +235,10 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
   const handleCerrar = async () => {
     if (!ficha || !paciente) return;
     if (!medicoId) { toast.error("Indique el médico que atendió."); return; }
-    if (cieLista.length === 0) { toast.error("Elija al menos un diagnóstico CIE-10."); return; }
+    if (cieLista.length === 0 && !form.diagnostico.trim()) {
+      toast.error("Elija un diagnóstico CIE-10 o escriba la descripción del diagnóstico.");
+      return;
+    }
     if (!destino) { toast.error("Indique el destino del paciente."); return; }
     if (destinoSel?.pideDias && !numeroONull(form.destino_dias)) {
       toast.error(`Indique cuántos días de ${destinoSel.label.toLowerCase()}.`);
@@ -247,9 +250,8 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
     }
 
     const cieTexto = cieLista.map((c) => `[${c.codigo}] ${c.descripcion}`).join(" / ");
-    const diagFinal = form.diagnostico.trim()
-      ? `${cieTexto} — ${sanitizePlainText(form.diagnostico)}`
-      : cieTexto;
+    const diagFinal = [cieTexto, sanitizePlainText(form.diagnostico)].filter(Boolean).join(" — ");
+    const primerCieId = cieLista[0]?.id && cieLista[0]?.id > 0 ? cieLista[0].id : null;
 
     try {
       // La internación va primero: es lo que puede chocar (cama ya ocupada).
@@ -280,7 +282,7 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
         laboratorio: sanitizeMultilineText(form.laboratorio) || null,
         radiologia: sanitizeMultilineText(form.radiologia) || null,
         diagnostico: diagFinal,
-        cie10_id: cieLista[0]?.id ?? null,
+        cie10_id: primerCieId,
         tratamiento: sanitizeMultilineText(form.tratamiento) || null,
         evolucion: sanitizeMultilineText(form.evolucion) || null,
         plan: sanitizeMultilineText(form.plan) || null,
@@ -643,7 +645,7 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
                 {/* Diagnóstico CIE-10 */}
                 {!soloLectura && (
                   <div className="space-y-2 pt-2 border-t">
-                    <Label htmlFor="rac-cie" className="text-xs font-semibold">Diagnóstico CIE-10 *</Label>
+                    <Label htmlFor="rac-cie" className="text-xs font-semibold">Diagnóstico CIE-10 (opcional)</Label>
                     <Input id="rac-cie" placeholder="Buscar por código o descripción..."
                       value={cieBusqueda} onChange={(e) => setCieBusqueda(e.target.value)} />
                     {cieOpciones.length > 0 && (

@@ -56,6 +56,19 @@ export function cleanQrText(text: string): string {
     .replace(/Ñ/g, "N");
 }
 
+export function formatTipoGrado(tipo?: string | null, grado?: string | null): string {
+  const t = tipo?.trim();
+  const g = grado?.trim();
+
+  if (t && g) {
+    if (g.toLowerCase().includes(t.toLowerCase())) {
+      return g;
+    }
+    return `${t} — ${g}`;
+  }
+  return g || t || "—";
+}
+
 /** Título, código de referencia y texto de cada conducta que se imprime. */
 const DOCUMENTOS_REPOSO = {
   reposo_domiciliario: {
@@ -117,7 +130,7 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
         <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
       </div>
       <div>
-        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${datos.pacienteTipo || "Cadete"} ${datos.pacienteGrado ? `— ${datos.pacienteGrado}` : ""}</p>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
         <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
       </div>
     </div>
@@ -235,7 +248,7 @@ export function imprimirConstanciaEnfermeria(datos: DatosConstanciaEnfermeria) {
         <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
       </div>
       <div>
-        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${datos.pacienteTipo || "Cadete"} ${datos.pacienteGrado ? `— ${datos.pacienteGrado}` : ""}</p>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
         <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
       </div>
     </div>
@@ -339,7 +352,7 @@ export function imprimirInformeConsulta(datos: DatosImpresionConsulta) {
         <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
       </div>
       <div>
-        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${datos.pacienteTipo || "Cadete"} ${datos.pacienteGrado ? `— ${datos.pacienteGrado}` : ""}</p>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
         <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
       </div>
     </div>

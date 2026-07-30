@@ -81,6 +81,7 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
   recepcion: {
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
+    consultas: ['ver', 'editar'],
     lista_espera: ['ver', 'editar'],
   },
 }

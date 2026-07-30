@@ -47,6 +47,8 @@ export interface Cita {
     apellidos: string;
     documento: string;
     tipo: string;
+    grado?: string | null;
+    unidad?: string | null;
   } | null;
   medico?: {
     id: number;
