@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { BedDouble, HeartPulse, Loader2, Printer, Search, ShieldAlert, UserPlus } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
@@ -150,17 +150,17 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   }, [camas, internaciones]);
 
   const handleGuardar = async (opts?: { eImprimir?: boolean }) => {
-    if (!pacienteId) { toast.error("Selecciona el paciente atendido."); return; }
-    if (!motivo.trim()) { toast.error("Indica el motivo de la atención."); return; }
-    if (!enfermero.trim()) { toast.error("Indica quién atendió (nombre y apellido)."); return; }
-    if (!fecha) { toast.error("Indica la fecha de la atención."); return; }
-    if (!hora) { toast.error("Indica la hora de la atención."); return; }
+    if (!pacienteId) { await showSwalError("Selecciona el paciente atendido."); return; }
+    if (!motivo.trim()) { await showSwalError("Indica el motivo de la atención."); return; }
+    if (!enfermero.trim()) { await showSwalError("Indica quién atendió (nombre y apellido)."); return; }
+    if (!fecha) { await showSwalError("Indica la fecha de la atención."); return; }
+    if (!hora) { await showSwalError("Indica la hora de la atención."); return; }
     if (destinoSel?.pideDias && reposoHasta && reposoHasta < fecha) {
-      toast.error("La fecha 'hasta' no puede ser anterior a la atención.");
+      await showSwalError("La fecha 'hasta' no puede ser anterior a la atención.");
       return;
     }
     if (destinoSel?.pideCama && !camaId && !internacionCreada.current) {
-      toast.error("Elija la cama donde queda en observación.");
+      await showSwalError("Elija la cama donde queda en observación.");
       return;
     }
 
@@ -175,7 +175,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
     ];
     for (const v of vitales) {
       if (v.texto.trim() && numeroONull(v.texto) === null) {
-        toast.error(`Revise el valor de ${v.etiqueta}: «${v.texto.trim()}» no es un número.`);
+        await showSwalError(`Revise el valor de ${v.etiqueta}: «${v.texto.trim()}» no es un número.`);
         return;
       }
     }
@@ -227,17 +227,16 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
 
       if (opts?.eImprimir) imprimirConstanciaDeAtencion(atencion);
 
-      toast.success(
+      onOpenChange(false);
+      await showSwalSuccess(
         destinoSel?.pideCama
           ? "Atención registrada y paciente en observación. Ya aparece en las camas."
-          : "Atención registrada. Queda pendiente de revisión médica."
+          : destino === "cita_medico"
+            ? "Atención registrada, pendiente de revisión médica. Recuerde anotar al paciente en la Lista de espera para que el médico lo llame."
+            : "Atención registrada. Queda pendiente de revisión médica."
       );
-      if (destino === "cita_medico") {
-        toast.info("Recuerde anotar al paciente en la Lista de espera para que el médico lo llame.");
-      }
-      onOpenChange(false);
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 
