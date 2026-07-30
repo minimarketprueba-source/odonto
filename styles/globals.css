@@ -94,6 +94,19 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Previene desbordamiento horizontal en m\u00f3vil */
+    overflow-x: hidden;
+    /* Scroll suave en toda la app */
+    scroll-behavior: smooth;
+    /* Mejora el rendering en iOS */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Asegura que nada se desborde horizontalmente */
+  body {
+    overflow-x: hidden;
+  }
   :root {
     /* Tema claro - Azul moderno */
     --background: 252 254 255; /* Casi blanco */
@@ -215,6 +228,23 @@
 }
 
 @layer utilities {
+  /* Tabla responsiva: scroll horizontal en m\u00f3vil */
+  .table-responsive {
+    @apply w-full overflow-x-auto -mx-0;
+  }
+
+  /* Scrollbar m\u00e1s delgado en m\u00f3vil */
+  @media (max-width: 640px) {
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+  }
+
+  /* Mejora el tap target en m\u00f3vil */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
 }
 
 /* Impresión de la agenda: solo se imprime el bloque #agenda-imprimible */

@@ -1,11 +1,15 @@
-"use client"
+'use client'
 
-import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react'
 
-import { supabase, clearProjectStorage, getProjectStorageInfo, isSupabaseConfigured } from "@/lib/supabase"
-import type { User, Session } from "@supabase/supabase-js"
-import { logger } from "@/lib/logger"
-
+import {
+  supabase,
+  clearProjectStorage,
+  getProjectStorageInfo,
+  isSupabaseConfigured,
+} from '@/lib/supabase'
+import type { User, Session } from '@supabase/supabase-js'
+import { logger } from '@/lib/logger'
 
 interface AuthContextType {
   user: User | null
@@ -20,7 +24,7 @@ interface AuthContextType {
 // Roles que pueden entrar a este sistema. Los roles de control de peso
 // (analyst, viewer) NO tienen acceso a Sanidad; solo los admins son comunes
 // a ambos sistemas.
-export const ROLES_SANIDAD = ["admin", "medico", "recepcion"]
+export const ROLES_SANIDAD = ['admin', 'medico', 'recepcion']
 
 /**
  * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
@@ -28,9 +32,9 @@ export const ROLES_SANIDAD = ["admin", "medico", "recepcion"]
  * cuadro de permisos sin tocar nada más.
  */
 export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
-  { value: "admin", label: "Administrador" },
-  { value: "medico", label: "Médico / Profesional" },
-  { value: "recepcion", label: "Enfermería / Recepción" },
+  { value: 'admin', label: 'Administrador' },
+  { value: 'medico', label: 'Médico / Profesional' },
+  { value: 'recepcion', label: 'Enfermería / Recepción' },
 ]
 
 /**
@@ -40,18 +44,18 @@ export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
  * acá — son de la otra app aunque compartan la tabla `user_roles`.
  */
 export const MODULOS_SANIDAD: { key: string; label: string }[] = [
-  { key: "pacientes", label: "Pacientes" },
-  { key: "citas", label: "Citas y horarios" },
-  { key: "consultas", label: "Consultas, urgencias y enfermería" },
-  { key: "recetas", label: "Recetas" },
-  { key: "nutricion", label: "Nutrición" },
-  { key: "lista_espera", label: "Lista de espera" },
-  { key: "reportes", label: "Reportes" },
-  { key: "mantenimiento", label: "Mantenimiento" },
-  { key: "usuarios", label: "Usuarios" },
+  { key: 'pacientes', label: 'Pacientes' },
+  { key: 'citas', label: 'Citas y horarios' },
+  { key: 'consultas', label: 'Consultas, urgencias y enfermería' },
+  { key: 'recetas', label: 'Recetas' },
+  { key: 'nutricion', label: 'Nutrición' },
+  { key: 'lista_espera', label: 'Lista de espera' },
+  { key: 'reportes', label: 'Reportes' },
+  { key: 'mantenimiento', label: 'Mantenimiento' },
+  { key: 'usuarios', label: 'Usuarios' },
 ]
 
-const TODOS_LOS_PERMISOS = ["ver", "editar", "exportar", "eliminar"]
+const TODOS_LOS_PERMISOS = ['ver', 'editar', 'exportar', 'eliminar']
 
 /**
  * Si `user_roles.status` habilita el acceso. Es el mismo estado que mira la
@@ -59,30 +63,42 @@ const TODOS_LOS_PERMISOS = ["ver", "editar", "exportar", "eliminar"]
  * verdad. `null` se toma como activo: hay filas viejas sin estado.
  */
 export function esEstadoActivo(status?: string | null): boolean {
-  if (status == null || status === "") return true
-  return ["activo", "active", "habilitado", "enabled"].includes(status.toLowerCase())
+  if (status == null || status === '') return true
+  return ['activo', 'active', 'habilitado', 'enabled'].includes(status.toLowerCase())
 }
 
 // Permisos por defecto cuando user_roles.permissions viene vacío.
 export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
   medico: {
-    pacientes: ["ver", "editar"],
-    citas: ["ver", "editar"],
-    consultas: ["ver", "editar"],
-    nutricion: ["ver", "editar"],
-    recetas: ["ver", "editar"],
-    lista_espera: ["ver", "editar"],
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    consultas: ['ver', 'editar'],
+    nutricion: ['ver', 'editar'],
+    recetas: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
   },
   recepcion: {
-    pacientes: ["ver", "editar"],
-    citas: ["ver", "editar"],
-    lista_espera: ["ver", "editar"],
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
   },
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+/**
+ * Usa los permisos explícitos cuando existen y los del rol cuando la fila
+ * todavía tiene el JSON vacío que deja la Edge Function compartida.
+ */
+export function resolverPermisosSanidad(
+  rol: string | null,
+  permissions: Record<string, string[]> | null
+): Record<string, string[]> | null {
+  if (!rol) return null
+  if (permissions && Object.keys(permissions).length > 0) return permissions
+  return DEFAULT_PERMISOS_SANIDAD[rol] ?? null
+}
 
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -99,11 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Debug: Verificar storage al inicio y limpiar tokens de otros proyectos
     const debugStorage = () => {
       const { projectRef, legacyKeys } = getProjectStorageInfo()
-      const keys = Object.keys(localStorage).filter(key =>
-        key.includes('supabase') || key.includes('sb-') || key.includes('control-peso')
+      const keys = Object.keys(localStorage).filter(
+        (key) => key.includes('supabase') || key.includes('sb-') || key.includes('control-peso')
       )
 
-      keys.forEach(key => {
+      keys.forEach((key) => {
         try {
           localStorage.getItem(key)
           if (key.startsWith('sb-') && projectRef && !key.includes(projectRef)) {
@@ -117,60 +133,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
     }
-    debugStorage();
+    debugStorage()
 
     if (!isSupabaseConfigured()) {
-      setIsLoading(false);
-      return;
+      setIsLoading(false)
+      return
     }
 
     // Suppress Supabase's console errors for refresh token failures
     // The errors will still be handled properly by our error handlers below
-    const originalConsoleError = console.error;
+    const originalConsoleError = console.error
 
     console.error = function (...args: any[]) {
-      const suppressedErrors = ['AuthApiError', 'Invalid Refresh Token', 'refresh_token_not_found'];
+      const suppressedErrors = ['AuthApiError', 'Invalid Refresh Token', 'refresh_token_not_found']
 
-      const shouldSuppress = args.some(arg => {
+      const shouldSuppress = args.some((arg) => {
         if (typeof arg === 'string') {
-          return suppressedErrors.some(err => arg.includes(err));
+          return suppressedErrors.some((err) => arg.includes(err))
         }
         if (arg instanceof Error) {
-          return suppressedErrors.some(err => arg.message.includes(err));
+          return suppressedErrors.some((err) => arg.message.includes(err))
         }
         if (typeof arg === 'object' && arg !== null) {
           // Check message property or stringify for other objects
-          const msg = arg.message || JSON.stringify(arg);
-          return suppressedErrors.some(err => msg.includes(err));
+          const msg = arg.message || JSON.stringify(arg)
+          return suppressedErrors.some((err) => msg.includes(err))
         }
-        return false;
-      });
+        return false
+      })
 
       if (!shouldSuppress) {
-        originalConsoleError.apply(console, args);
+        originalConsoleError.apply(console, args)
       }
-    };
+    }
 
-    let isMounted = true;
+    let isMounted = true
 
     // Get initial session
     const getInitialSession = async () => {
       try {
         // Verificar si hay un token antes de intentar obtener la sesión
         // Esto nos ayuda a detectar cuando el refresco falla silenciosamente
-        const { authStorageKey } = getProjectStorageInfo();
-        const hasToken = typeof window !== 'undefined' && localStorage.getItem(authStorageKey);
+        const { authStorageKey } = getProjectStorageInfo()
+        const hasToken = typeof window !== 'undefined' && localStorage.getItem(authStorageKey)
 
         const {
           data: { session },
-          error
-        } = await supabase.auth.getSession();
+          error,
+        } = await supabase.auth.getSession()
 
-        if (!isMounted) return;
+        if (!isMounted) return
 
         if (error) {
           // Si hay error explícito en la sesión (token inválido), limpiar todo
-          logger.error("Error obteniendo sesión:", error)
+          logger.error('Error obteniendo sesión:', error)
           await supabase.auth.signOut()
           clearProjectStorage()
           setUser(null)
@@ -178,7 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.location.href = '/auth/login'
         } else if (hasToken && !session) {
           // Si había token pero no hay sesión, es un token inválido que Supabase no reportó como error
-          logger.warn("Token existente detectado pero no se recuperó sesión. Limpiando almacenamiento corrupto.")
+          logger.warn(
+            'Token existente detectado pero no se recuperó sesión. Limpiando almacenamiento corrupto.'
+          )
           await supabase.auth.signOut()
           clearProjectStorage()
           setUser(null)
@@ -186,8 +204,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(session?.user ?? null)
         }
       } catch (err) {
-        if (!isMounted) return;
-        logger.error("Error crítico obteniendo sesión:", err)
+        if (!isMounted) return
+        logger.error('Error crítico obteniendo sesión:', err)
         await supabase.auth.signOut()
         clearProjectStorage()
         setUser(null)
@@ -206,10 +224,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
-
       // Si el evento es TOKEN_REFRESHED y falló, limpiar sesión
       if (event === 'TOKEN_REFRESHED' && !session) {
-        logger.warn("Token refresh falló, limpiando sesión")
+        logger.warn('Token refresh falló, limpiando sesión')
         await supabase.auth.signOut()
         clearProjectStorage()
         setUser(null)
@@ -232,9 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-      console.error = originalConsoleError;
+      isMounted = false
+      subscription.unsubscribe()
+      console.error = originalConsoleError
     }
   }, [])
 
@@ -251,16 +268,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ensureProfileExists = async () => {
       try {
         // Validate UUID format before request
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const uuidRegex =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
         if (!uuidRegex.test(user.id)) {
-          logger.error(`[AuthContext] Invalid UUID for user.id: ${user.id}`);
-          return;
+          logger.error(`[AuthContext] Invalid UUID for user.id: ${user.id}`)
+          return
         }
 
         const { data, error } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", user.id)
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
           .maybeSingle()
 
         if (error) {
@@ -268,17 +286,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // no las tratamos como errores críticos en producción.
           const isExpected = ['400', '403', '404'].includes(error.code || '')
           if (isExpected) {
-            logger.warn("Error checking user profile (expected):", {
+            logger.warn('Error checking user profile (expected):', {
               code: error.code,
               message: error.message,
-            });
+            })
           } else {
-            logger.error("Error checking user profile:", {
+            logger.error('Error checking user profile:', {
               code: error.code,
               message: error.message,
               details: error.details,
-              hint: error.hint
-            });
+              hint: error.hint,
+            })
           }
           return
         }
@@ -290,20 +308,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Usar upsert con ignoreDuplicates para evitar errores si ya existe (race conditions)
           const { error: upsertError } = await supabase
-            .from("profiles")
+            .from('profiles')
             .upsert(payload, { onConflict: 'id', ignoreDuplicates: true })
 
           if (upsertError) {
             // Ignorar error de duplicado (postgres code 23505) o Bad Request (400) si es por concurrencia
-            if (upsertError.code !== '23505' && upsertError.code !== '409' && upsertError.code !== '400') {
-              logger.error("No se pudo crear el perfil del usuario:", {
+            if (
+              upsertError.code !== '23505' &&
+              upsertError.code !== '409' &&
+              upsertError.code !== '400'
+            ) {
+              logger.error('No se pudo crear el perfil del usuario:', {
                 message: upsertError.message,
                 code: upsertError.code,
-                details: upsertError.details
+                details: upsertError.details,
               })
             } else {
               // Si dió error de duplicado/400, asumimos que ya existe y lo marcamos como 'synced'
-              logger.warn("Perfil ya existente o conflicto al crear (ignorado):", upsertError.code);
+              logger.warn('Perfil ya existente o conflicto al crear (ignorado):', upsertError.code)
             }
             // Aun si falla, marcamos como synced para no reintentar infinitamente en este render
           }
@@ -311,46 +333,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Cargar Rol y Permisos despues de asegurar que el perfil existe
         const { data: roleData, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role, permissions, status")
-          .eq("user_id", user.id)
-          .maybeSingle();
+          .from('user_roles')
+          .select('role, permissions, status')
+          .eq('user_id', user.id)
+          .maybeSingle()
 
         if (roleError) {
-          logger.error("Error cargando rol del usuario:", {
+          logger.error('Error cargando rol del usuario:', {
             message: roleError.message,
             code: roleError.code,
             details: roleError.details,
             hint: roleError.hint,
-            status: (roleError as any).status
-          });
+            status: (roleError as any).status,
+          })
         } else if (roleData && !esEstadoActivo(roleData.status as string | null)) {
           // Cuenta suspendida: se la trata como sin rol para que ProtectedRoute
           // muestre "Sin acceso". Antes solo la frenaba el RLS, así que entraba
           // igual y veía las pantallas vacías o con errores.
-          logger.warn("Cuenta suspendida: acceso denegado");
-          setRole(null);
-          setPermissions(null);
+          logger.warn('Cuenta suspendida: acceso denegado')
+          setRole(null)
+          setPermissions(null)
         } else if (roleData) {
-          const rol = roleData.role ? roleData.role.toLowerCase() : null;
-          setRole(rol);
+          const rol = roleData.role ? roleData.role.toLowerCase() : null
+          setRole(rol)
           setPermissions(
-            (roleData.permissions as Record<string, string[]> | null) ??
-              (rol ? (DEFAULT_PERMISOS_SANIDAD[rol] ?? null) : null)
-          );
+            resolverPermisosSanidad(rol, roleData.permissions as Record<string, string[]> | null)
+          )
         } else {
           // Sin rol asignado: sin acceso a Sanidad. No se auto-asigna nada;
           // ProtectedRoute mostrará la pantalla de "sin acceso".
-          setRole(null);
-          setPermissions(null);
+          setRole(null)
+          setPermissions(null)
         }
 
         if (isActive) {
           syncedProfilesRef.current.add(user.id)
         }
       } catch (syncError) {
-        console.error("[DEBUG] Error sincronizando el perfil del usuario:", syncError)
-        logger.error("Error sincronizando el perfil del usuario:", syncError)
+        console.error('[DEBUG] Error sincronizando el perfil del usuario:', syncError)
+        logger.error('Error sincronizando el perfil del usuario:', syncError)
       } finally {
         // Siempre marcar como resuelto para no dejar el loader colgado.
         // Si rol/permisos no cargaron, ProtectedRoute decidirá con lo que haya.
@@ -374,7 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     })
     if (error) {
-      console.error("[DEBUG] Login error details:", error)
+      console.error('[DEBUG] Login error details:', error)
       throw error
     }
   }
@@ -410,12 +431,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // resuelto, para que ProtectedRoute no redirija prematuramente al Dashboard.
   const effectiveLoading = isLoading || (!!user && !permissionsResolved)
 
-  return <AuthContext.Provider value={{ user, role, permissions, login, logout, clearStorage, isLoading: effectiveLoading }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{ user, role, permissions, login, logout, clearStorage, isLoading: effectiveLoading }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
 }

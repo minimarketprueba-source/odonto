@@ -56,3 +56,4 @@ docs/*.docx
 
 # codigo descartado de la plantilla control-peso
 /_descartado
+vitest.config.ts.timestamp-*

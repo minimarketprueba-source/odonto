@@ -49,7 +49,7 @@ export function Sidebar() {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-4 left-4 z-50 md:hidden bg-card/95 backdrop-blur-md border border-border/50 shadow-lg hover:scale-110 transition-all duration-200"
+        className="fixed top-3 left-3 z-50 md:hidden bg-card/95 backdrop-blur-md border border-border/50 shadow-lg hover:scale-110 transition-all duration-200 h-10 w-10"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="relative w-6 h-6">
@@ -67,8 +67,8 @@ export function Sidebar() {
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-40 bg-card border-r border-border shadow-xl transform transition-all duration-300 ease-in-out md:translate-x-0",
-          isCollapsed ? "w-20" : "w-64",
+          "fixed inset-y-0 left-0 z-40 bg-card border-r border-border shadow-xl transform transition-all duration-300 ease-in-out md:translate-x-0 w-72",
+          isCollapsed ? "md:w-20" : "md:w-64",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >

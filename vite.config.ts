@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
   const useDevTunnel = Boolean(devTunnelHost)
 
   return {
-    base: process.env.VERCEL ? '/' : './',
+    base: env.VITE_ELECTRON === 'true' ? './' : '/',
     plugins: [react(), removeCrossorigin()],
     resolve: {
       alias: {
@@ -52,7 +52,6 @@ export default defineConfig(({ mode }) => {
             'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
             'supabase-vendor': ['@supabase/supabase-js'],
             'charts-vendor': ['recharts'],
-            'pdf-vendor': ['jspdf', 'docx'],
             'utils-vendor': ['date-fns', 'clsx', 'tailwind-merge', 'class-variance-authority'],
             'mui-vendor': ['@mui/material', '@mui/x-charts', '@emotion/react', '@emotion/styled'],
             'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
@@ -74,7 +73,6 @@ export default defineConfig(({ mode }) => {
         'react-router-dom',
         '@supabase/supabase-js',
         'recharts',
-        'jspdf'
       ],
     },
   }

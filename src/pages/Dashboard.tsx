@@ -252,36 +252,36 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Banner de Bienvenida & Acciones Rápidas */}
-        <div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-background p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-background p-4 sm:p-6 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <SaludoIcon className={`h-5 w-5 ${saludo.color}`} />
-                <span className="text-sm font-medium text-muted-foreground">
+              <div className="flex items-center gap-2 flex-wrap">
+                <SaludoIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${saludo.color}`} />
+                <span className="text-xs sm:text-sm font-medium text-muted-foreground">
                   {saludo.texto}, {user?.email?.split("@")[0] ?? "Usuario"}
                 </span>
-                <Badge variant="outline" className="ml-2 text-xs font-normal border-primary/30">
+                <Badge variant="outline" className="hidden sm:inline-flex text-xs font-normal border-primary/30">
                   <ShieldCheck className="mr-1 h-3 w-3 text-primary" /> Sanidad Policial ISEPOL
                 </Badge>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
                 Panel de Control de Sanidad
               </h1>
-              <p className="text-sm text-muted-foreground">
-                {getFechaFormateada()} — Resumen operativo del centro médico policial
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {getFechaFormateada()} — Resumen operativo
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button asChild size="sm" className="gap-2">
+              <Button asChild size="sm" className="gap-2 flex-1 sm:flex-none justify-center">
                 <Link to="/citas">
                   <CalendarPlus className="h-4 w-4" />
                   Agendar Cita
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="sm" className="gap-2 bg-background/80 backdrop-blur">
+              <Button asChild variant="outline" size="sm" className="gap-2 bg-background/80 backdrop-blur flex-1 sm:flex-none justify-center">
                 <Link to="/pacientes">
                   <UserPlus className="h-4 w-4" />
                   Nuevo Paciente
@@ -389,7 +389,7 @@ export default function Dashboard() {
         )}
 
         {/* Tarjetas KPI de Métricas Clave */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <Link to="/pacientes" className="block group">
             <Card className="h-full transition-all duration-200 hover:border-primary/60 hover:shadow-md">
               <CardContent className="p-4 space-y-2">
@@ -494,7 +494,7 @@ export default function Dashboard() {
         </div>
 
         {/* Sección de Analítica y Gráficos (Recharts) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Gráfico 1: Estado de Citas de Hoy */}
           <Card className="lg:col-span-1 shadow-sm">
             <CardHeader className="pb-2">
@@ -583,7 +583,7 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground">Accesos directos al sistema</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {modulos.map((m) => (
               <Link key={m.nombre} to={m.href} className="block group">
                 <Card className="h-full transition-all duration-200 group-hover:border-primary/60 group-hover:shadow-md overflow-hidden">

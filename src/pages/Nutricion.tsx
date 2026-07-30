@@ -118,11 +118,11 @@ export default function Nutricion() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Encabezado y botones principales */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold text-balance mb-1 sm:mb-2">
+            <h1 className="text-xl sm:text-3xl font-bold text-balance mb-0.5 sm:mb-2">
               Gestión Nutricional
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground text-pretty">
@@ -132,8 +132,8 @@ export default function Nutricion() {
         </div>
 
         {/* Buscador y estado */}
-        <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="relative flex-1 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -145,12 +145,12 @@ export default function Nutricion() {
             </div>
 
             {/* Pestañas de estado (Activos / Inactivos / Todos) */}
-            <div className="flex flex-wrap gap-1 sm:gap-2">
+            <div className="flex gap-1 sm:gap-2">
               <Button
                 variant={filtroEstado === "activos" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFiltroEstado("activos")}
-                className="gap-1 text-xs sm:text-sm px-2 sm:px-3 h-8"
+                className="gap-1 text-xs sm:text-sm px-2 sm:px-3 h-8 flex-1 sm:flex-none"
               >
                 <User className="w-3 h-3" />
                 <span className="hidden sm:inline">Activos</span> ({conteoActivos})
@@ -159,7 +159,7 @@ export default function Nutricion() {
                 variant={filtroEstado === "inactivos" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFiltroEstado("inactivos")}
-                className="gap-1 text-xs sm:text-sm px-2 sm:px-3 h-8"
+                className="gap-1 text-xs sm:text-sm px-2 sm:px-3 h-8 flex-1 sm:flex-none"
               >
                 <Minus className="w-3 h-3" />
                 <span className="hidden sm:inline">Inactivos</span> ({conteoInactivos})
@@ -168,7 +168,7 @@ export default function Nutricion() {
                 variant={filtroEstado === "todos" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFiltroEstado("todos")}
-                className="gap-1 text-xs sm:text-sm px-2 sm:px-3 h-8"
+                className="gap-1 text-xs sm:text-sm px-2 sm:px-3 h-8 flex-1 sm:flex-none"
               >
                 <span className="hidden sm:inline">Todos</span>
                 <span className="sm:hidden">All</span> ({conteoTotal})
@@ -176,12 +176,12 @@ export default function Nutricion() {
             </div>
           </div>
 
-          {/* Filtros desplegables */}
-          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-            <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0 hidden sm:block" />
+          {/* Filtros desplegables — grid 2 col en móvil, fila en sm+ */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+            <Filter className="hidden sm:block w-4 h-4 text-muted-foreground flex-shrink-0" />
 
             <Select value={filtroSeccion} onValueChange={setFiltroSeccion}>
-              <SelectTrigger className="w-full sm:w-auto min-w-[170px] bg-muted/30 text-xs sm:text-sm h-9">
+              <SelectTrigger className="w-full bg-muted/30 text-xs sm:text-sm h-9">
                 <SelectValue placeholder="Todas las secciones" />
               </SelectTrigger>
               <SelectContent>
@@ -193,8 +193,8 @@ export default function Nutricion() {
             </Select>
 
             <Select value={filtroClasificacion} onValueChange={setFiltroClasificacion}>
-              <SelectTrigger className="w-full sm:w-auto min-w-[180px] bg-muted/30 text-xs sm:text-sm h-9">
-                <SelectValue placeholder="Todas las clasificaciones" />
+              <SelectTrigger className="w-full bg-muted/30 text-xs sm:text-sm h-9">
+                <SelectValue placeholder="Clasificación IMC" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas las clasificaciones</SelectItem>
@@ -205,7 +205,7 @@ export default function Nutricion() {
             </Select>
 
             <Select value={filtroCurso} onValueChange={setFiltroCurso}>
-              <SelectTrigger className="w-full sm:w-auto min-w-[160px] bg-muted/30 text-xs sm:text-sm h-9">
+              <SelectTrigger className="w-full bg-muted/30 text-xs sm:text-sm h-9">
                 <SelectValue placeholder="Todos los cursos" />
               </SelectTrigger>
               <SelectContent>
@@ -217,21 +217,21 @@ export default function Nutricion() {
               </SelectContent>
             </Select>
 
-            <Badge variant="secondary" className="gap-1 text-xs py-1 px-2.5">
+            <Badge variant="secondary" className="gap-1 text-xs py-1 px-2.5 justify-center sm:justify-start">
               <User className="w-3 h-3" />
               {cadetesFiltrados.length} cadetes
             </Badge>
           </div>
         </div>
 
-        {/* Acciones de exportación y estadísticas */}
-        <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 items-center justify-between sm:justify-end">
-          {conteoSobrepeso > 0 && (
+        {/* Alerta de sobrepeso */}
+        {conteoSobrepeso > 0 && (
+          <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
               ⚠️ {conteoSobrepeso} con Sobrepeso / Obesidad
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Carga o Estado Vacío */}
         {isLoading ? (

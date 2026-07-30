@@ -15,18 +15,18 @@ export const AppLayout: FC<AppLayoutProps> = ({ children }) => {
   const { isCollapsed } = useSidebar()
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <div className="sidebar-print-hide">
         <Sidebar />
       </div>
       <div className={cn(
-        "flex-1 transition-all duration-300 ease-in-out",
+        "flex flex-col flex-1 min-w-0 overflow-hidden transition-all duration-300 ease-in-out",
         isCollapsed ? "md:ml-20" : "md:ml-64"
       )}>
-        <div className="header-print-hide">
+        <div className="header-print-hide flex-shrink-0">
           <Header />
         </div>
-        <main className="p-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
           {children}
         </main>
       </div>

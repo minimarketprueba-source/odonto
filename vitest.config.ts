@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   test: {
-    exclude: [...configDefaults.exclude, '_descartado/**'],
+    exclude: [...configDefaults.exclude, '_descartado/**', 'e2e/**'],
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],

@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,11 +15,13 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: true,
     },
     mutations: {
-      // Reintentar máximo 1 vez en mutaciones
-      retry: 1,
+      // Nunca reintentar escrituras automáticamente. Si el servidor alcanzó a
+      // guardar y se perdió la respuesta, repetir desde el navegador puede
+      // duplicar citas, recetas, pesadas u otros registros clínicos.
+      retry: 0,
     },
   },
-});
+})
 
 // Keys centralizadas para las queries
 export const queryKeys = {
@@ -78,7 +80,8 @@ export const queryKeys = {
   citas: {
     all: ['citas'] as const,
     porDia: (fecha: string) => [...queryKeys.citas.all, 'dia', fecha] as const,
-    rango: (desde: string, hasta: string) => [...queryKeys.citas.all, 'rango', desde, hasta] as const,
+    rango: (desde: string, hasta: string) =>
+      [...queryKeys.citas.all, 'rango', desde, hasta] as const,
   },
   // Médicos (catálogo para la agenda)
   medicos: {
@@ -90,7 +93,8 @@ export const queryKeys = {
   // Consultas (historia clínica)
   consultas: {
     all: ['consultas'] as const,
-    porPaciente: (pacienteId: number) => [...queryKeys.consultas.all, 'paciente', pacienteId] as const,
+    porPaciente: (pacienteId: number) =>
+      [...queryKeys.consultas.all, 'paciente', pacienteId] as const,
     atenciones: () => [...queryKeys.consultas.all, 'atenciones'] as const,
     registros: () => [...queryKeys.consultas.all, 'registros'] as const,
   },
@@ -118,7 +122,8 @@ export const queryKeys = {
   // Recetas
   recetas: {
     all: ['recetas'] as const,
-    porPaciente: (pacienteId: number) => [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
+    porPaciente: (pacienteId: number) =>
+      [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
   },
   // Enfermería: salas, camas, internaciones y atención ambulatoria
   enfermeria: {
@@ -126,8 +131,10 @@ export const queryKeys = {
     salas: () => [...queryKeys.enfermeria.all, 'salas'] as const,
     camas: () => [...queryKeys.enfermeria.all, 'camas'] as const,
     internaciones: () => [...queryKeys.enfermeria.all, 'internaciones'] as const,
-    ambulatoriasPendientes: () => [...queryKeys.enfermeria.all, 'ambulatorias', 'pendientes'] as const,
-    ambulatoriasRecientes: () => [...queryKeys.enfermeria.all, 'ambulatorias', 'recientes'] as const,
+    ambulatoriasPendientes: () =>
+      [...queryKeys.enfermeria.all, 'ambulatorias', 'pendientes'] as const,
+    ambulatoriasRecientes: () =>
+      [...queryKeys.enfermeria.all, 'ambulatorias', 'recientes'] as const,
     ambulatoriasPaciente: (pacienteId: number) =>
       [...queryKeys.enfermeria.all, 'ambulatorias', 'paciente', pacienteId] as const,
   },
@@ -139,7 +146,8 @@ export const queryKeys = {
   // Salvoconductos (autorización de traslado)
   salvoconductos: {
     all: ['salvoconductos'] as const,
-    porPaciente: (pacienteId: number) => [...queryKeys.salvoconductos.all, 'paciente', pacienteId] as const,
+    porPaciente: (pacienteId: number) =>
+      [...queryKeys.salvoconductos.all, 'paciente', pacienteId] as const,
     porDia: (fecha: string) => [...queryKeys.salvoconductos.all, 'dia', fecha] as const,
   },
   // Fichas de RAC (urgencias)
@@ -153,4 +161,4 @@ export const queryKeys = {
     all: ['especialidades'] as const,
     list: () => [...queryKeys.especialidades.all, 'list'] as const,
   },
-} as const;
+} as const

@@ -20,7 +20,7 @@ Funciona como **aplicación web** (desplegada en Vercel) y como
 ## 🛠️ Stack
 
 React 18 · TypeScript · Vite 6 · Supabase (Auth + Postgres con RLS + Storage + Edge Functions) ·
-TanStack Query · Tailwind + shadcn/ui · Recharts · docx + jsPDF · Electron · Sentry.
+TanStack Query · Tailwind + shadcn/ui · Recharts · Electron · Sentry.
 
 ## 🚀 Puesta en marcha
 
