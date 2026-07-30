@@ -66,6 +66,7 @@ export function imprimirConstanciaDeAtencion(atencion: AtencionEnfermeria) {
     motivo: atencion.motivo,
     procedimiento: atencion.procedimiento,
     enfermeroNombre: enfermero,
+    enfermeroRegistro: atencion.enfermero_registro ?? null,
     atencionId: atencion.id,
     revisadaEl,
     revisadaPor: atencion.medico_revisor

@@ -17,7 +17,7 @@ import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePacientes, type Paciente } from "@/api/pacientes";
-import { useNombrePerfil } from "@/api/perfil";
+import { usePerfilProfesional } from "@/api/perfil";
 import { fechaHoyISO } from "@/api/citas";
 import {
   DESTINOS_AMBULATORIO, TIPOS_ATENCION, destinoAmbulatorio, useCrearAtencion,
@@ -64,7 +64,10 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const { hasPermission } = usePermissions();
   const puedeCrearPaciente = hasPermission("pacientes", "editar");
   const { data: pacientes = [] } = usePacientes();
-  const { data: nombrePerfil } = useNombrePerfil(user);
+  const { data: perfilProf } = usePerfilProfesional(user);
+  const nombrePerfil = perfilProf?.nombre ?? null;
+  // Va a la firma de la constancia; se toma del perfil de quien registra.
+  const registroPerfil = perfilProf?.registro ?? null;
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: internaciones = [] } = useEnfermeriaIngresos();
   const crear = useCrearAtencion();
@@ -216,6 +219,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
         procedimiento: sanitizeMultilineText(procedimiento) || null,
         observaciones: sanitizeMultilineText(observaciones) || null,
         destino,
+        enfermero_registro: registroPerfil,
         reposo_hasta: destinoSel?.pideDias ? reposoHasta || null : null,
         pa_sistolica: entero(paSistolica),
         pa_diastolica: entero(paDiastolica),

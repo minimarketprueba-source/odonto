@@ -14,7 +14,7 @@ import { cn, matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
-import { useNombrePerfil } from "@/api/perfil";
+import { usePerfilProfesional } from "@/api/perfil";
 import { imprimirFichaRac } from "@/lib/imprimir";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
@@ -75,7 +75,8 @@ interface RacFormProps {
 
 export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormProps) {
   const { user } = useAuth();
-  const { data: nombrePerfil } = useNombrePerfil(user);
+  const { data: perfilProf } = usePerfilProfesional(user);
+  const nombrePerfil = perfilProf?.nombre ?? null;
   const { data: pacientes = [] } = usePacientes();
   const { data: medicos = [] } = useMedicosActivos();
   const { data: camas = [] } = useEnfermeriaCamas();

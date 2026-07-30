@@ -198,6 +198,8 @@ export interface DatosConstanciaEnfermeria {
   motivo?: string | null;
   procedimiento?: string | null;
   enfermeroNombre: string;
+  /** Nº de registro profesional del enfermero/a, si lo cargó en Mi perfil. */
+  enfermeroRegistro?: string | null;
   atencionId: number | string;
   /** dd/mm/yyyy si un médico ya la revisó (reimpresión). */
   revisadaEl?: string | null;
@@ -309,6 +311,7 @@ export function imprimirConstanciaEnfermeria(datos: DatosConstanciaEnfermeria) {
         <div class="firmas">
           <div class="linea-firma"></div>
           <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.enfermeroNombre}</p>
+          ${datos.enfermeroRegistro ? `<p style="margin:0; font-size:11px; font-weight:bold;">Reg. Prof. N° ${datos.enfermeroRegistro}</p>` : ""}
           <p style="margin:0; font-size:10px; color:#64748b;">Firma del Enfermero/a — Sección Sanidad</p>
         </div>
       </div>

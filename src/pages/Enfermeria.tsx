@@ -31,12 +31,13 @@ import {
 import { imprimirHojaEnfermeria, cleanQrText } from "@/lib/imprimir";
 import { useAuth } from "@/context/auth-context";
 import { useAtencionesPendientes } from "@/api/atenciones-enfermeria";
-import { useNombrePerfil } from "@/api/perfil";
+import { usePerfilProfesional } from "@/api/perfil";
 import { AtencionAmbulatoriaPanel } from "@/components/enfermeria/atencion-ambulatoria-panel";
 
 export default function Enfermeria() {
   const { user } = useAuth();
-  const { data: nombrePerfil } = useNombrePerfil(user);
+  const { data: perfilProf } = usePerfilProfesional(user);
+  const nombrePerfil = perfilProf?.nombre ?? null;
   const { data: salas = [] } = useSalas();
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: ingresos = [] } = useEnfermeriaIngresos();

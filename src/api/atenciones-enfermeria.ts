@@ -75,6 +75,8 @@ export interface AtencionEnfermeria {
   fecha: string; // yyyy-mm-dd
   hora: string; // HH:mm:ss
   enfermero: string | null;
+  /** Nº de registro profesional de quien atendió (para la constancia). */
+  enfermero_registro: string | null;
   registrado_por: string | null;
   tipo_atencion: TipoAtencion | string;
   motivo: string | null;
@@ -109,6 +111,7 @@ export interface CrearAtencionInput {
   fecha: string;
   hora: string;
   enfermero?: string | null;
+  enfermero_registro?: string | null;
   registrado_por?: string | null;
   tipo_atencion: string;
   motivo?: string | null;
@@ -174,6 +177,13 @@ export function traducirErrorAtencion(
   if (error.code === "23514") {
     return errorConCodigo(
       "Hay un valor fuera de rango. Revise los signos vitales (por ejemplo, la temperatura o la saturación).",
+      error.code
+    );
+  }
+  if (error.code === "PGRST204" && /enfermero_registro/.test(error.message)) {
+    return errorConCodigo(
+      "Falta aplicar la actualización de la base para el registro profesional " +
+        "(archivo SQL_Registro_Profesional.txt del Escritorio). Avise al administrador.",
       error.code
     );
   }
@@ -248,12 +258,17 @@ export async function fetchAtencionesPaciente(pacienteId: number): Promise<Atenc
 }
 
 export async function crearAtencion(input: CrearAtencionInput): Promise<AtencionEnfermeria> {
-  const { reposo_hasta, ...resto } = input;
+  const { reposo_hasta, enfermero_registro, ...resto } = input;
   const { data, error } = await supabase
     .from("atenciones_enfermeria")
     // reposo_hasta solo viaja cuando hay reposo: así los demás destinos siguen
     // funcionando aunque la columna todavía no exista en la base.
-    .insert({ ...resto, clinica_id: CLINICA_ID, ...(reposo_hasta ? { reposo_hasta } : {}) })
+    .insert({
+      ...resto,
+      clinica_id: CLINICA_ID,
+      ...(reposo_hasta ? { reposo_hasta } : {}),
+      ...(enfermero_registro ? { enfermero_registro } : {}),
+    })
     .select(ATENCION_SELECT)
     .single();
   if (error) throw traducirErrorAtencion(error, "No se pudo registrar la atención");
