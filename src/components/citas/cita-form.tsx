@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Loader2, Search, UserPlus } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { matchPaciente, matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
@@ -83,9 +83,9 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   }, [medicoId, fecha, hora, horarios, ausencias]);
 
   const handleAgendar = async () => {
-    if (!paciente) { toast.error("Selecciona el paciente."); return; }
-    if (!medicoId) { toast.error("Selecciona el médico."); return; }
-    if (!fecha || !hora) { toast.error("Indica fecha y hora."); return; }
+    if (!paciente) { await showSwalError("Selecciona el paciente."); return; }
+    if (!medicoId) { await showSwalError("Selecciona el médico."); return; }
+    if (!fecha || !hora) { await showSwalError("Indica fecha y hora."); return; }
     try {
       await crear.mutateAsync({
         paciente_id: paciente.id,
@@ -95,10 +95,13 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
         motivo: sanitizePlainText(motivo) || null,
         agendado_por: user?.email ?? null,
       });
-      toast.success("Cita agendada.");
       onOpenChange(false);
+      await showSwalSuccess(
+        `Cita agendada para ${paciente.apellidos}, ${paciente.nombres} — ` +
+          `${fecha.split("-").reverse().join("/")} a las ${hora} hs.`
+      );
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 

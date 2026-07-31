@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
 import { Ambulance, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
@@ -119,14 +119,14 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
 
   const handleExpedir = async () => {
     if (!paciente) return;
-    if (!medicoId) { toast.error("Indique el profesional tratante que autoriza el traslado."); return; }
+    if (!medicoId) { await showSwalError("Indique el profesional tratante que autoriza el traslado."); return; }
     if (destino === "otro" && !destinoDetalle.trim()) {
-      toast.error("Escriba a dónde se traslada al paciente.");
+      await showSwalError("Escriba a dónde se traslada al paciente.");
       return;
     }
-    if (!motivo.trim()) { toast.error("Indique el motivo médico del traslado."); return; }
+    if (!motivo.trim()) { await showSwalError("Indique el motivo médico del traslado."); return; }
     if (retornoFecha && retornoFecha < fecha) {
-      toast.error("La fecha de retorno no puede ser anterior a la de salida.");
+      await showSwalError("La fecha de retorno no puede ser anterior a la de salida.");
       return;
     }
     try {
@@ -144,11 +144,11 @@ export function SalvoconductoForm({ open, onOpenChange, paciente }: Salvoconduct
         retorno_fecha: retornoFecha || null,
         retorno_hora: retornoHora || null,
       });
-      toast.success(`Salvoconducto ${sc.numero} expedido. Se abre para imprimir.`);
+      await showSwalSuccess(`Salvoconducto ${sc.numero} expedido. Se abre para imprimir.`);
       onOpenChange(false);
       setTimeout(() => imprimir(sc, paciente), 300);
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 

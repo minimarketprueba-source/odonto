@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2, Pill } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { PacienteAlertasBanner } from "@/components/consultas/paciente-alertas-banner";
@@ -108,9 +108,9 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
 
   const handleGuardar = async () => {
     if (!pacienteId) return;
-    if (!medicoId) { toast.error("Selecciona el médico."); return; }
+    if (!medicoId) { await showSwalError("Selecciona el médico."); return; }
     const validos = items.filter((i) => i.medicamento.trim());
-    if (validos.length === 0) { toast.error("Agrega al menos un medicamento."); return; }
+    if (validos.length === 0) { await showSwalError("Agrega al menos un medicamento."); return; }
     try {
       await crear.mutateAsync({
         paciente_id: pacienteId,
@@ -126,10 +126,14 @@ export function RecetaForm({ open, onOpenChange, pacienteId, pacienteNombre }: R
           indicaciones: sanitizeMultilineText(i.indicaciones || "") || null,
         })),
       });
-      toast.success("Receta emitida.");
       onOpenChange(false);
+      await showSwalSuccess(
+        validos.length === 1
+          ? "Receta emitida con 1 medicamento."
+          : `Receta emitida con ${validos.length} medicamentos.`
+      );
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 

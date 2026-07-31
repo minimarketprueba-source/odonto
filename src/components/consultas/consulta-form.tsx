@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Activity, BedDouble, FileSpreadsheet, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
@@ -211,9 +211,9 @@ export function ConsultaForm({
   const reposoTipo = destinoSel?.reposo ?? null;
   const guardando = crear.isPending || internar.isPending;
 
-  const handleImprimirOrdenEstudios = () => {
+  const handleImprimirOrdenEstudios = async () => {
     if (!estudiosSolicitados.trim()) {
-      toast.error("Indique los estudios o análisis solicitados.");
+      await showSwalError("Indique los estudios o análisis solicitados.");
       return;
     }
 
@@ -254,22 +254,22 @@ export function ConsultaForm({
     });
 
     setOrdenEstudiosOpen(false);
-    toast.success("Orden de estudios emitida.");
+    await showSwalSuccess("Orden de estudios emitida. Se abre para imprimir.");
   };
 
   const handleGuardar = async (opts?: { eImprimirReposo?: boolean }) => {
     if (!pacienteId) return;
-    if (!medicoId) { toast.error("Selecciona el médico que atendió."); return; }
+    if (!medicoId) { await showSwalError("Selecciona el médico que atendió."); return; }
     if (cieLista.length === 0 && !diagnostico.trim() && !motivo.trim() && !examen.trim() && !tratamiento.trim()) {
-      toast.error("Registra al menos un diagnóstico, motivo o descripción de la consulta.");
+      await showSwalError("Registra al menos un diagnóstico, motivo o descripción de la consulta.");
       return;
     }
     if (reposoTipo && reposoHasta && reposoHasta < fecha) {
-      toast.error("La fecha 'hasta' del reposo no puede ser anterior a la consulta.");
+      await showSwalError("La fecha 'hasta' del reposo no puede ser anterior a la consulta.");
       return;
     }
     if (destino === "internacion" && !camaId && !internacionCreada.current) {
-      toast.error("Elija la cama donde queda internado.");
+      await showSwalError("Elija la cama donde queda internado.");
       return;
     }
 
@@ -346,18 +346,18 @@ export function ConsultaForm({
           qrSvgHtml,
         });
 
-        toast.success(`Consulta registrada y ${tituloDocumento(destino)} emitido.`);
         onOpenChange(false);
+        await showSwalSuccess(`Consulta registrada y ${tituloDocumento(destino)} emitido.`);
       } else {
-        toast.success(
+        onOpenChange(false);
+        await showSwalSuccess(
           destino === "internacion"
             ? "Consulta registrada y paciente internado. Ya aparece en Enfermería."
             : cita ? "Consulta registrada y cita atendida." : "Consulta registrada."
         );
-        onOpenChange(false);
       }
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 
