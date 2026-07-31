@@ -102,6 +102,7 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
     citas: ['ver', 'editar'],
     consultas: ['ver', 'editar'],
     lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
   },
   enfermeria: {
     pacientes: ['ver', 'editar'],
@@ -109,6 +110,7 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
     consultas: ['ver', 'editar'],
     nutricion: ['ver', 'editar'],
     lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
   },
   nutricionista: {
     pacientes: ['ver', 'editar'],

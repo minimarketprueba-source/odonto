@@ -1433,3 +1433,121 @@ export function imprimirFichaAntropometrica(cadete: {
   ejecutarImpresionIframe("Ficha Antropométrica", html);
 }
 
+export interface DatosImpresionProductividad {
+  especialidadNombre: string;
+  especialistaNombre: string;
+  especialistaColegiatura?: string | null;
+  fecha: string;
+  horario?: string | null;
+  unidad?: string | null;
+  tipoPeriodo?: "diario" | "semanal" | "mensual" | "personalizado";
+  periodoEtiqueta?: string;
+  filas: {
+    index: number;
+    pacienteNombre: string;
+    pacienteJerarquia: string;
+    pacienteSexo: string;
+    diagnostico: string;
+    tratamiento: string;
+  }[];
+  totalAtendidos: number;
+  totalMasculino: number;
+  totalFemenino: number;
+}
+
+export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad) {
+  let tituloPrincipal = "INFORME DIARIO DE CONSULTORIO EXTERNO";
+  if (datos.tipoPeriodo === "semanal") {
+    tituloPrincipal = "INFORME SEMANAL DE CONSULTORIO EXTERNO";
+  } else if (datos.tipoPeriodo === "mensual") {
+    tituloPrincipal = "INFORME MENSUAL DE CONSULTORIO EXTERNO";
+  } else if (datos.tipoPeriodo === "personalizado") {
+    tituloPrincipal = "INFORME DE CONSULTORIO EXTERNO — PRODUCTIVIDAD";
+  }
+
+  const tituloDoc = `${tituloPrincipal} - PLANILLA DE PRODUCTIVIDAD`;
+
+  const trs = datos.filas.map((f) => `
+    <tr>
+      <td style="padding: 6px 4px; border: 1px solid #334155; text-align: center; font-weight: bold; font-size: 11px;">${f.index}</td>
+      <td style="padding: 6px; border: 1px solid #334155; font-size: 12px; font-weight: 600; color: #0f172a;">${f.pacienteNombre}</td>
+      <td style="padding: 6px; border: 1px solid #334155; font-size: 11px; text-align: center; color: #334155;">${f.pacienteJerarquia}</td>
+      <td style="padding: 6px; border: 1px solid #334155; font-size: 11px; text-align: center; font-weight: bold; color: ${f.pacienteSexo === "M" ? "#1d4ed8" : "#be185d"};">${f.pacienteSexo}</td>
+      <td style="padding: 6px; border: 1px solid #334155; font-size: 11px; color: #1e293b;">${f.diagnostico}</td>
+      <td style="padding: 6px; border: 1px solid #334155; font-size: 11px; color: #1e293b;">${f.tratamiento}</td>
+    </tr>
+  `).join("");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 15px; color: #0f172a; max-width: 900px; margin: 0 auto;">
+      <!-- CABECERA INSTITUCIONAL OFICIAL -->
+      <div style="border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="text-align: left;">
+          <h3 style="margin: 0; font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.5px;">POLICÍA NACIONAL DEL PARAGUAY</h3>
+          <h2 style="margin: 2px 0; font-size: 13px; font-weight: 800; color: #0f172a;">HOSPITAL CENTRAL DE POLICÍA "RIGOBERTO CABALLERO"</h2>
+          <h1 style="margin: 4px 0 0 0; font-size: 15px; font-weight: 900; color: #1e3a8a; text-transform: UPPERCASE; letter-spacing: 0.5px;">${tituloPrincipal}</h1>
+          <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: bold; color: #2563eb;">PLANILLA DE PRODUCTIVIDAD POR ESPECIALIDAD Y PROFESIONAL</p>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #334155; line-height: 1.4;">
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">SECCIÓN SANIDAD</p>
+          <p style="margin: 0;">Academia Nacional de Policía "Gral. E. Díaz"</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Emisión: ${new Date().toLocaleDateString("es-PY")}</p>
+        </div>
+      </div>
+
+      <!-- METADATOS DE CABECERA -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px;">
+        <div><strong>Especialidad:</strong> <span style="color: #1e40af; font-weight: bold; text-transform: uppercase;">${datos.especialidadNombre}</span></div>
+        <div><strong>Especialista / Profesional:</strong> <span style="font-weight: bold; color: #0f172a;">${datos.especialistaNombre}</span> ${datos.especialistaColegiatura ? `(Reg. N° ${datos.especialistaColegiatura})` : ""}</div>
+        <div><strong>Período de Atención:</strong> <span style="font-weight: bold; color: #0369a1;">${datos.periodoEtiqueta || datos.fecha}</span></div>
+        <div><strong>Horario / Turno:</strong> <span style="font-weight: bold;">${datos.horario || "13:00 a 19:00"} hs</span></div>
+      </div>
+
+      <!-- TABLA DE PACIENTES ATENDIDOS -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11px;" border="1">
+        <thead>
+          <tr style="background-color: #1e293b; color: #ffffff;">
+            <th style="padding: 8px 4px; width: 35px; text-align: center;">Nº</th>
+            <th style="padding: 8px; text-align: left;">Nombre y Apellido</th>
+            <th style="padding: 8px; width: 110px; text-align: center;">Jerarquía</th>
+            <th style="padding: 8px; width: 45px; text-align: center;">Sexo</th>
+            <th style="padding: 8px; text-align: left;">Diagnóstico</th>
+            <th style="padding: 8px; text-align: left;">Tratamiento / Observación</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${trs.length > 0 ? trs : `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #64748b; font-style: italic;">Sin atenciones registradas en la fecha seleccionada.</td></tr>`}
+        </tbody>
+      </table>
+
+      <!-- RESUMEN DE PRODUCTIVIDAD -->
+      <div style="display: flex; justify-content: space-between; align-items: center; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8px 14px; margin-bottom: 40px; font-size: 12px; font-weight: bold; color: #1e3a8a;">
+        <span>TOTAL PACIENTES ATENDIDOS: ${datos.totalAtendidos}</span>
+        <div style="display: flex; gap: 16px; font-size: 11px;">
+          <span style="color: #1d4ed8;">Masculino (M): ${datos.totalMasculino}</span>
+          <span style="color: #be185d;">Femenino (F): ${datos.totalFemenino}</span>
+        </div>
+      </div>
+
+      <!-- FIRMAS OFICIALES -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; text-align: center; page-break-inside: avoid; margin-top: 50px;">
+        <div>
+          <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
+          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">${datos.especialistaNombre}</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">${datos.especialidadNombre} ${datos.especialistaColegiatura ? `· Reg. N° ${datos.especialistaColegiatura}` : ""}</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y Sello del Especialista / Profesional</p>
+        </div>
+        <div>
+          <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
+          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">V° B° JEFATURA DE SANIDAD</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">Sección Sanidad — ANP</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y Sello Autorizado</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
+
