@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance, HeartPulse,
+  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance, HeartPulse, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
@@ -287,12 +287,22 @@ export default function Pacientes() {
                   {(canEdit || veHistoria || puedeDarDeBaja || puedeRegistrarAtencion || puedeExpedirSalvoconducto) && (
                     <div className="flex items-center gap-1 pt-2 border-t">
                       {veHistoria && (
-                        <Button
-                          variant="ghost" size="icon" title="Historia clínica"
-                          onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
-                        >
-                          <Stethoscope className="w-4 h-4" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost" size="icon" title="Historia clínica"
+                            onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
+                          >
+                            <Stethoscope className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon"
+                            title="Fisioterapia y Kinesiología (Sesiones, tratamientos y rehabilitación)"
+                            className="text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                            onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
+                          >
+                            <Activity className="w-4 h-4" />
+                          </Button>
+                        </>
                       )}
                       {puedeRegistrarAtencion && (
                         <Button
