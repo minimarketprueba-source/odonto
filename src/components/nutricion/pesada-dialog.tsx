@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Scale, Activity, HeartPulse } from "lucide-react";
+import { Apple, Activity, HeartPulse } from "lucide-react";
 import { useCrearPesada, CadeteNutricion, calcularDxICC } from "@/api/nutricion";
 import { calcularIMC, calcularPesoIdeal, clasificarIMC } from "@/lib/utils/imc-utils";
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
@@ -119,7 +119,7 @@ export function PesadaDialog({ cadete, open, onOpenChange }: PesadaDialogProps) 
       <DialogContent className="w-[calc(100%-2rem)] max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
-            <Scale className="w-5 h-5 text-primary" />
+            <Apple className="w-5 h-5 text-primary" />
             Ficha Antropométrica - ISEPOL
           </DialogTitle>
           <DialogDescription>
