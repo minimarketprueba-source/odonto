@@ -125,6 +125,8 @@ export default function PerfilUsuario() {
 
 
 
+  const esAdmin = role === "admin" || role === "superadmin" || role === "super_admin";
+
   const rolLabel =
     role === "admin" ? "Administrador" : role === "medico" ? "Profesional de salud" : role === "recepcion" ? "Recepción / Enfermería" : role ?? "—";
 
@@ -200,29 +202,38 @@ export default function PerfilUsuario() {
                 <IdCard className="w-5 h-5 text-primary" /> Mi ficha de profesional
               </CardTitle>
               <CardDescription>
-                Modifique su nombre, teléfono y número de registro para que aparezcan correctamente en sus consultas y certificados.
+                El teléfono de contacto y número de registro profesional aparecen en su ficha y en los documentos.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
                 <div className="space-y-1">
-                  <Label htmlFor="pm-nombre">Nombre(s)</Label>
+                  <Label htmlFor="pm-nombre" className="text-xs">Nombre(s)</Label>
                   <Input
                     id="pm-nombre"
                     value={nombreMedico}
+                    disabled={!esAdmin}
                     onChange={(e) => setNombreMedico(e.target.value)}
+                    className={!esAdmin ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="pm-apellido">Apellido(s)</Label>
+                  <Label htmlFor="pm-apellido" className="text-xs">Apellido(s)</Label>
                   <Input
                     id="pm-apellido"
                     value={apellidoMedico}
+                    disabled={!esAdmin}
                     onChange={(e) => setApellidoMedico(e.target.value)}
+                    className={!esAdmin ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}
                   />
                 </div>
+                {!esAdmin && (
+                  <p className="text-[11px] text-muted-foreground sm:col-span-2 italic">
+                    ℹ️ Los nombres y apellidos oficiales de los profesionales solo pueden ser modificados por el Administrador desde la pantalla de Mantenimiento.
+                  </p>
+                )}
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="p-telefono">Teléfono de contacto</Label>
+                  <Label htmlFor="p-telefono" className="text-xs">Teléfono de contacto</Label>
                   <Input
                     id="p-telefono"
                     placeholder="Ej: 0981-123456"
@@ -231,7 +242,7 @@ export default function PerfilUsuario() {
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="p-reg-medico">N° de registro profesional (Colegiatura)</Label>
+                  <Label htmlFor="p-reg-medico" className="text-xs">N° de registro profesional (Colegiatura)</Label>
                   <Input
                     id="p-reg-medico"
                     placeholder="Ej: 12345"
@@ -242,7 +253,7 @@ export default function PerfilUsuario() {
               </div>
               <Button onClick={guardarFichaMedico} disabled={guardandoFichaMedica || !nombreMedico.trim() || !apellidoMedico.trim()}>
                 {guardandoFichaMedica ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Guardar mi ficha
+                Guardar datos de mi ficha
               </Button>
             </CardContent>
           </Card>
