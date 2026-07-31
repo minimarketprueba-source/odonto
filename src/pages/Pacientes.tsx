@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ function fechaHaceDias(dias: number): string {
 }
 
 export default function Pacientes() {
+  const navigate = useNavigate();
   const { hasPermission, canView, canDelete } = usePermissions();
   const canEdit = hasPermission("pacientes", "editar");
   // Dar de baja es una decisión de padrón (afecta a control de peso): solo admin.
@@ -317,9 +318,9 @@ export default function Pacientes() {
                       )}
                       <Button
                         variant="ghost" size="icon"
-                        title="Nutrición y Control Antropométrico"
+                        title="Ir a Gestión Nutricional y Control Antropométrico"
                         className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                        onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
+                        onClick={() => navigate(`/nutricion?q=${encodeURIComponent(p.documento || `${p.apellidos} ${p.nombres}`)}`)}
                       >
                         <Apple className="w-4 h-4" />
                       </Button>

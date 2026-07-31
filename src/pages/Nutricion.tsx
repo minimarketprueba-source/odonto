@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,10 +33,12 @@ function fmtFechaPesada(fecha?: string | null): string {
 }
 
 export default function Nutricion() {
+  const [searchParams] = useSearchParams();
+  const queryInicial = searchParams.get("q") || searchParams.get("busqueda") || "";
   const { data: cadetes = [], isLoading, isError, refetch } = useCadetesNutricion();
 
   // Estados de filtros
-  const [busqueda, setBusqueda] = useState("");
+  const [busqueda, setBusqueda] = useState(queryInicial);
   const [filtroEstado, setFiltroEstado] = useState<"activos" | "inactivos" | "todos">("activos");
   const [filtroSeccion, setFiltroSeccion] = useState<string>("todas");
   const [filtroClasificacion, setFiltroClasificacion] = useState<string>("todas");
