@@ -3,6 +3,7 @@ import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth, ROLES_SANIDAD } from "@/context/auth-context"
 import { usePermissions } from "@/hooks/use-permissions"
+import { useRealtimeSubscriptions } from "@/hooks/use-realtime-subscriptions"
 import { Button } from "@/components/ui/button"
 import { ShieldAlert, LogOut } from "lucide-react"
 
@@ -37,6 +38,9 @@ export function ProtectedRoute({ children, moduleKey }: ProtectedRouteProps) {
   const navigate = useNavigate()
 
   const esPersonalSanidad = !!role && ROLES_SANIDAD.includes(role)
+
+  // Suscripción automática a Realtime Postgres Changes
+  useRealtimeSubscriptions(!!user && esPersonalSanidad)
 
   useEffect(() => {
     if (isLoading) return;

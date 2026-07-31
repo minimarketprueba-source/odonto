@@ -659,6 +659,204 @@ export function imprimirHojaEnfermeria(datos: DatosImpresionHojaEnfermeria) {
   ejecutarImpresionIframe(tituloDoc, html);
 }
 
+export interface DatosImpresionHistoriaClinicaCompleta {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteTipo?: string | null;
+  pacienteGrado?: string | null;
+  pacienteUnidad?: string | null;
+  pacientePromocion?: string | null;
+  consultas: {
+    fecha: string;
+    hora?: string | null;
+    especialidad?: string | null;
+    medico?: string | null;
+    motivo?: string | null;
+    examen?: string | null;
+    cie10?: string | null;
+    diagnostico?: string | null;
+    tratamiento?: string | null;
+    conducta?: string | null;
+  }[];
+  recetas?: {
+    numero: string;
+    fecha: string;
+    medico?: string | null;
+    items: string[];
+    indicaciones?: string | null;
+  }[];
+  atencionesEnfermeria?: {
+    fecha: string;
+    hora?: string | null;
+    tipo: string;
+    motivo?: string | null;
+    procedimiento?: string | null;
+    signos?: string | null;
+    enfermero?: string | null;
+    revisada?: string | null;
+  }[];
+  fichasRac?: {
+    numero: string;
+    fecha: string;
+    hora?: string | null;
+    triaje?: string | null;
+    motivo?: string | null;
+    diagnostico?: string | null;
+    destino?: string | null;
+  }[];
+  qrSvgHtml?: string;
+}
+
+export function imprimirHistoriaClinicaCompleta(datos: DatosImpresionHistoriaClinicaCompleta) {
+  const tituloDoc = "HISTORIA CLÍNICA GENERAL Y LEGAJO MÉDICO";
+  const refCod = `HC-${datos.pacienteDocumento || "0"}`;
+
+  const numConsultas = datos.consultas.length;
+  const numRecetas = datos.recetas?.length ?? 0;
+  const numEnfermeria = datos.atencionesEnfermeria?.length ?? 0;
+  const numRac = datos.fichasRac?.length ?? 0;
+
+  const html = `
+    <div class="header">
+      <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+      <p class="sub">Gral. José E. Díaz</p>
+      <h2>${tituloDoc}</h2>
+      <p class="meta">Emisión: ${new Date().toLocaleDateString("es-PY")} — ${new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs</p>
+    </div>
+
+    <div class="box-paciente">
+      <div>
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
+      </div>
+      <div>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:16px; text-align:center;">
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px;">
+        <div style="font-size:18px; font-weight:800; color:#1e40af;">${numConsultas}</div>
+        <div style="font-size:10px; font-weight:bold; color:#475569; text-transform:uppercase;">Consultas</div>
+      </div>
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px;">
+        <div style="font-size:18px; font-weight:800; color:#0d9488;">${numEnfermeria}</div>
+        <div style="font-size:10px; font-weight:bold; color:#475569; text-transform:uppercase;">Enfermería</div>
+      </div>
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px;">
+        <div style="font-size:18px; font-weight:800; color:#e11d48;">${numRac}</div>
+        <div style="font-size:10px; font-weight:bold; color:#475569; text-transform:uppercase;">Urgencias RAC</div>
+      </div>
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px;">
+        <div style="font-size:18px; font-weight:800; color:#7c3aed;">${numRecetas}</div>
+        <div style="font-size:10px; font-weight:bold; color:#475569; text-transform:uppercase;">Recetas</div>
+      </div>
+    </div>
+
+    ${datos.consultas.length > 0 ? `
+      <h3 style="font-size:13px; font-weight:800; color:#1e3a8a; text-transform:uppercase; border-bottom:2px solid #1e3a8a; padding-bottom:4px; margin:16px 0 10px 0;">
+        1. HISTORIAL DE CONSULTAS MÉDICAS (${datos.consultas.length})
+      </h3>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${datos.consultas.map((c) => `
+          <div class="consulta-card" style="page-break-inside:avoid;">
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">
+              <span style="font-weight:bold; font-size:12px; color:#0f172a;">${c.fecha}${c.hora ? ` · ${c.hora} hs` : ""}</span>
+              <span style="font-weight:bold; font-size:11px; color:#1e40af; text-transform:uppercase;">${c.especialidad || "CONSULTA GENERAL"}</span>
+            </div>
+            ${c.motivo ? `<p style="margin:2px 0;"><strong>Motivo:</strong> ${c.motivo}</p>` : ""}
+            ${c.examen ? `<p style="margin:2px 0;"><strong>Examen Físico:</strong> ${c.examen}</p>` : ""}
+            ${c.diagnostico ? `<p style="margin:2px 0;"><strong>Diagnóstico:</strong> ${c.diagnostico}</p>` : ""}
+            ${c.tratamiento ? `<p style="margin:2px 0; white-space:pre-wrap;"><strong>Tratamiento / Indicaciones:</strong> ${c.tratamiento}</p>` : ""}
+            ${c.conducta ? `<p style="margin:2px 0; color:#b91c1c; font-weight:bold;"><strong>Conducta:</strong> ${c.conducta}</p>` : ""}
+            ${c.medico ? `<p style="margin:4px 0 0 0; font-size:11px; color:#64748b;">Médico: ${c.medico}</p>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    ` : `<p style="color:#64748b; font-style:italic;">Sin consultas médicas registradas.</p>`}
+
+    ${datos.atencionesEnfermeria && datos.atencionesEnfermeria.length > 0 ? `
+      <h3 style="font-size:13px; font-weight:800; color:#0d9488; text-transform:uppercase; border-bottom:2px solid #0d9488; padding-bottom:4px; margin:20px 0 10px 0;">
+        2. ATENCIONES AMBULATORIAS DE ENFERMERÍA (${datos.atencionesEnfermeria.length})
+      </h3>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${datos.atencionesEnfermeria.map((a) => `
+          <div style="border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; background:#f0fdf4; page-break-inside:avoid;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:11.5px; color:#166534;">
+              <span>${a.fecha}${a.hora ? ` · ${a.hora} hs` : ""} — ${a.tipo}</span>
+              <span>${a.revisada ? `Revisada por ${a.revisada}` : "Pendiente revisión"}</span>
+            </div>
+            ${a.motivo ? `<p style="margin:2px 0; font-size:11px;"><strong>Motivo:</strong> ${a.motivo}</p>` : ""}
+            ${a.procedimiento ? `<p style="margin:2px 0; font-size:11px;"><strong>Procedimiento:</strong> ${a.procedimiento}</p>` : ""}
+            ${a.signos ? `<p style="margin:2px 0; font-size:11px; color:#334155;"><strong>Signos Vitales:</strong> ${a.signos}</p>` : ""}
+            ${a.enfermero ? `<p style="margin:2px 0 0 0; font-size:10.5px; color:#64748b;">Atendió: ${a.enfermero}</p>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    ${datos.fichasRac && datos.fichasRac.length > 0 ? `
+      <h3 style="font-size:13px; font-weight:800; color:#e11d48; text-transform:uppercase; border-bottom:2px solid #e11d48; padding-bottom:4px; margin:20px 0 10px 0;">
+        3. ATENCIONES DE URGENCIAS / RAC (${datos.fichasRac.length})
+      </h3>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${datos.fichasRac.map((f) => `
+          <div style="border:1px solid #fecaca; border-radius:6px; padding:8px 10px; background:#fff1f2; page-break-inside:avoid;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:11.5px; color:#9f1239;">
+              <span>${f.numero} · ${f.fecha}${f.hora ? ` (${f.hora} hs)` : ""}</span>
+              <span>Triaje: ${f.triaje || "Sin clasificar"}</span>
+            </div>
+            ${f.motivo ? `<p style="margin:2px 0; font-size:11px;"><strong>Motivo:</strong> ${f.motivo}</p>` : ""}
+            ${f.diagnostico ? `<p style="margin:2px 0; font-size:11px;"><strong>Diagnóstico:</strong> ${f.diagnostico}</p>` : ""}
+            ${f.destino ? `<p style="margin:2px 0; font-size:11px; font-weight:bold;"><strong>Conducta:</strong> ${f.destino}</p>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    ${datos.recetas && datos.recetas.length > 0 ? `
+      <h3 style="font-size:13px; font-weight:800; color:#7c3aed; text-transform:uppercase; border-bottom:2px solid #7c3aed; padding-bottom:4px; margin:20px 0 10px 0;">
+        4. RECETAS MÉDICAS EMITIDAS (${datos.recetas.length})
+      </h3>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${datos.recetas.map((r) => `
+          <div style="border:1px solid #ddd6fe; border-radius:6px; padding:8px 10px; background:#f5f3ff; page-break-inside:avoid;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:11.5px; color:#5b21b6;">
+              <span>Receta ${r.numero} — ${r.fecha}</span>
+              <span>${r.medico || ""}</span>
+            </div>
+            <ul style="margin:4px 0; padding-left:16px; font-size:11px;">
+              ${r.items.map((it) => `<li>${it}</li>`).join("")}
+            </ul>
+            ${r.indicaciones ? `<p style="margin:2px 0; font-size:10.5px; color:#4c1d95;"><strong>Indicaciones:</strong> ${r.indicaciones}</p>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    <div class="footer-qr">
+      <div style="display:flex; align-items:center; gap: 12px;">
+        ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
+        <div style="font-size:10px; color:#475569;">
+          <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
+          <p style="margin:1px 0;">Sanidad ANP — Legajo Clínico Oficial</p>
+          <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
+          <p style="margin:1px 0; color:#64748b;">Documento oficial expedido por la Sección Sanidad</p>
+        </div>
+      </div>
+
+      <div class="firmas">
+        <div class="linea-firma"></div>
+        <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">Dirección de Sanidad ANP</p>
+        <p style="margin:0; font-size:10px; color:#64748b;">Firma y Sello del Responsable de Sanidad</p>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
 export function imprimirHistoriaClinicaHTML(pacienteNombre: string, pacienteDoc: string, contenidoBodyHtml: string) {
   const tituloDoc = `HISTORIA CLÍNICA — ${pacienteNombre} (CI: ${pacienteDoc})`;
   const html = `
@@ -869,6 +1067,91 @@ export function imprimirFichaRac(datos: DatosImpresionFichaRac) {
   `;
 
   ejecutarImpresionIframe(`Ficha de RAC ${datos.numero}`, html);
+}
+
+export interface DatosImpresionOrdenEstudios {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteTipo?: string | null;
+  pacienteGrado?: string | null;
+  pacienteUnidad?: string | null;
+  fecha: string;
+  estudiosSolicitados: string;
+  diagnosticoPresuntivo?: string | null;
+  indicaciones?: string | null;
+  medicoNombre: string;
+  ordenId?: string | number;
+  qrSvgHtml?: string;
+}
+
+export function imprimirOrdenEstudios(datos: DatosImpresionOrdenEstudios) {
+  const tituloDoc = "SOLICITUD DE ESTUDIOS MÉDICOS Y ANÁLISIS";
+  const refCod = `ORD-${datos.pacienteDocumento || "0"}-${datos.ordenId || Date.now().toString().slice(-5)}`;
+
+  const html = `
+    <div class="header">
+      <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
+      <p class="sub">Gral. José E. Díaz</p>
+      <h2>${tituloDoc}</h2>
+      <p class="meta">Emisión: ${datos.fecha} — Sanidad ANP / Hospital Rigoberto Caballero</p>
+    </div>
+
+    <div class="box-paciente">
+      <div>
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:2px 0;"><strong>Cédula de Identidad (CI):</strong> ${datos.pacienteDocumento || "—"}</p>
+      </div>
+      <div>
+        <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+      </div>
+    </div>
+
+    <div class="box-reposo">
+      <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 12px; font-weight:bold; color: #1e293b;">
+        <span>REF: ${refCod}</span>
+        <span>FECHA SOLICITUD: ${datos.fecha}</span>
+      </div>
+
+      <div style="margin-bottom:14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px 12px;">
+        <p style="margin:0 0 6px 0; font-weight:bold; color:#1e40af; font-size:11px; text-transform:uppercase;">ESTUDIOS / ANÁLISIS SOLICITADOS:</p>
+        <p style="margin:0; font-size:13px; font-weight:700; color:#1e3a8a; white-space:pre-wrap;">${datos.estudiosSolicitados}</p>
+      </div>
+
+      ${datos.diagnosticoPresuntivo ? `
+        <div style="margin-bottom:14px; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+          <p style="margin:0 0 4px 0; font-weight:bold; color:#334155; font-size:11px; text-transform:uppercase;">DIAGNÓSTICO PRESUNTIVO / JUSTIFICACIÓN MÉDICA:</p>
+          <p style="margin:0; font-size:12.5px; color:#0f172a;">${datos.diagnosticoPresuntivo}</p>
+        </div>
+      ` : ""}
+
+      ${datos.indicaciones ? `
+        <div style="margin-bottom:14px; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
+          <p style="margin:0 0 4px 0; font-weight:bold; color:#334155; font-size:11px; text-transform:uppercase;">INDICACIONES PREVIAS / PREPARACIÓN DEL PACIENTE:</p>
+          <p style="margin:0; font-size:12.5px; color:#0f172a; white-space:pre-wrap;">${datos.indicaciones}</p>
+        </div>
+      ` : ""}
+
+      <div class="footer-qr">
+        <div style="display:flex; align-items:center; gap: 12px;">
+          ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
+          <div style="font-size:10px; color:#475569;">
+            <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
+            <p style="margin:1px 0;">Sanidad ANP — Solicitud Oficial de Estudios</p>
+            <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
+          </div>
+        </div>
+
+        <div class="firmas">
+          <div class="linea-firma"></div>
+          <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.medicoNombre}</p>
+          <p style="margin:0; font-size:10px; color:#64748b;">Firma y Sello del Médico Solicitante</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
 }
 
 function ejecutarImpresionIframe(titulo: string, bodyContent: string) {

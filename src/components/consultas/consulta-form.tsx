@@ -13,12 +13,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
-import { BedDouble, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
+import { BedDouble, FileSpreadsheet, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
+import { PacienteAlertasBanner } from "@/components/consultas/paciente-alertas-banner";
 import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import {
@@ -26,7 +27,7 @@ import {
   type Cie10, type Consulta, type DestinoAtencion,
 } from "@/api/consultas";
 import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
-import { imprimirCertificadoReposo, documentoReposo, cleanQrText } from "@/lib/imprimir";
+import { imprimirCertificadoReposo, documentoReposo, cleanQrText, imprimirOrdenEstudios } from "@/lib/imprimir";
 
 function sumarDiasISO(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T00:00:00`);
@@ -121,6 +122,11 @@ export function ConsultaForm({
   const [reposoDias, setReposoDias] = useState("");
   const [camaId, setCamaId] = useState("");
 
+  // Estado para Solicitud de Orden de Estudios Médicos
+  const [ordenEstudiosOpen, setOrdenEstudiosOpen] = useState(false);
+  const [estudiosSolicitados, setEstudiosSolicitados] = useState("");
+  const [estudiosIndicaciones, setEstudiosIndicaciones] = useState("");
+
   // Si la internación se creó y después falló la consulta, no se crea de nuevo.
   const internacionCreada = useRef<number | null>(null);
 
@@ -183,6 +189,8 @@ export function ConsultaForm({
       setReposoHasta(hastaInicial);
       setReposoDias(hastaInicial ? String(diasEntre(fechaBase, hastaInicial)) : "");
       setCamaId("");
+      setEstudiosSolicitados("");
+      setEstudiosIndicaciones("");
       internacionCreada.current = null;
     }
   }, [open, cita, motivoInicial, destinoInicial, reposoHastaInicial]);
@@ -200,6 +208,52 @@ export function ConsultaForm({
   const destinoSel = destinoAtencion(destino);
   const reposoTipo = destinoSel?.reposo ?? null;
   const guardando = crear.isPending || internar.isPending;
+
+  const handleImprimirOrdenEstudios = () => {
+    if (!estudiosSolicitados.trim()) {
+      toast.error("Indique los estudios o análisis solicitados.");
+      return;
+    }
+
+    const medicoNombre = medicoSeleccionado
+      ? `Dr(a). ${medicoSeleccionado.apellidos}, ${medicoSeleccionado.nombres}`
+      : "Profesional Médico";
+
+    const cieTexto = cieLista.map((c) => `[${c.codigo}] ${c.descripcion}`).join(" / ");
+    const dxFinal = [cieTexto, diagnostico.trim()].filter(Boolean).join(" — ");
+
+    const qrSvgHtml = renderToStaticMarkup(
+      <QRCodeSVG
+        value={cleanQrText([
+          "SANIDAD POLICIAL - ACADEMIA NACIONAL DE POLICIA",
+          "DOCUMENTO: SOLICITUD DE ESTUDIOS MEDICOS",
+          `Paciente: ${pacienteNombre}`,
+          `Estudios: ${estudiosSolicitados.trim()}`,
+          `Dx: ${dxFinal || "Consulta Médica"}`,
+          `Medico: ${medicoNombre}`,
+        ].join("\n"))}
+        size={100}
+        level="M"
+      />
+    );
+
+    imprimirOrdenEstudios({
+      pacienteNombre,
+      pacienteDocumento: pacienteActual?.documento,
+      pacienteTipo: pacienteActual?.tipo ? labelTipoPaciente(pacienteActual.tipo) : null,
+      pacienteGrado: (pacienteActual && "grado" in pacienteActual ? pacienteActual.grado : null) || null,
+      pacienteUnidad: (pacienteActual && "unidad" in pacienteActual ? pacienteActual.unidad : null) || "ANP",
+      fecha: fecha.split("-").reverse().join("/"),
+      estudiosSolicitados: estudiosSolicitados.trim(),
+      diagnosticoPresuntivo: dxFinal || null,
+      indicaciones: estudiosIndicaciones.trim() || null,
+      medicoNombre,
+      qrSvgHtml,
+    });
+
+    setOrdenEstudiosOpen(false);
+    toast.success("Orden de estudios emitida.");
+  };
 
   const handleGuardar = async (opts?: { eImprimirReposo?: boolean }) => {
     if (!pacienteId) return;
@@ -222,8 +276,6 @@ export function ConsultaForm({
     const primerCieId = cieLista[0]?.id && cieLista[0]?.id > 0 ? cieLista[0].id : null;
 
     try {
-      // La internación va primero: es lo único que puede chocar (cama ocupada).
-      // Si después falla la consulta, se reintenta sin volver a ocupar la cama.
       if (destino === "internacion" && !internacionCreada.current) {
         const creada = await internar.mutateAsync({
           paciente_id: pacienteId,
@@ -255,7 +307,6 @@ export function ConsultaForm({
         reposo_hasta: reposoTipo ? reposoHasta || null : null,
       });
 
-      // Antes de la bifurcación de impresión: cubre los dos caminos.
       onCreated?.(res);
 
       if (opts?.eImprimirReposo && reposoTipo) {
@@ -313,13 +364,30 @@ export function ConsultaForm({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl w-[94vw] sm:max-w-4xl max-h-[92vh] overflow-y-auto p-6 sm:p-8">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Registrar consulta — {pacienteNombre}</DialogTitle>
-            <DialogDescription className="text-sm">
-              {cita
-                ? "Al guardar, la cita de la agenda quedará marcada como atendida."
-                : "Consulta sin cita previa (se agrega directo a la historia clínica)."}
-            </DialogDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <DialogTitle className="text-xl font-bold">Registrar consulta — {pacienteNombre}</DialogTitle>
+                <DialogDescription className="text-sm">
+                  {cita
+                    ? "Al guardar, la cita de la agenda quedará marcada como atendida."
+                    : "Consulta sin cita previa (se agrega directo a la historia clínica)."}
+                </DialogDescription>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs h-9 border-blue-300 text-blue-800 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200"
+                onClick={() => setOrdenEstudiosOpen(true)}
+              >
+                <FileSpreadsheet className="w-4 h-4 text-blue-600" /> Solicitud de Estudios
+              </Button>
+            </div>
           </DialogHeader>
+
+          {/* Banner de alertas clínicas del paciente */}
+          <PacienteAlertasBanner pacienteId={pacienteId} className="my-1" />
 
           <div className="space-y-5 pt-2">
             {/* Fila 1: Médico y Fecha */}
@@ -600,6 +668,69 @@ export function ConsultaForm({
             <Button onClick={() => handleGuardar()} disabled={guardando} className="w-full h-11 font-semibold text-base mt-2">
               {guardando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Registrar consulta
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sub-diálogo para emitir Orden de Estudios Médicos */}
+      <Dialog open={ordenEstudiosOpen} onOpenChange={setOrdenEstudiosOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+              Solicitud de Estudios Médicos — {pacienteNombre}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Emitir orden oficial de análisis o estudios para la Sanidad ANP o el Hospital Rigoberto Caballero.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="oe-estudios" className="font-semibold text-xs">Estudios o Análisis Solicitados *</Label>
+              <Textarea
+                id="oe-estudios"
+                rows={3}
+                placeholder="Ej: Hemograma completo, Perfil renal, Ecografía abdominal, Rx Tórax PA"
+                value={estudiosSolicitados}
+                onChange={(e) => setEstudiosSolicitados(e.target.value)}
+              />
+              <div className="flex flex-wrap gap-1 pt-1">
+                <span className="text-[11px] text-muted-foreground mr-1">Rápidos:</span>
+                {["Hemograma Completo", "Perfil Renal / Uremia", "Perfil Hepático", "Rx Tórax PA", "Ecografía Abdominal"].map((est) => (
+                  <Badge
+                    key={est}
+                    variant="outline"
+                    className="cursor-pointer text-[11px] py-0.5 hover:bg-blue-100 dark:hover:bg-blue-900"
+                    onClick={() =>
+                      setEstudiosSolicitados((prev) =>
+                        prev ? `${prev}, ${est}` : est
+                      )
+                    }
+                  >
+                    + {est}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="oe-ind" className="font-semibold text-xs">Indicaciones previas o preparación</Label>
+              <Input
+                id="oe-ind"
+                placeholder="Ej: Ayuno de 8 horas / Vejiga llena para ecografía"
+                value={estudiosIndicaciones}
+                onChange={(e) => setEstudiosIndicaciones(e.target.value)}
+              />
+            </div>
+
+            <Button
+              type="button"
+              className="w-full gap-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold"
+              onClick={handleImprimirOrdenEstudios}
+            >
+              <Printer className="w-4 h-4" /> Emitir e Imprimir Orden de Estudios
             </Button>
           </div>
         </DialogContent>

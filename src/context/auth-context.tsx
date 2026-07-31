@@ -24,7 +24,18 @@ interface AuthContextType {
 // Roles que pueden entrar a este sistema. Los roles de control de peso
 // (analyst, viewer) NO tienen acceso a Sanidad; solo los admins son comunes
 // a ambos sistemas.
-export const ROLES_SANIDAD = ['admin', 'medico', 'recepcion']
+export const ROLES_SANIDAD = [
+  'admin',
+  'superadmin',
+  'super_admin',
+  'medico',
+  'recepcion',
+  'enfermeria',
+  'nutricionista',
+  'fisioterapeuta',
+  'psicologo',
+  'ginecologo',
+]
 
 /**
  * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
@@ -34,7 +45,12 @@ export const ROLES_SANIDAD = ['admin', 'medico', 'recepcion']
 export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
   { value: 'admin', label: 'Administrador' },
   { value: 'medico', label: 'Médico / Profesional' },
-  { value: 'recepcion', label: 'Enfermería / Recepción' },
+  { value: 'recepcion', label: 'Recepción / Admisión' },
+  { value: 'enfermeria', label: 'Enfermería' },
+  { value: 'nutricionista', label: 'Nutricionista / Lic. en Nutrición' },
+  { value: 'fisioterapeuta', label: 'Fisioterapeuta / Kinesiólogo/a' },
+  { value: 'psicologo', label: 'Psicólogo/a / Lic. en Psicología' },
+  { value: 'ginecologo', label: 'Ginecólogo/a - Obstetra / Lic. en Obstetricia' },
 ]
 
 /**
@@ -70,6 +86,8 @@ export function esEstadoActivo(status?: string | null): boolean {
 // Permisos por defecto cuando user_roles.permissions viene vacío.
 export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
   admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
+  superadmin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
+  super_admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
   medico: {
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
@@ -77,12 +95,49 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
     nutricion: ['ver', 'editar'],
     recetas: ['ver', 'editar'],
     lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
   },
   recepcion: {
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
     consultas: ['ver', 'editar'],
     lista_espera: ['ver', 'editar'],
+  },
+  enfermeria: {
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    consultas: ['ver', 'editar'],
+    nutricion: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
+  },
+  nutricionista: {
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    nutricion: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
+  },
+  fisioterapeuta: {
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    consultas: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
+  },
+  psicologo: {
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    consultas: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
+  },
+  ginecologo: {
+    pacientes: ['ver', 'editar'],
+    citas: ['ver', 'editar'],
+    consultas: ['ver', 'editar'],
+    recetas: ['ver', 'editar'],
+    lista_espera: ['ver', 'editar'],
+    reportes: ['ver'],
   },
 }
 

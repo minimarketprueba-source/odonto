@@ -10,9 +10,14 @@ export function usePermissions() {
 
   const checks = useMemo(() => {
     return {
-      isAdmin: normalizedRole === "admin",
+      isAdmin: normalizedRole === "admin" || normalizedRole === "superadmin" || normalizedRole === "super_admin",
       isMedico: normalizedRole === "medico",
       isRecepcion: normalizedRole === "recepcion",
+      isEnfermeria: normalizedRole === "enfermeria",
+      isNutricionista: normalizedRole === "nutricionista",
+      isFisioterapeuta: normalizedRole === "fisioterapeuta",
+      isPsicologo: normalizedRole === "psicologo",
+      isGinecologo: normalizedRole === "ginecologo",
 
       /**
        * Verifica si el usuario tiene un permiso específico en un módulo.
@@ -21,7 +26,7 @@ export function usePermissions() {
        * @returns boolean
        */
       hasPermission: (moduleKey: string, permType: PermissionType = "ver"): boolean => {
-        if (normalizedRole === "admin") return true; // Admins tienen todo
+        if (normalizedRole === "admin" || normalizedRole === "superadmin" || normalizedRole === "super_admin") return true; // Admins tienen todo
         if (!permissions) return false;
 
         const modulePerms = permissions[moduleKey] || [];
@@ -32,7 +37,7 @@ export function usePermissions() {
        * Verifica si el usuario puede ver un módulo específico.
        */
       canView: (moduleKey: string) => {
-        if (normalizedRole === "admin") return true;
+        if (normalizedRole === "admin" || normalizedRole === "superadmin" || normalizedRole === "super_admin") return true;
         if (!permissions) return false;
         return (permissions[moduleKey] || []).length > 0;
       },
@@ -42,7 +47,7 @@ export function usePermissions() {
        * Sin módulo → solo admin. Con módulo → admin o permiso "eliminar" otorgado.
        */
       canDelete: (moduleKey?: string): boolean => {
-        if (normalizedRole === "admin") return true;
+        if (normalizedRole === "admin" || normalizedRole === "superadmin" || normalizedRole === "super_admin") return true;
         if (!moduleKey || !permissions) return false;
         return (permissions[moduleKey] || []).includes("eliminar");
       },

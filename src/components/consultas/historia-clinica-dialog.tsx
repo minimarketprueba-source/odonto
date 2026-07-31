@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance, HeartPulse } from "lucide-react";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance, HeartPulse, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { labelDestinoAtencion, useConsultasPaciente, type Consulta } from "@/api/consultas";
@@ -25,14 +25,10 @@ import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } 
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
 import { RecetaForm } from "./receta-form";
+import { PacienteAlertasBanner } from "./paciente-alertas-banner";
 import {
-  documentoReposo, imprimirCertificadoReposo, imprimirInformeConsulta, imprimirHistoriaClinicaHTML,
+  imprimirCertificadoReposo, imprimirInformeConsulta, imprimirHistoriaClinicaCompleta,
 } from "@/lib/imprimir";
-
-/** Textos del certificado de una consulta (parte sin servicio, enfermo local...). */
-function docReposo(c: Consulta) {
-  return documentoReposo(c.destino === "alta" ? null : c.destino, c.reposo_tipo);
-}
 
 interface HistoriaClinicaDialogProps {
   open: boolean;
@@ -134,8 +130,14 @@ function getQrPayload(c: Consulta | null, paciente: Paciente | null, tipo: "cons
   return cleanQrText(raw);
 }
 
+function esConsultaGinecologia(c: Consulta): boolean {
+  const esp = c.medico?.especialidad?.nombre?.toLowerCase() || "";
+  return esp.includes("ginecolog") || esp.includes("obstetr");
+}
+
 export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: HistoriaClinicaDialogProps) {
-  const { hasPermission, canView, isAdmin } = usePermissions();
+  const { hasPermission, canView, isAdmin, isGinecologo } = usePermissions();
+  const puedeVerGinecologia = isAdmin || isGinecologo;
   const puedeRegistrar = hasPermission("consultas", "editar");
   const puedeRecetar = hasPermission("recetas", "editar");
   const veRecetas = canView("recetas");
@@ -155,7 +157,6 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const [formOpen, setFormOpen] = useState(false);
   const [recetaOpen, setRecetaOpen] = useState(false);
   const [servicioFiltro, setServicioFiltro] = useState("todos");
-  const [printTarget, setPrintTarget] = useState<PrintTarget>(null);
 
   const nombre = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : "";
 
@@ -164,6 +165,9 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
 
     if (target.type === "reposo" && target.consulta) {
       const c = target.consulta;
+      const esGineco = esConsultaGinecologia(c);
+      const ocultar = esGineco && !puedeVerGinecologia;
+
       const qrSvgHtml = renderToStaticMarkup(
         <QRCodeSVG
           value={getQrPayload(c, paciente, "reposo")}
@@ -182,16 +186,19 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
         destino: c.destino === "alta" ? null : c.destino,
         fechaDesde: fmtFecha(c.fecha),
         fechaHasta: c.reposo_hasta ? fmtFecha(c.reposo_hasta) : null,
-        cieCodigo: c.cie10?.codigo,
-        cieDescripcion: c.cie10?.descripcion,
-        diagnosticoDetalle: c.diagnostico,
-        tratamiento: c.tratamiento,
+        cieCodigo: ocultar ? undefined : c.cie10?.codigo,
+        cieDescripcion: ocultar ? undefined : c.cie10?.descripcion,
+        diagnosticoDetalle: ocultar ? "🔒 Diagnóstico Reservado (Ginecología y Obstetricia)" : c.diagnostico,
+        tratamiento: ocultar ? "🔒 Tratamiento Reservado" : c.tratamiento,
         medicoNombre: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : "Profesional Médico",
         consultaId: c.id,
         qrSvgHtml,
       });
     } else if (target.type === "consulta" && target.consulta) {
       const c = target.consulta;
+      const esGineco = esConsultaGinecologia(c);
+      const ocultar = esGineco && !puedeVerGinecologia;
+
       const qrSvgHtml = renderToStaticMarkup(
         <QRCodeSVG
           value={getQrPayload(c, paciente, "consulta")}
@@ -214,29 +221,87 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
         fechaConsulta: fmtFecha(c.fecha),
         horaConsulta: hora,
         especialidad: c.medico?.especialidad?.nombre || "Consulta General",
-        motivoConsulta: c.motivo_consulta,
-        examenFisico: c.examen_fisico,
-        cieCodigo: c.cie10?.codigo,
-        cieDescripcion: c.cie10?.descripcion,
-        diagnosticoDetalle: c.diagnostico,
-        tratamiento: c.tratamiento,
+        motivoConsulta: ocultar ? "🔒 Reservado (Ginecología y Obstetricia)" : c.motivo_consulta,
+        examenFisico: ocultar ? "🔒 Reservado (Ginecología y Obstetricia)" : c.examen_fisico,
+        cieCodigo: ocultar ? undefined : c.cie10?.codigo,
+        cieDescripcion: ocultar ? undefined : c.cie10?.descripcion,
+        diagnosticoDetalle: ocultar ? "🔒 Diagnóstico Reservado (Ginecología y Obstetricia)" : c.diagnostico,
+        tratamiento: ocultar ? "🔒 Tratamiento Reservado" : c.tratamiento,
         reposoOtorgado: reposoStr,
         medicoNombre: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : "Profesional Médico",
         consultaId: c.id,
         qrSvgHtml,
       });
     } else {
-      setPrintTarget(target);
-      setTimeout(() => {
-        const printElem = document.getElementById("historia-print");
-        if (printElem) {
-          imprimirHistoriaClinicaHTML(
-            `${paciente.apellidos}, ${paciente.nombres}`,
-            paciente.documento || "",
-            printElem.innerHTML
-          );
-        }
-      }, 150);
+      const qrSvgHtml = renderToStaticMarkup(
+        <QRCodeSVG
+          value={getQrPayload(null, paciente, "todas")}
+          size={105}
+          level="M"
+        />
+      );
+
+      imprimirHistoriaClinicaCompleta({
+        pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
+        pacienteDocumento: paciente.documento,
+        pacienteTipo: labelTipoPaciente(paciente.tipo),
+        pacienteGrado: paciente.grado,
+        pacienteUnidad: paciente.unidad || "ANP",
+        pacientePromocion: paciente.promocion,
+        consultas: vigentes.map((c) => {
+          const esGineco = esConsultaGinecologia(c);
+          const ocultar = esGineco && !puedeVerGinecologia;
+          return {
+            fecha: fmtFecha(c.fecha),
+            hora: fmtHora(c.created_at, c.cita?.hora),
+            especialidad: c.medico?.especialidad?.nombre || "Consulta General",
+            medico: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : null,
+            motivo: ocultar ? "🔒 Reservado (Ginecología y Obstetricia)" : c.motivo_consulta,
+            examen: ocultar ? "🔒 Reservado (Ginecología y Obstetricia)" : c.examen_fisico,
+            cie10: ocultar ? null : (c.cie10 ? `[${c.cie10.codigo}] ${c.cie10.descripcion}` : null),
+            diagnostico: ocultar ? "🔒 Diagnóstico Reservado (Ginecología y Obstetricia)" : c.diagnostico,
+            tratamiento: ocultar ? "🔒 Tratamiento Reservado" : c.tratamiento,
+            conducta: c.reposo_tipo
+              ? `${labelDestinoAtencion(c.destino, c.reposo_tipo)} hasta ${c.reposo_hasta ? fmtFecha(c.reposo_hasta) : "nueva orden"}`
+              : null,
+          };
+        }),
+        recetas: recetasVigentes.map((r) => ({
+          numero: r.numero,
+          fecha: fmtFecha(r.fecha),
+          medico: r.medico ? `Dr(a). ${r.medico.apellidos}, ${r.medico.nombres}` : null,
+          items: (r.items ?? []).map(
+            (i) => `${i.medicamento} ${[i.dosis, i.frecuencia, i.duracion].filter(Boolean).join(" · ")}`
+          ),
+          indicaciones: r.indicaciones,
+        })),
+        atencionesEnfermeria: atencionesEnfermeria.map((a) => ({
+          fecha: fmtFecha(a.fecha),
+          hora: a.hora?.slice(0, 5),
+          tipo: labelTipoAtencion(a.tipo_atencion),
+          motivo: a.motivo,
+          procedimiento: a.procedimiento,
+          signos: [
+            a.pa_sistolica && a.pa_diastolica && `PA ${a.pa_sistolica}/${a.pa_diastolica}`,
+            a.fc && `FC ${a.fc}`,
+            a.fr && `FR ${a.fr}`,
+            a.spo2 && `SpO2 ${a.spo2}%`,
+            a.temp && `T° ${a.temp}`,
+          ].filter(Boolean).join(" · "),
+          enfermero: a.enfermero || a.registrado_por?.split("@")[0],
+          revisada: a.revisada_at ? (a.medico_revisor ? `Dr(a). ${a.medico_revisor.apellidos}` : "Médico") : null,
+        })),
+        fichasRac: fichasRac.map((f) => ({
+          numero: numeroRac(f.numero),
+          fecha: fmtFecha(f.fecha),
+          hora: f.hora_admision?.slice(0, 5),
+          triaje: nivelTriaje(f.triaje)?.label,
+          motivo: f.motivo_consulta,
+          diagnostico: f.diagnostico,
+          destino: labelDestino(f.destino),
+        })),
+        qrSvgHtml,
+      });
     }
   };
 
@@ -326,6 +391,9 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
               )}
             </div>
           </DialogHeader>
+
+          {/* Banner de alertas clínicas del paciente */}
+          <PacienteAlertasBanner pacienteId={paciente?.id ?? null} className="my-1" />
 
           <Tabs defaultValue="consultas" className="flex-1 flex flex-col min-h-0">
             <TabsList className={`grid w-full ${GRID_PESTANAS[cantidadPestanas]}`}>
@@ -507,6 +575,9 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
               ) : (
                 consultasFiltradas.map((c) => {
                   const hora = fmtHora(c.created_at, c.cita?.hora);
+                  const esGineco = esConsultaGinecologia(c);
+                  const ocultar = esGineco && !puedeVerGinecologia;
+
                   return (
                     <div key={c.id} className="p-3 rounded-lg border space-y-1">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -519,7 +590,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                               {c.medico.especialidad.nombre}
                             </Badge>
                           )}
-                          {c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
+                          {!ocultar && c.cie10 && <Badge variant="outline">{c.cie10.codigo}</Badge>}
                           {c.reposo_tipo && (
                             <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
                               {labelDestinoAtencion(c.destino, c.reposo_tipo)}
@@ -567,20 +638,34 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                           )}
                         </div>
                       </div>
-                      {c.motivo_consulta && (
-                        <p className="text-sm mt-1"><span className="text-muted-foreground">Motivo: </span>{c.motivo_consulta}</p>
-                      )}
-                      {c.examen_fisico && (
-                        <p className="text-sm"><span className="text-muted-foreground">Examen: </span>{c.examen_fisico}</p>
-                      )}
-                      {c.diagnostico && (
-                        <p className="text-sm">
-                          <span className="text-muted-foreground">Diagnóstico: </span>
-                          {c.diagnostico}{c.cie10 ? ` (${c.cie10.descripcion})` : ""}
-                        </p>
-                      )}
-                      {c.tratamiento && (
-                        <p className="text-sm whitespace-pre-wrap"><span className="text-muted-foreground">Tratamiento: </span>{c.tratamiento}</p>
+                      {ocultar ? (
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-2 rounded text-xs text-amber-800 dark:text-amber-300 space-y-0.5 mt-1">
+                          <p className="font-semibold flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                            Diagnóstico e información médica reservada (Ginecología y Obstetricia)
+                          </p>
+                          <p className="text-[11px] opacity-90">
+                            Acceso confidencial restringido exclusivamente a profesionales de Ginecología y Obstetricia.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {c.motivo_consulta && (
+                            <p className="text-sm mt-1"><span className="text-muted-foreground">Motivo: </span>{c.motivo_consulta}</p>
+                          )}
+                          {c.examen_fisico && (
+                            <p className="text-sm"><span className="text-muted-foreground">Examen: </span>{c.examen_fisico}</p>
+                          )}
+                          {c.diagnostico && (
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Diagnóstico: </span>
+                              {c.diagnostico}{c.cie10 ? ` (${c.cie10.descripcion})` : ""}
+                            </p>
+                          )}
+                          {c.tratamiento && (
+                            <p className="text-sm whitespace-pre-wrap"><span className="text-muted-foreground">Tratamiento: </span>{c.tratamiento}</p>
+                          )}
+                        </>
                       )}
                       {c.medico && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -738,232 +823,6 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
         guardando={anularConsulta.isPending || anularReceta.isPending}
         onConfirmar={handleAnular}
       />
-
-      {/* Vista de Impresión Aislada (HTML/PDF) con QR */}
-      <div id="historia-print">
-        {paciente && printTarget && (
-          <div className="p-4 font-sans text-black max-w-3xl mx-auto">
-            {/* Encabezado Institucional */}
-            <div className="text-center border-b-2 border-black pb-3 mb-4">
-              <h1 className="text-xl font-bold uppercase tracking-wider">SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
-              <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide mt-0.5">Gral. José E. Díaz</p>
-              <h2 className="text-base font-bold text-gray-900 mt-2 tracking-wide uppercase">
-                {printTarget.type === "reposo"
-                  ? docReposo(printTarget.consulta).titulo
-                  : printTarget.type === "todas"
-                  ? "HISTORIA CLÍNICA GENERAL"
-                  : "INFORME DE CONSULTA MÉDICA"}
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Impreso el {new Date().toLocaleDateString("es-PY")} a las {new Date().toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })} hs
-              </p>
-            </div>
-
-            {/* Datos del Paciente */}
-            <div className="bg-gray-50 p-3 rounded border border-gray-300 mb-5 text-sm grid grid-cols-2 gap-2">
-              <div>
-                <p><strong>Paciente:</strong> {paciente.apellidos}, {paciente.nombres}</p>
-                <p><strong>Cédula de Identidad (CI):</strong> {ciImpresa(paciente)}</p>
-              </div>
-              <div>
-                <p><strong>Tipo / Grado:</strong> {labelTipoPaciente(paciente.tipo)} {paciente.grado ? `— ${paciente.grado}` : ""}</p>
-                {paciente.unidad && (
-                  <p><strong>Unidad / Sección:</strong> {paciente.unidad} {paciente.promocion ? `(Curso ${paciente.promocion})` : ""}</p>
-                )}
-                {paciente.familiar_de && (
-                  <p><strong>Familiar de:</strong> {paciente.familiar_de}</p>
-                )}
-              </div>
-            </div>
-
-            {/* OPCIÓN 1: CERTIFICADO DE REPOSO MÉDICO (DOMICILIARIO O ENFERMO LOCAL) */}
-            {printTarget.type === "reposo" ? (
-              <div className="border-2 border-red-600 p-5 rounded space-y-4 text-sm bg-white">
-                <div className="flex justify-between font-bold border-b border-red-300 pb-2 text-base text-red-900">
-                  <span>REF: {docReposo(printTarget.consulta).ref}-{idPaciente(paciente)}-{printTarget.consulta.id}</span>
-                  <span>FECHA EMISIÓN: {fmtFecha(printTarget.consulta.fecha)}</span>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="bg-red-50 border border-red-200 p-3 rounded">
-                    <p className="font-bold text-red-900 text-base">TIPO DE CONDICIÓN MÉDICA:</p>
-                    <p className="text-lg font-extrabold text-red-700 mt-1 uppercase">
-                      • {docReposo(printTarget.consulta).condicion}
-                    </p>
-                    <p className="text-xs text-red-800 mt-1 font-medium">
-                      {docReposo(printTarget.consulta).detalle}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-gray-200">
-                    <div>
-                      <p className="font-bold text-gray-700">FECHA DE INICIO:</p>
-                      <p className="text-base font-semibold">{fmtFecha(printTarget.consulta.fecha)}</p>
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-700">HASTA (INCLUSIVE):</p>
-                      <p className="text-base font-semibold">
-                        {printTarget.consulta.reposo_hasta
-                          ? fmtFecha(printTarget.consulta.reposo_hasta)
-                          : "Hasta nueva orden médica"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {printTarget.consulta.diagnostico && (
-                    <div>
-                      <p className="font-bold text-gray-800">DIAGNÓSTICO MÉDICO:</p>
-                      <p className="pl-2 pt-0.5">
-                        {printTarget.consulta.diagnostico}
-                        {printTarget.consulta.cie10 ? ` [CIE-10: ${printTarget.consulta.cie10.codigo} - ${printTarget.consulta.cie10.descripcion}]` : ""}
-                      </p>
-                    </div>
-                  )}
-
-                  <div>
-                    <p className="font-bold text-gray-800">INDICACIONES / RESTRICCIONES:</p>
-                    <p className="pl-2 pt-0.5">
-                      {printTarget.consulta.tratamiento || "Se indica suspensión total de actividades físicas, instrucción y ejercicios durante el periodo indicado."}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Pie con Código QR y Firma */}
-                <div className="pt-10 mt-8 flex justify-between items-end border-t border-gray-300">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 border border-gray-400 bg-white rounded">
-                      <QRCodeSVG
-                        value={getQrPayload(printTarget.consulta, paciente, "reposo")}
-                        size={105}
-                        level="M"
-                      />
-                    </div>
-                    <div className="text-xs space-y-0.5">
-                      <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL QR</p>
-                      <p className="text-gray-600">Sanidad ANP — Documento Oficial</p>
-                      <p className="font-mono text-[10px] text-gray-500">ID: REP-{idPaciente(paciente)}-{printTarget.consulta.id}</p>
-                      <p className="text-[10px] text-gray-400">Escanee para verificar autenticidad</p>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="w-52 border-b border-black mb-1 mx-auto"></div>
-                    <p className="font-bold text-sm">Dr(a). {printTarget.consulta.medico?.apellidos}, {printTarget.consulta.medico?.nombres}</p>
-                    <p className="text-xs text-gray-600">Firma y Sello del Profesional Médico</p>
-                  </div>
-                </div>
-              </div>
-            ) : printTarget.type === "todas" ? (
-              /* OPCIÓN 2: HISTORIA CLÍNICA COMPLETA */
-              <div className="space-y-4">
-                <h3 className="font-bold border-b border-gray-400 pb-1 text-sm uppercase">Historial de Consultas Registradas ({consultasFiltradas.length})</h3>
-                {consultasFiltradas.map((c) => {
-                  const h = fmtHora(c.created_at, c.cita?.hora);
-                  return (
-                    <div key={c.id} className="border border-gray-300 p-3 rounded space-y-1.5 text-xs">
-                      <div className="flex justify-between font-bold border-b pb-1 text-sm">
-                        <span>{fmtFecha(c.fecha)}{h ? ` · ${h} hs` : ""} — {c.medico?.especialidad?.nombre || "Consulta"}</span>
-                        {c.cie10 && <span>CIE-10: {c.cie10.codigo}</span>}
-                      </div>
-                      {c.motivo_consulta && <p><strong>Motivo:</strong> {c.motivo_consulta}</p>}
-                      {c.examen_fisico && <p><strong>Examen Físico:</strong> {c.examen_fisico}</p>}
-                      {c.diagnostico && <p><strong>Diagnóstico:</strong> {c.diagnostico} {c.cie10 ? `(${c.cie10.descripcion})` : ""}</p>}
-                      {c.tratamiento && <p className="whitespace-pre-wrap"><strong>Tratamiento:</strong> {c.tratamiento}</p>}
-                      {c.reposo_tipo && (
-                        <p className="text-red-700 font-bold"><strong>Reposo Médico:</strong> {c.reposo_tipo === "domiciliario" ? "Domiciliario" : "Local"} {c.reposo_hasta ? `hasta ${fmtFecha(c.reposo_hasta)}` : ""}</p>
-                      )}
-                      {c.medico && <p className="text-gray-600 pt-1">Atendió: Dr(a). {c.medico.apellidos}, {c.medico.nombres}</p>}
-                    </div>
-                  );
-                })}
-
-                <div className="pt-6 flex justify-between items-center border-t border-gray-300">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1 border border-gray-400 bg-white rounded">
-                      <QRCodeSVG
-                        value={getQrPayload(null, paciente, "todas")}
-                        size={80}
-                        level="M"
-                      />
-                    </div>
-                    <div className="text-xs">
-                      <p className="font-bold">VERIFICACIÓN DE FICHA CLÍNICA</p>
-                      <p className="text-gray-600 font-mono text-[10px]">HC-{idPaciente(paciente)}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">Sanidad ANP — Todos los derechos reservados</p>
-                </div>
-              </div>
-            ) : printTarget.type === "consulta" ? (
-              /* OPCIÓN 3: INFORME DE CONSULTA INDIVIDUAL */
-              <div className="border-2 border-gray-400 p-5 rounded space-y-4 text-sm bg-white">
-                <div className="flex justify-between font-bold border-b pb-2 text-base">
-                  <span>FECHA: {fmtFecha(printTarget.consulta.fecha)} · HORA: {fmtHora(printTarget.consulta.created_at, printTarget.consulta.cita?.hora) || "—"} hs</span>
-                  <span>ESPECIALIDAD: {printTarget.consulta.medico?.especialidad?.nombre || "—"}</span>
-                </div>
-
-                <div className="space-y-3">
-                  {printTarget.consulta.motivo_consulta && (
-                    <div>
-                      <p className="font-bold text-gray-800">MOTIVO DE CONSULTA:</p>
-                      <p className="pl-2 pt-0.5">{printTarget.consulta.motivo_consulta}</p>
-                    </div>
-                  )}
-                  {printTarget.consulta.examen_fisico && (
-                    <div>
-                      <p className="font-bold text-gray-800">EXAMEN FÍSICO / HALLAZGOS:</p>
-                      <p className="pl-2 pt-0.5">{printTarget.consulta.examen_fisico}</p>
-                    </div>
-                  )}
-                  {printTarget.consulta.diagnostico && (
-                    <div>
-                      <p className="font-bold text-gray-800">DIAGNÓSTICO:</p>
-                      <p className="pl-2 pt-0.5">{printTarget.consulta.diagnostico} {printTarget.consulta.cie10 ? `[CIE-10: ${printTarget.consulta.cie10.codigo} - ${printTarget.consulta.cie10.descripcion}]` : ""}</p>
-                    </div>
-                  )}
-                  {printTarget.consulta.tratamiento && (
-                    <div>
-                      <p className="font-bold text-gray-800">TRATAMIENTO Y PRESCRIPCIÓN:</p>
-                      <p className="pl-2 pt-0.5 whitespace-pre-wrap">{printTarget.consulta.tratamiento}</p>
-                    </div>
-                  )}
-                  {printTarget.consulta.reposo_tipo && (
-                    <div className="bg-red-50 border border-red-200 p-3 rounded">
-                      <p className="font-bold text-red-800">REPOSO MÉDICO CONCEDIDO:</p>
-                      <p className="pl-2 pt-0.5 text-red-900 font-semibold">
-                        {printTarget.consulta.reposo_tipo === "domiciliario" ? "Reposo domiciliario" : "Enfermo local"}
-                        {printTarget.consulta.reposo_hasta ? ` hasta la fecha ${fmtFecha(printTarget.consulta.reposo_hasta)}` : " (hasta nueva orden)"}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-12 mt-8 flex justify-between items-end border-t border-gray-300">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1 border border-gray-400 bg-white rounded">
-                      <QRCodeSVG
-                        value={getQrPayload(printTarget.consulta, paciente, "consulta")}
-                        size={90}
-                        level="M"
-                      />
-                    </div>
-                    <div className="text-xs">
-                      <p className="font-bold text-gray-800">VERIFICACIÓN DIGITAL</p>
-                      <p className="font-mono text-[10px] text-gray-500">CON-{idPaciente(paciente)}-{printTarget.consulta.id}</p>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="w-52 border-b border-black mb-1 mx-auto"></div>
-                    <p className="font-bold text-sm">Dr(a). {printTarget.consulta.medico?.apellidos}, {printTarget.consulta.medico?.nombres}</p>
-                    <p className="text-xs text-gray-600">Firma y Sello del Profesional</p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </div>
 
       <ConsultaForm
         open={formOpen}
