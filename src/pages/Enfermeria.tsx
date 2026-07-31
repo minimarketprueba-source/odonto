@@ -22,6 +22,9 @@ import {
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
 import { matchPaciente } from "@/lib/utils";
+import {
+  enteroSignoONull, numeroSignoONull, validarSignosVitales,
+} from "@/lib/signos-vitales";
 import { usePacientes, labelTipoPaciente } from "@/api/pacientes";
 import { useSearchCie10, type Cie10 } from "@/api/consultas";
 import {
@@ -199,17 +202,25 @@ export default function Enfermeria() {
       toast.error("Registra al menos una constante vital (PA, FC, Temp o SpO2).");
       return;
     }
+    // Se avisa acá cuál valor está mal: la base lo rechaza con un error
+    // genérico que no dice qué campo corregir.
+    const avisoVitales = validarSignosVitales({
+      pa_sistolica: paSistolica,
+      pa_diastolica: paDiastolica,
+      fc, fr, temp, spo2, glucemia,
+    });
+    if (avisoVitales) { toast.error(avisoVitales); return; }
 
     try {
       await vitalesMut.mutateAsync({
         internacion_id: Number(ingresoSeleccionado.id),
-        pa_sistolica: paSistolica ? Number(paSistolica) : null,
-        pa_diastolica: paDiastolica ? Number(paDiastolica) : null,
-        fc: fc ? Number(fc) : null,
-        fr: fr ? Number(fr) : null,
-        temp: temp ? Number(temp) : null,
-        spo2: spo2 ? Number(spo2) : null,
-        glucemia: glucemia ? Number(glucemia) : null,
+        pa_sistolica: enteroSignoONull(paSistolica),
+        pa_diastolica: enteroSignoONull(paDiastolica),
+        fc: enteroSignoONull(fc),
+        fr: enteroSignoONull(fr),
+        temp: numeroSignoONull(temp),
+        spo2: enteroSignoONull(spo2),
+        glucemia: enteroSignoONull(glucemia),
         observaciones: obsVitales,
         registrado_por: user?.email ?? enfermeroVitales ?? null,
       });

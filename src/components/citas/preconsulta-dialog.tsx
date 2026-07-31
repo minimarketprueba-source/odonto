@@ -12,14 +12,9 @@ import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useAuth } from "@/context/auth-context";
 import { usePerfilProfesional } from "@/api/perfil";
 import { useGuardarPreconsulta, type Cita } from "@/api/citas";
-
-/** Texto → número (acepta coma decimal) o null si está vacío o no es número. */
-function numeroONull(texto: string): number | null {
-  const limpio = texto.trim();
-  if (!limpio) return null;
-  const n = Number(limpio.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
+import {
+  enteroSignoONull, numeroSignoONull, validarSignosVitales,
+} from "@/lib/signos-vitales";
 
 const vacio = (v: number | null | undefined) => (v == null ? "" : String(v));
 
@@ -71,46 +66,36 @@ export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialo
       return;
     }
 
-    // Un valor mal tecleado no se descarta en silencio: se avisa.
-    const campos: { etiqueta: string; texto: string; entero: boolean }[] = [
-      { etiqueta: "la presión sistólica", texto: paSistolica, entero: true },
-      { etiqueta: "la presión diastólica", texto: paDiastolica, entero: true },
-      { etiqueta: "la frecuencia cardíaca", texto: fc, entero: true },
-      { etiqueta: "la frecuencia respiratoria", texto: fr, entero: true },
-      { etiqueta: "la temperatura", texto: temp, entero: false },
-      { etiqueta: "la saturación (SpO2)", texto: spo2, entero: true },
-      { etiqueta: "el peso", texto: peso, entero: false },
-      { etiqueta: "la talla", texto: talla, entero: true },
-    ];
-    for (const c of campos) {
-      if (c.texto.trim() && numeroONull(c.texto) === null) {
-        await showSwalError(`Revise el valor de ${c.etiqueta}: «${c.texto.trim()}» no es un número.`);
-        return;
-      }
-    }
-    const entero = (texto: string) => {
-      const n = numeroONull(texto);
-      return n === null ? null : Math.round(n);
-    };
-
-    if (!campos.some((c) => c.texto.trim())) {
+    const cargados = [paSistolica, paDiastolica, fc, fr, temp, spo2, peso, talla];
+    if (!cargados.some((c) => c.trim())) {
       await showSwalError("Cargue al menos un signo vital.");
       return;
     }
+
+    // Un valor mal tecleado se avisa acá, nombrando el campo y su rango: si se
+    // dejara pasar, la base lo rechaza con un error genérico.
+    const avisoVitales = validarSignosVitales({
+      pa_sistolica: paSistolica,
+      pa_diastolica: paDiastolica,
+      fc, fr, temp, spo2,
+      peso_kg: peso,
+      talla_cm: talla,
+    });
+    if (avisoVitales) { await showSwalError(avisoVitales); return; }
 
     try {
       await guardar.mutateAsync({
         cita_id: cita.id,
         enfermero: sanitizePlainText(enfermero) || null,
         nota: sanitizeMultilineText(nota) || null,
-        pa_sistolica: entero(paSistolica),
-        pa_diastolica: entero(paDiastolica),
-        fc: entero(fc),
-        fr: entero(fr),
-        temp: numeroONull(temp),
-        spo2: entero(spo2),
-        peso_kg: numeroONull(peso),
-        talla_cm: entero(talla),
+        pa_sistolica: enteroSignoONull(paSistolica),
+        pa_diastolica: enteroSignoONull(paDiastolica),
+        fc: enteroSignoONull(fc),
+        fr: enteroSignoONull(fr),
+        temp: numeroSignoONull(temp),
+        spo2: enteroSignoONull(spo2),
+        peso_kg: numeroSignoONull(peso),
+        talla_cm: enteroSignoONull(talla),
       });
       onOpenChange(false);
       await showSwalSuccess("Signos vitales guardados. El médico los verá al atender al paciente.");

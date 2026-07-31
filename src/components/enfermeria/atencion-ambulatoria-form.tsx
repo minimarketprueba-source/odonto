@@ -14,6 +14,9 @@ import { BedDouble, HeartPulse, Loader2, Printer, Search, ShieldAlert, UserPlus 
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
+import {
+  enteroSignoONull, numeroSignoONull, validarSignosVitales,
+} from "@/lib/signos-vitales";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePacientes, type Paciente } from "@/api/pacientes";
@@ -42,14 +45,6 @@ function diasEntre(desde: string, hasta: string): number {
 function horaAhora(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-/** Texto → número (acepta coma decimal) o null si está vacío o no es número. */
-function numeroONull(texto: string): number | null {
-  const limpio = texto.trim();
-  if (!limpio) return null;
-  const n = Number(limpio.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
 }
 
 interface AtencionAmbulatoriaFormProps {
@@ -167,27 +162,15 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
       return;
     }
 
-    // Un signo vital mal tecleado no se descarta en silencio: se avisa.
-    const vitales: { etiqueta: string; texto: string; entero: boolean }[] = [
-      { etiqueta: "la presión sistólica", texto: paSistolica, entero: true },
-      { etiqueta: "la presión diastólica", texto: paDiastolica, entero: true },
-      { etiqueta: "la frecuencia cardíaca", texto: fc, entero: true },
-      { etiqueta: "la frecuencia respiratoria", texto: fr, entero: true },
-      { etiqueta: "la temperatura", texto: temp, entero: false },
-      { etiqueta: "la saturación (SpO2)", texto: spo2, entero: true },
-    ];
-    for (const v of vitales) {
-      if (v.texto.trim() && numeroONull(v.texto) === null) {
-        await showSwalError(`Revise el valor de ${v.etiqueta}: «${v.texto.trim()}» no es un número.`);
-        return;
-      }
-    }
-    // Las columnas de PA/FC/FR/SpO2 son enteras: un decimal se redondea acá
-    // en vez de dejar que la base rechace todo el registro.
-    const entero = (texto: string) => {
-      const n = numeroONull(texto);
-      return n === null ? null : Math.round(n);
-    };
+    // Un signo vital mal tecleado se avisa acá, diciendo cuál y entre qué
+    // valores tiene que estar. Si se dejara pasar, la base lo rechazaría con un
+    // error genérico y no habría forma de saber qué corregir.
+    const avisoVitales = validarSignosVitales({
+      pa_sistolica: paSistolica,
+      pa_diastolica: paDiastolica,
+      fc, fr, temp, spo2,
+    });
+    if (avisoVitales) { await showSwalError(avisoVitales); return; }
 
     try {
       // La observación interna de verdad. Va primero: es lo único que puede
@@ -221,12 +204,14 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
         destino,
         enfermero_registro: registroPerfil,
         reposo_hasta: destinoSel?.pideDias ? reposoHasta || null : null,
-        pa_sistolica: entero(paSistolica),
-        pa_diastolica: entero(paDiastolica),
-        fc: entero(fc),
-        fr: entero(fr),
-        temp: numeroONull(temp),
-        spo2: entero(spo2),
+        // PA/FC/FR/SpO2 son columnas enteras: un decimal se redondea acá en vez
+        // de dejar que la base rechace todo el registro.
+        pa_sistolica: enteroSignoONull(paSistolica),
+        pa_diastolica: enteroSignoONull(paDiastolica),
+        fc: enteroSignoONull(fc),
+        fr: enteroSignoONull(fr),
+        temp: numeroSignoONull(temp),
+        spo2: enteroSignoONull(spo2),
       });
 
       if (opts?.eImprimir) imprimirConstanciaDeAtencion(atencion);

@@ -12,6 +12,9 @@ import { AlertTriangle, Loader2, Printer, Search, X, UserCheck, HeartPulse, Stet
 import { toast } from "sonner";
 import { cn, matchPaciente } from "@/lib/utils";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
+import {
+  enteroSignoONull, numeroSignoONull, validarSignosVitales,
+} from "@/lib/signos-vitales";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { usePerfilProfesional } from "@/api/perfil";
@@ -199,6 +202,17 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
     if (!form.hora_admision) { toast.error("Indique la hora de admisión."); return; }
     if (!triajeSel) { toast.error("Clasifique al paciente (triaje) antes de guardar."); return; }
     if (!form.motivo_consulta.trim()) { toast.error("Escriba el motivo de consulta."); return; }
+    // Los signos vitales se controlan acá para poder decir cuál está mal: la
+    // base los rechaza con un error genérico que no nombra el campo.
+    const avisoVitales = validarSignosVitales({
+      pa_sistolica: form.pa_sistolica,
+      pa_diastolica: form.pa_diastolica,
+      fc: form.fc,
+      fr: form.fr,
+      temp: form.temp,
+      spo2: form.spo2,
+    });
+    if (avisoVitales) { toast.error(avisoVitales); return; }
 
     try {
       await abrir.mutateAsync({
@@ -213,12 +227,12 @@ export function RacForm({ open, onOpenChange, ficha, pacienteInicial }: RacFormP
         referencia_domiciliaria: sanitizePlainText(form.referencia_domiciliaria) || null,
         telefono: sanitizePlainText(form.telefono) || null,
         hora_enfermeria: form.hora_enfermeria || null,
-        pa_sistolica: numeroONull(form.pa_sistolica),
-        pa_diastolica: numeroONull(form.pa_diastolica),
-        fc: numeroONull(form.fc),
-        fr: numeroONull(form.fr),
-        spo2: numeroONull(form.spo2),
-        temp: numeroONull(form.temp),
+        pa_sistolica: enteroSignoONull(form.pa_sistolica),
+        pa_diastolica: enteroSignoONull(form.pa_diastolica),
+        fc: enteroSignoONull(form.fc),
+        fr: enteroSignoONull(form.fr),
+        spo2: enteroSignoONull(form.spo2),
+        temp: numeroSignoONull(form.temp),
         motivo_consulta: sanitizeMultilineText(form.motivo_consulta) || null,
         discriminante: sanitizePlainText(form.discriminante) || null,
         triaje: triajeSel,

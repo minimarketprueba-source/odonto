@@ -46,15 +46,54 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+/**
+ * Los avisos de SweetAlert2 se dibujan en el `body`, FUERA del árbol del
+ * diálogo. Sin esto, Radix tomaba el clic en «Aceptar» del aviso como un clic
+ * afuera y cerraba el modal entero: la enfermera leía "revise los signos
+ * vitales" y el formulario desaparecía con todo lo que había cargado.
+ * Ninguna interacción nacida dentro de un aviso debe cerrar lo que está debajo.
+ */
+function vieneDeUnAviso(target: EventTarget | null): boolean {
+  const el = target as Element | null
+  return typeof el?.closest === 'function' && !!el.closest('.swal2-container')
+}
+
+function hayAvisoAbierto(): boolean {
+  return typeof document !== 'undefined' && !!document.querySelector('.swal2-container')
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onInteractOutside,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
   const contentRef = React.useRef<HTMLDivElement>(null)
+
+  const handleInteractOutside: React.ComponentProps<
+    typeof DialogPrimitive.Content
+  >['onInteractOutside'] = (event) => {
+    if (vieneDeUnAviso(event.detail.originalEvent.target)) {
+      event.preventDefault()
+      return
+    }
+    onInteractOutside?.(event)
+  }
+
+  const handleEscapeKeyDown: React.ComponentProps<
+    typeof DialogPrimitive.Content
+  >['onEscapeKeyDown'] = (event) => {
+    // Escape con un aviso encima lo cierra a él, no al formulario de atrás.
+    if (hayAvisoAbierto()) {
+      event.preventDefault()
+      return
+    }
+    onEscapeKeyDown?.(event)
+  }
 
   // Dejar que Radix gestione el foco automáticamente al abrir/cerrar el diálogo.
   // El manejo manual previo causaba que el foco se quedase en elementos fuera
@@ -83,8 +122,10 @@ function DialogContent({
           'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 focus:outline-none',
           className,
         )}
-        onOpenAutoFocus={handleOpenAutoFocus}
         {...props}
+        onOpenAutoFocus={handleOpenAutoFocus}
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
       >
         {children}
         {showCloseButton && (
