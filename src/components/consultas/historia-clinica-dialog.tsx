@@ -136,9 +136,11 @@ function esConsultaGinecologia(c: Consulta): boolean {
 }
 
 export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: HistoriaClinicaDialogProps) {
-  const { hasPermission, canView, isAdmin, isGinecologo } = usePermissions();
+  const { hasPermission, canView, isAdmin, isMedico, isGinecologo } = usePermissions();
   const puedeVerGinecologia = isAdmin || isGinecologo;
-  const puedeRegistrar = hasPermission("consultas", "editar");
+  // Enfermería LEE la historia clínica, pero la consulta la firma el médico:
+  // el botón de registrar es solo para quien puede firmarla con su cuenta.
+  const puedeRegistrar = hasPermission("consultas", "editar") && (isMedico || isAdmin);
   const puedeRecetar = hasPermission("recetas", "editar");
   const veRecetas = canView("recetas");
   // El administrador trae también las anuladas, para poder verlas y restaurarlas.

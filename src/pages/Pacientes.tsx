@@ -49,13 +49,14 @@ function fechaHaceDias(dias: number): string {
 }
 
 export default function Pacientes() {
-  const { hasPermission, canView, canDelete, isMedico, isAdmin } = usePermissions();
+  const { hasPermission, canView, canDelete } = usePermissions();
   const canEdit = hasPermission("pacientes", "editar");
   // Dar de baja es una decisión de padrón (afecta a control de peso): solo admin.
   const puedeDarDeBaja = canDelete("pacientes");
-  // La historia médica (botón Stethoscope) es exclusiva para médicos y doctores (y administradores)
-  const esMedicoODoctor = isMedico || isAdmin;
-  const veHistoria = esMedicoODoctor && canView("consultas");
+  // La historia clínica la lee todo el personal de salud: enfermería necesita
+  // los antecedentes para curar y medicar con criterio. Quién puede REGISTRAR
+  // una consulta se decide adentro del diálogo (solo médicos y admin).
+  const veHistoria = canView("consultas");
   // El salvoconducto lo expide el profesional o la enfermera de turno.
   const puedeExpedirSalvoconducto = hasPermission("consultas", "editar");
   // La atención ambulatoria la registra enfermería (mismo permiso que el panel).
