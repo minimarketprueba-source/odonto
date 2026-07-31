@@ -13,14 +13,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
-import { BedDouble, FileSpreadsheet, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
+import { Activity, BedDouble, FileSpreadsheet, Loader2, Printer, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { sanitizePlainText, sanitizeMultilineText } from "@/lib/security";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/auth-context";
 import { MedicoSelector } from "@/components/consultas/medico-selector";
 import { PacienteAlertasBanner } from "@/components/consultas/paciente-alertas-banner";
-import { useMedicosActivos, fechaHoyISO, type Cita } from "@/api/citas";
+import {
+  useMedicosActivos, fechaHoyISO, tienePreconsulta, resumenPreconsulta, type Cita,
+} from "@/api/citas";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import {
   DESTINOS_ATENCION, destinoAtencion, useCreateConsulta, useSearchCie10,
@@ -388,6 +390,28 @@ export function ConsultaForm({
 
           {/* Banner de alertas clínicas del paciente */}
           <PacienteAlertasBanner pacienteId={pacienteId} className="my-1" />
+
+          {/* Signos vitales que enfermería tomó antes de que el paciente pasara. */}
+          {cita && tienePreconsulta(cita) && (
+            <div className="rounded-lg border border-cyan-300 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 px-3 py-2 my-1">
+              <p className="text-xs font-semibold text-cyan-800 dark:text-cyan-200 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5" /> Signos vitales tomados por enfermería
+              </p>
+              <p className="text-sm font-mono text-cyan-900 dark:text-cyan-100 mt-0.5">
+                {resumenPreconsulta(cita)}
+              </p>
+              {cita.preconsulta_nota && (
+                <p className="text-xs text-cyan-700 dark:text-cyan-300 mt-0.5 whitespace-pre-wrap">
+                  {cita.preconsulta_nota}
+                </p>
+              )}
+              {cita.preconsulta_enfermero && (
+                <p className="text-[11px] text-cyan-600 dark:text-cyan-400 mt-0.5">
+                  Tomados por {cita.preconsulta_enfermero}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-5 pt-2">
             {/* Fila 1: Médico y Fecha */}

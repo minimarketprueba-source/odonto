@@ -41,6 +41,19 @@ export interface Cita {
   agendado_por: string | null; // email de quien agendó (registro estilo PY HIS)
   admitida_at: string | null; // cuándo llegó el paciente (check-in)
   orden_llegada: number | null; // nº de orden del día para el médico
+  // Preconsulta: signos vitales que toma enfermería mientras el paciente
+  // espera al médico. Todos opcionales (migración SQL_Preconsulta.txt).
+  pa_sistolica?: number | null;
+  pa_diastolica?: number | null;
+  fc?: number | null;
+  fr?: number | null;
+  temp?: number | null;
+  spo2?: number | null;
+  peso_kg?: number | null;
+  talla_cm?: number | null;
+  preconsulta_enfermero?: string | null;
+  preconsulta_at?: string | null;
+  preconsulta_nota?: string | null;
   paciente?: {
     id: number;
     nombres: string;
@@ -162,6 +175,77 @@ export async function admitirCita(cita: Cita): Promise<void> {
   if (error) throw new Error(`No se pudo admitir al paciente: ${error.message}`);
 }
 
+export interface PreconsultaInput {
+  cita_id: number;
+  enfermero?: string | null;
+  nota?: string | null;
+  pa_sistolica?: number | null;
+  pa_diastolica?: number | null;
+  fc?: number | null;
+  fr?: number | null;
+  temp?: number | null;
+  spo2?: number | null;
+  peso_kg?: number | null;
+  talla_cm?: number | null;
+}
+
+/** True si faltan las columnas de la preconsulta (migración sin aplicar). */
+export function faltaMigracionPreconsulta(error?: { code?: string; message?: string } | null): boolean {
+  if (!error?.message) return false;
+  if (error.code !== "PGRST204" && error.code !== "42703") return false;
+  return /pa_sistolica|preconsulta_/.test(error.message);
+}
+
+/**
+ * Guarda los signos vitales que enfermería tomó antes de la consulta.
+ * Quedan en la propia cita: el médico los ve al atender, sin volver a
+ * preguntarlos ni abrir una ficha de urgencias.
+ */
+export async function guardarPreconsulta(input: PreconsultaInput): Promise<void> {
+  const { cita_id, enfermero, nota, ...signos } = input;
+  const { error } = await supabase
+    .from("citas")
+    .update({
+      ...signos,
+      preconsulta_enfermero: enfermero ?? null,
+      preconsulta_nota: nota ?? null,
+      preconsulta_at: new Date().toISOString(),
+    })
+    .eq("id", cita_id);
+  if (error) {
+    if (faltaMigracionPreconsulta(error)) {
+      throw new Error(
+        "Falta aplicar la actualización de la base para la preconsulta " +
+          "(archivo SQL_Preconsulta.txt del Escritorio). Avise al administrador."
+      );
+    }
+    if (error.code === "23514") {
+      throw new Error(
+        "Hay un valor fuera de rango. Revise los signos vitales (por ejemplo, la temperatura o la saturación)."
+      );
+    }
+    throw new Error(`No se pudieron guardar los signos vitales: ${error.message}`);
+  }
+}
+
+/** True si la cita ya tiene signos vitales cargados por enfermería. */
+export function tienePreconsulta(c: Cita): boolean {
+  return !!(c.preconsulta_at || c.pa_sistolica || c.fc || c.temp || c.spo2 || c.fr);
+}
+
+/** Resumen en una línea de los signos tomados (solo los que hay). */
+export function resumenPreconsulta(c: Cita): string | null {
+  const partes: string[] = [];
+  if (c.pa_sistolica || c.pa_diastolica) partes.push(`PA ${c.pa_sistolica ?? "—"}/${c.pa_diastolica ?? "—"}`);
+  if (c.fc) partes.push(`FC ${c.fc}`);
+  if (c.fr) partes.push(`FR ${c.fr}`);
+  if (c.spo2) partes.push(`SpO2 ${c.spo2}%`);
+  if (c.temp) partes.push(`T° ${c.temp}`);
+  if (c.peso_kg) partes.push(`Peso ${c.peso_kg} kg`);
+  if (c.talla_cm) partes.push(`Talla ${c.talla_cm} cm`);
+  return partes.length ? partes.join(" · ") : null;
+}
+
 export async function fetchMedicosActivos(): Promise<Medico[]> {
   const { data, error } = await supabase
     .from("medicos")
@@ -192,6 +276,15 @@ export function useCitasDelDia(fecha: string) {
     queryKey: queryKeys.citas.porDia(fecha),
     queryFn: () => fetchCitasDelDia(fecha),
     enabled: !!fecha,
+  });
+}
+
+export function useGuardarPreconsulta() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: guardarPreconsulta,
+    retry: 0,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.citas.all }),
   });
 }
 

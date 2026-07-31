@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ClipboardCheck,
-  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Ambulance, Trash2,
+  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Ambulance, Trash2, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchTexto } from "@/lib/utils";
@@ -19,11 +19,13 @@ import { usePacientes, type Paciente } from "@/api/pacientes";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  ESTADOS_CITA, fechaHoyISO, turnoDeHora, useAdmitirCita, useCambiarEstadoCita,
+  ESTADOS_CITA, fechaHoyISO, turnoDeHora, tienePreconsulta, resumenPreconsulta,
+  useAdmitirCita, useCambiarEstadoCita,
   useCitasDelDia, useCitasRango, useMiMedico,
   type Cita, type EstadoCita,
 } from "@/api/citas";
 import { useAtenciones } from "@/api/consultas";
+import { PreconsultaDialog } from "@/components/citas/preconsulta-dialog";
 import { useBorrarCita } from "@/api/anulaciones";
 
 const COLOR_ESTADO: Record<string, string> = {
@@ -96,6 +98,7 @@ export default function Citas() {
   const [formOpen, setFormOpen] = useState(false);
   const [consultaCita, setConsultaCita] = useState<Cita | null>(null);
   const [reagendarCita, setReagendarCita] = useState<Cita | null>(null);
+  const [preconsultaCita, setPreconsultaCita] = useState<Cita | null>(null);
   const [pacienteSalvoconducto, setPacienteSalvoconducto] = useState<Paciente | null>(null);
   const [soloMias, setSoloMias] = useState(isMedico);
 
@@ -228,6 +231,20 @@ export default function Citas() {
           <Button variant="outline" size="sm" className="gap-1" onClick={() => setReagendarCita(c)}>
             <CalendarClock className="w-3.5 h-3.5" /> Reagendar
           </Button>
+          {/* Preconsulta: enfermería toma los signos mientras espera al médico. */}
+          <Button
+            variant="outline" size="sm"
+            className={tienePreconsulta(c)
+              ? "gap-1 text-cyan-700 border-cyan-300 bg-cyan-50 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800"
+              : "gap-1"}
+            onClick={() => setPreconsultaCita(c)}
+            title={tienePreconsulta(c)
+              ? `Signos vitales cargados: ${resumenPreconsulta(c) ?? ""}`
+              : "Cargar signos vitales antes de la consulta"}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            {tienePreconsulta(c) ? "Signos ✓" : "Signos"}
+          </Button>
           {atiendeConsultas && (
             <Button
               variant="ghost" size="icon"
@@ -288,6 +305,11 @@ export default function Citas() {
           {c.motivo ? ` · ${c.motivo}` : ""}
           {c.agendado_por ? ` · agendó: ${c.agendado_por.split("@")[0]}` : ""}
         </p>
+        {tienePreconsulta(c) && (
+          <p className="text-xs font-mono text-cyan-700 dark:text-cyan-300 mt-0.5">
+            {resumenPreconsulta(c)}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
         <Badge className={`border-0 ${COLOR_ESTADO[c.estado] || ""}`}>
@@ -485,6 +507,11 @@ export default function Citas() {
       </div>
 
       <CitaForm open={formOpen} onOpenChange={setFormOpen} fechaInicial={vista === "dia" ? fecha : undefined} />
+      <PreconsultaDialog
+        open={!!preconsultaCita}
+        onOpenChange={(o) => { if (!o) setPreconsultaCita(null); }}
+        cita={preconsultaCita}
+      />
       <ReagendarDialog cita={reagendarCita} onOpenChange={(abierto) => { if (!abierto) setReagendarCita(null); }} />
       <SalvoconductoForm
         open={!!pacienteSalvoconducto}
