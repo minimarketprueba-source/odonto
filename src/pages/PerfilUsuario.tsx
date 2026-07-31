@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IdCard, KeyRound, Loader2, Phone, UserCircle2 } from "lucide-react";
+import { IdCard, KeyRound, Loader2, UserCircle2 } from "lucide-react";
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -24,7 +24,6 @@ export default function PerfilUsuario() {
   const [guardandoPass, setGuardandoPass] = useState(false);
 
   const [telefono, setTelefono] = useState("");
-  const [guardandoTel, setGuardandoTel] = useState(false);
 
   // Nombre y registro profesional propios: prellenan "quién atiende" y la
   // firma de la constancia. Los médicos los toman de su ficha; enfermería y
@@ -36,9 +35,11 @@ export default function PerfilUsuario() {
   const [registro, setRegistro] = useState("");
   const [guardandoNombre, setGuardandoNombre] = useState(false);
 
-  // Registro profesional del médico (va a su ficha, como el teléfono).
+  // Datos de ficha de profesional médico
+  const [nombreMedico, setNombreMedico] = useState("");
+  const [apellidoMedico, setApellidoMedico] = useState("");
   const [registroMedico, setRegistroMedico] = useState("");
-  const [guardandoRegMed, setGuardandoRegMed] = useState(false);
+  const [guardandoFichaMedica, setGuardandoFichaMedica] = useState(false);
 
   useEffect(() => {
     if (!miMedico && nombrePerfil) {
@@ -47,21 +48,35 @@ export default function PerfilUsuario() {
       setApellido((prev) => prev || partes.slice(Math.ceil(partes.length / 2)).join(" "));
     }
     if (!miMedico) setRegistro((prev) => prev || perfilProf?.registro || "");
-    if (miMedico) setRegistroMedico((prev) => prev || perfilProf?.registro || "");
+    if (miMedico) {
+      setNombreMedico((prev) => prev || miMedico.nombres || "");
+      setApellidoMedico((prev) => prev || miMedico.apellidos || "");
+      setRegistroMedico((prev) => prev || (miMedico as any).numero_colegiatura || perfilProf?.registro || "");
+    }
   }, [miMedico, nombrePerfil, perfilProf?.registro]);
 
-  const guardarRegistroMedico = async () => {
+  const guardarFichaMedico = async () => {
     if (!miMedico) return;
-    setGuardandoRegMed(true);
+    if (!nombreMedico.trim() || !apellidoMedico.trim()) {
+      await showSwalError("Debe ingresar su nombre y apellido.");
+      return;
+    }
+    setGuardandoFichaMedica(true);
     try {
-      await updateMedico(miMedico.id, { numero_colegiatura: registroMedico.trim() || null });
+      await updateMedico(miMedico.id, {
+        nombres: nombreMedico.trim(),
+        apellidos: apellidoMedico.trim(),
+        telefono: telefono.trim() || null,
+        numero_colegiatura: registroMedico.trim() || null,
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.medicos.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.citas.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.perfil.all });
-      await showSwalSuccess("Número de registro profesional guardado en su ficha.");
+      await showSwalSuccess(`Ficha de profesional actualizada: ${nombreMedico.trim()} ${apellidoMedico.trim()}`);
     } catch (e) {
       await showSwalError((e as Error).message);
     } finally {
-      setGuardandoRegMed(false);
+      setGuardandoFichaMedica(false);
     }
   };
 
@@ -108,19 +123,7 @@ export default function PerfilUsuario() {
     }
   };
 
-  const guardarTelefono = async () => {
-    if (!miMedico) return;
-    setGuardandoTel(true);
-    try {
-      await updateMedico(miMedico.id, { telefono: telefono.trim() || null });
-      queryClient.invalidateQueries({ queryKey: queryKeys.medicos.all });
-      await showSwalSuccess("Teléfono actualizado en su ficha.");
-    } catch (e) {
-      await showSwalError((e as Error).message);
-    } finally {
-      setGuardandoTel(false);
-    }
-  };
+
 
   const rolLabel =
     role === "admin" ? "Administrador" : role === "medico" ? "Profesional de salud" : role === "recepcion" ? "Recepción / Enfermería" : role ?? "—";
@@ -194,41 +197,53 @@ export default function PerfilUsuario() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Phone className="w-5 h-5 text-primary" /> Mi ficha de profesional
+                <IdCard className="w-5 h-5 text-primary" /> Mi ficha de profesional
               </CardTitle>
-              <CardDescription>El teléfono y el registro aparecen en su ficha y en los documentos.</CardDescription>
+              <CardDescription>
+                Modifique su nombre, teléfono y número de registro para que aparezcan correctamente en sus consultas y certificados.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="p-telefono">Teléfono de contacto</Label>
-                <div className="flex gap-2">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+                <div className="space-y-1">
+                  <Label htmlFor="pm-nombre">Nombre(s)</Label>
+                  <Input
+                    id="pm-nombre"
+                    value={nombreMedico}
+                    onChange={(e) => setNombreMedico(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="pm-apellido">Apellido(s)</Label>
+                  <Input
+                    id="pm-apellido"
+                    value={apellidoMedico}
+                    onChange={(e) => setApellidoMedico(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="p-telefono">Teléfono de contacto</Label>
                   <Input
                     id="p-telefono"
                     placeholder="Ej: 0981-123456"
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}
-                    className="max-w-xs"
                   />
-                  <Button onClick={guardarTelefono} disabled={guardandoTel}>
-                    {guardandoTel ? <Loader2 className="w-4 h-4 animate-spin" /> : "Guardar"}
-                  </Button>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="p-reg-medico">N° de registro profesional</Label>
-                <div className="flex gap-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="p-reg-medico">N° de registro profesional (Colegiatura)</Label>
                   <Input
                     id="p-reg-medico"
                     placeholder="Ej: 12345"
                     value={registroMedico}
                     onChange={(e) => setRegistroMedico(e.target.value)}
-                    className="max-w-xs"
                   />
-                  <Button onClick={guardarRegistroMedico} disabled={guardandoRegMed}>
-                    {guardandoRegMed ? <Loader2 className="w-4 h-4 animate-spin" /> : "Guardar"}
-                  </Button>
                 </div>
               </div>
+              <Button onClick={guardarFichaMedico} disabled={guardandoFichaMedica || !nombreMedico.trim() || !apellidoMedico.trim()}>
+                {guardandoFichaMedica ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Guardar mi ficha
+              </Button>
             </CardContent>
           </Card>
         )}
