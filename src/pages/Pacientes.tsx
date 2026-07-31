@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance, HeartPulse, Activity,
+  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance, HeartPulse, BicepsFlexed, Apple,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
@@ -289,18 +289,19 @@ export default function Pacientes() {
                       {veHistoria && (
                         <>
                           <Button
-                            variant="ghost" size="icon" title="Historia clínica"
+                            variant="ghost" size="icon" title="Historia clínica médica"
+                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                             onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
                           >
                             <Stethoscope className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost" size="icon"
-                            title="Fisioterapia y Kinesiología (Sesiones, tratamientos y rehabilitación)"
+                            title="Fisioterapia y Kinesiología (Tratamientos, ejercicios y rehabilitación)"
                             className="text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30"
                             onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
                           >
-                            <Activity className="w-4 h-4" />
+                            <BicepsFlexed className="w-4 h-4" />
                           </Button>
                         </>
                       )}
@@ -308,12 +309,20 @@ export default function Pacientes() {
                         <Button
                           variant="ghost" size="icon"
                           title="Registrar atención de enfermería (curación, medicación, control)"
-                          className="text-teal-600 hover:text-teal-700"
+                          className="text-teal-600 hover:text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/30"
                           onClick={() => setPacienteAtencion(p)}
                         >
                           <HeartPulse className="w-4 h-4" />
                         </Button>
                       )}
+                      <Button
+                        variant="ghost" size="icon"
+                        title="Nutrición y Control Antropométrico"
+                        className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                        onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
+                      >
+                        <Apple className="w-4 h-4" />
+                      </Button>
                       {puedeExpedirSalvoconducto && (
                         <Button
                           variant="ghost" size="icon"

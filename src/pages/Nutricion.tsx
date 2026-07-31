@@ -12,7 +12,7 @@ import { imprimirFichaAntropometrica } from "@/lib/imprimir";
 import {
   Search,
   Users,
-  Scale,
+  Apple,
   Filter,
   User,
   Shield,
@@ -409,7 +409,7 @@ export default function Nutricion() {
                           className="flex-1 gap-1 h-8 text-xs"
                           title="Registrar pesada"
                         >
-                          <Scale className="w-3.5 h-3.5" />
+                          <Apple className="w-3.5 h-3.5" />
                           Pesar
                         </Button>
 
