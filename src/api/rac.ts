@@ -360,6 +360,41 @@ export function useFichasRac(desde: string, hasta: string) {
   });
 }
 
+/**
+ * Pacientes que ya pasaron por enfermería (signos vitales y triaje) y esperan
+ * al médico. Sin filtro de fecha: una ficha abierta anoche que nadie cerró
+ * tiene que seguir a la vista, no desaparecer al cambiar el día.
+ */
+export async function fetchRacEnEspera(): Promise<FichaRac[]> {
+  const { data, error } = await supabase
+    .from("fichas_rac")
+    .select(RAC_SELECT)
+    .eq("estado", "espera")
+    .is("anulada_at", null)
+    .order("fecha", { ascending: true })
+    .order("hora_admision", { ascending: true })
+    .limit(200);
+  if (error) throw mensajeError(error, "Error al cargar la cola de urgencias");
+  const fichas = (data as unknown as FichaRac[]) || [];
+  // Primero el más grave; a igual gravedad, el que llegó antes.
+  return fichas.sort((a, b) => {
+    const dif = (PESO_TRIAJE[a.triaje ?? "azul"] ?? 9) - (PESO_TRIAJE[b.triaje ?? "azul"] ?? 9);
+    if (dif !== 0) return dif;
+    return `${a.fecha}${a.hora_admision}`.localeCompare(`${b.fecha}${b.hora_admision}`);
+  });
+}
+
+export function useRacEnEspera(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.rac.enEspera(),
+    queryFn: fetchRacEnEspera,
+    enabled,
+    // Realtime ya refresca al instante; esto es el respaldo por las dudas.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
 export function useFichasRacPaciente(pacienteId: number | null) {
   return useQuery({
     queryKey: queryKeys.rac.porPaciente(pacienteId ?? 0),

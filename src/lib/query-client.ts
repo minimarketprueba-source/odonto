@@ -155,6 +155,7 @@ export const queryKeys = {
     all: ['rac'] as const,
     rango: (desde: string, hasta: string) => [...queryKeys.rac.all, 'rango', desde, hasta] as const,
     porPaciente: (pacienteId: number) => [...queryKeys.rac.all, 'paciente', pacienteId] as const,
+    enEspera: () => [...queryKeys.rac.all, 'en-espera'] as const,
   },
   // Especialidades
   especialidades: {

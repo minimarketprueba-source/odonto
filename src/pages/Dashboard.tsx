@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   TrendingUp,
   FileText,
+  Ambulance,
 } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -45,6 +46,7 @@ import { usePacientes } from "@/api/pacientes"
 import { useCitasDelDia, useCitasRango, useMiMedico, fechaHoyISO } from "@/api/citas"
 import { useAtenciones } from "@/api/consultas"
 import { useAtencionesPendientes } from "@/api/atenciones-enfermeria"
+import { useRacEnEspera, triaje as nivelTriaje } from "@/api/rac"
 
 function pacientesDistintos(regs: { paciente_id: number; fecha: string }[], desde?: string): number {
   const ids = new Set<number>()
@@ -95,6 +97,11 @@ export default function Dashboard() {
   // Aviso a los médicos: atenciones de enfermería sin revisar. Solo se pide
   // cuando la cuenta tiene ficha de médico.
   const { data: atencionesPorRevisar = [] } = useAtencionesPendientes(!!miMedico)
+  // Urgencias que ya pasaron por enfermería y esperan al médico. Es la cola
+  // completa (no solo la de hoy): una ficha abierta anoche sigue esperando.
+  const { data: racEnEspera = [] } = useRacEnEspera(!!miMedico)
+  const racMasGrave = racEnEspera[0] ?? null
+  const hayRojo = racEnEspera.some((f) => f.triaje === "rojo")
   const { data: atenciones = [], isLoading: loadingAtenciones } = useAtenciones()
 
   const isLoading = loadingPacientes || loadingCitasHoy || loadingCitasSemana || loadingMedico || loadingAtenciones
@@ -290,6 +297,43 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Urgencias esperando al médico: enfermería ya tomó signos y triaje */}
+        {miMedico && racEnEspera.length > 0 && (
+          <Link
+            to="/rac"
+            className={
+              hayRojo
+                ? "flex items-center gap-3 rounded-lg border-2 border-red-400 bg-red-50 dark:bg-red-950/30 dark:border-red-700 p-3.5 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+                : "flex items-center gap-3 rounded-lg border border-orange-300 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-800 p-3.5 hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"
+            }
+          >
+            <Ambulance className={`w-5 h-5 shrink-0 ${hayRojo ? "text-red-600" : "text-orange-600"}`} />
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-sm ${hayRojo ? "text-red-800 dark:text-red-200" : "text-orange-800 dark:text-orange-200"}`}>
+                {racEnEspera.length === 1
+                  ? "1 paciente en urgencias espera al médico"
+                  : `${racEnEspera.length} pacientes en urgencias esperan al médico`}
+              </p>
+              <p className={`text-xs ${hayRojo ? "text-red-700 dark:text-red-300" : "text-orange-700 dark:text-orange-300"}`}>
+                {racMasGrave ? (
+                  <>
+                    Más urgente: {racMasGrave.paciente
+                      ? `${racMasGrave.paciente.apellidos}, ${racMasGrave.paciente.nombres}`
+                      : "paciente sin ficha"}
+                    {racMasGrave.triaje && ` — triaje ${nivelTriaje(racMasGrave.triaje)?.value ?? racMasGrave.triaje}`}
+                    {racMasGrave.hora_admision && ` · llegó ${racMasGrave.hora_admision.slice(0, 5)} hs`}
+                  </>
+                ) : (
+                  "Enfermería ya tomó los signos vitales. Toque para atender."
+                )}
+              </p>
+            </div>
+            {hayRojo && (
+              <Badge className="bg-red-600 text-white border-0 shrink-0 animate-pulse">ROJO</Badge>
+            )}
+          </Link>
+        )}
 
         {/* Atenciones de enfermería que esperan revisión médica */}
         {miMedico && atencionesPorRevisar.length > 0 && (
