@@ -95,7 +95,15 @@ export default function Pacientes() {
     const lista = pacientes.filter((p) => {
       if (estadoSel === "activos" && !p.activo) return false;
       if (estadoSel === "inactivos" && p.activo) return false;
-      if (tipoSel !== "todos" && (p.tipo || "").toLowerCase() !== tipoSel.toLowerCase()) return false;
+      if (tipoSel !== "todos") {
+        const pTipo = (p.tipo || "").toLowerCase();
+        const sel = tipoSel.toLowerCase();
+        if (sel === "medico") {
+          if (!["medico", "personal_sanidad", "personal", "sanidad", "funcionario", "doctor", "enfermero"].includes(pTipo)) return false;
+        } else if (pTipo !== sel) {
+          return false;
+        }
+      }
       if (atencionSel !== "todos") {
         const ultima = ultimasAtenciones[p.id];
         if (!ultima) return false;
