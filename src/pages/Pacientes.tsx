@@ -26,6 +26,11 @@ import { useUltimasAtenciones } from "@/api/consultas";
 
 const POR_PAGINA = 24;
 
+/** Etiquetas que cuentan como "Médico / Personal de Sanidad" en fichas viejas. */
+const TIPOS_SANIDAD = [
+  "medico", "personal_sanidad", "personal", "sanidad", "funcionario", "doctor", "enfermero",
+];
+
 const FILTROS_ATENCION = [
   { value: "todos", label: "Con o sin atención" },
   { value: "hoy", label: "Atendidos: hoy" },
@@ -99,7 +104,7 @@ export default function Pacientes() {
         const pTipo = (p.tipo || "").toLowerCase();
         const sel = tipoSel.toLowerCase();
         if (sel === "medico") {
-          if (!["medico", "personal_sanidad", "personal", "sanidad", "funcionario", "doctor", "enfermero"].includes(pTipo)) return false;
+          if (!TIPOS_SANIDAD.includes(pTipo)) return false;
         } else if (pTipo !== sel) {
           return false;
         }
@@ -117,6 +122,26 @@ export default function Pacientes() {
     }
     return lista;
   }, [pacientes, busquedaDebounced, tipoSel, estadoSel, atencionSel, ultimasAtenciones]);
+
+  /**
+   * Cuántas fichas hay de cada tipo con el estado elegido. Se muestra en el
+   * desplegable para que se vea de entrada que un tipo está en cero porque
+   * todavía no se cargó ninguna ficha, no porque el filtro falle.
+   */
+  const conteoPorTipo = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const p of pacientes) {
+      if (estadoSel === "activos" && !p.activo) continue;
+      if (estadoSel === "inactivos" && p.activo) continue;
+      const t = (p.tipo || "").toLowerCase();
+      acc[t] = (acc[t] ?? 0) + 1;
+      // "Médico / Personal de Sanidad" agrupa varias etiquetas heredadas.
+      if (TIPOS_SANIDAD.includes(t) && t !== "medico") {
+        acc.medico = (acc.medico ?? 0) + 1;
+      }
+    }
+    return acc;
+  }, [pacientes, estadoSel]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
@@ -190,7 +215,9 @@ export default function Pacientes() {
             <SelectContent>
               <SelectItem value="todos">Todos los tipos</SelectItem>
               {TIPOS_PACIENTE.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label} ({conteoPorTipo[t.value] ?? 0})
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -220,7 +247,11 @@ export default function Pacientes() {
             <p className="text-muted-foreground">
               {busquedaDebounced
                 ? `No se encontró ningún paciente con «${busquedaDebounced}».`
-                : "No se encontraron pacientes con esos filtros."}
+                : tipoSel !== "todos" && (conteoPorTipo[tipoSel] ?? 0) === 0
+                  ? `Todavía no hay ninguna ficha de tipo «${
+                      TIPOS_PACIENTE.find((t) => t.value === tipoSel)?.label ?? tipoSel
+                    }». Registre la primera con el botón de abajo.`
+                  : "No se encontraron pacientes con esos filtros."}
             </p>
             {canEdit && (
               <Button
