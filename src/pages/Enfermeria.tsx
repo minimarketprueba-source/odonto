@@ -34,6 +34,7 @@ import {
 import { imprimirHojaEnfermeria, cleanQrText } from "@/lib/imprimir";
 import { useAuth } from "@/context/auth-context";
 import { useAtencionesPendientes } from "@/api/atenciones-enfermeria";
+import { useMiMedico } from "@/api/citas";
 import { usePerfilProfesional } from "@/api/perfil";
 import { AtencionAmbulatoriaPanel } from "@/components/enfermeria/atencion-ambulatoria-panel";
 
@@ -45,8 +46,13 @@ export default function Enfermeria() {
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: ingresos = [] } = useEnfermeriaIngresos();
   const { data: pacientes = [] } = usePacientes();
-  // Solo para el contador de la pestaña: comparte caché con el panel.
-  const { data: ambulatoriasPendientes = [] } = useAtencionesPendientes();
+  const { data: miMedico } = useMiMedico(user?.id);
+  // Solo para el contador de la pestaña: comparte caché con el panel, así que
+  // filtra por el mismo servicio (un médico cuenta lo que le toca revisar).
+  const { data: ambulatoriasPendientes = [] } = useAtencionesPendientes(
+    true,
+    miMedico?.especialidad?.id ?? null
+  );
 
   const ingresarMut = useIngresarPacienteCama();
   const vitalesMut = useRegistrarSignosVitales();

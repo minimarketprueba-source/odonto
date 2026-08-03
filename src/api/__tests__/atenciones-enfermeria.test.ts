@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DESTINOS_AMBULATORIO, TIPOS_ATENCION, destinoAmbulatorio, esDestinoImprimible,
-  esTablaFaltante, labelDestinoAmbulatorio, labelTipoAtencion, traducirErrorAtencion,
+  esTablaFaltante, especialidadPredeterminada, faltaColumnaEspecialidad,
+  labelDestinoAmbulatorio, labelTipoAtencion, nombreEspecialidad, traducirErrorAtencion,
 } from "@/api/atenciones-enfermeria";
 
 /**
@@ -30,6 +31,22 @@ describe("esTablaFaltante", () => {
     expect(esTablaFaltante({ message: "Failed to fetch" })).toBe(false);
     expect(esTablaFaltante(null)).toBe(false);
     expect(esTablaFaltante(undefined)).toBe(false);
+  });
+
+  it("que falte una COLUMNA no es que falte la tabla", () => {
+    // Este es el mensaje textual de PostgREST. Si se lo toma por tabla
+    // faltante, la pantalla manda a crear una tabla que ya existe y esconde
+    // cuál es la migración que de verdad falta.
+    for (const columna of ["especialidad_id", "reposo_hasta", "enfermero_registro"]) {
+      expect(esTablaFaltante({
+        code: "PGRST204",
+        message: `Could not find the '${columna}' column of 'atenciones_enfermeria' in the schema cache`,
+      }), columna).toBe(false);
+    }
+    expect(esTablaFaltante({
+      code: "42703",
+      message: "column atenciones_enfermeria.especialidad_id does not exist",
+    })).toBe(false);
   });
 
   it("reconoce también el error YA TRADUCIDO (React Query le pasa ese al panel y al retry)", () => {
@@ -139,5 +156,79 @@ describe("destinos con reposo provisorio (sin médico de guardia)", () => {
       "No se pudo registrar la atención"
     );
     expect(e.message).toMatch(/SQL_Atencion_Reposo/);
+  });
+});
+
+/**
+ * Cada atención se deriva a un servicio: a la odontóloga no le sirve ver un
+ * dolor de cabeza, y a la clínica no le corresponde una muela. El servicio lo
+ * elige enfermería al registrar.
+ */
+describe("servicio que debe revisar la atención", () => {
+  const CATALOGO = [
+    { id: 3, nombre: "Odontología", activo: true },
+    { id: 1, nombre: "Medicina General", activo: true },
+    { id: 7, nombre: "Fisioterapia", activo: true },
+  ];
+
+  it("el formulario arranca en Medicina General, que es la enorme mayoría", () => {
+    expect(especialidadPredeterminada(CATALOGO)?.id).toBe(1);
+  });
+
+  it("no toma una especialidad dada de baja", () => {
+    const baja = [{ id: 1, nombre: "Medicina General", activo: false }, ...CATALOGO.slice(0, 1)];
+    expect(especialidadPredeterminada(baja)).toBeNull();
+  });
+
+  it("si el catálogo no tiene Medicina General no inventa ninguna", () => {
+    // Antes que elegir mal el servicio (y esconderle la atención al que
+    // corresponde), el formulario queda sin elegir y lo pide.
+    expect(especialidadPredeterminada([{ id: 3, nombre: "Odontología" }])).toBeNull();
+    expect(especialidadPredeterminada([])).toBeNull();
+  });
+
+  it("pone nombre al servicio de cada tarjeta", () => {
+    expect(nombreEspecialidad(3, CATALOGO)).toBe("Odontología");
+    expect(nombreEspecialidad(null, CATALOGO)).toBeNull();
+    // Una especialidad borrada del catálogo no rompe la tarjeta.
+    expect(nombreEspecialidad(99, CATALOGO)).toBeNull();
+  });
+});
+
+describe("faltaColumnaEspecialidad", () => {
+  it("reconoce el error del insert cuando falta la migración", () => {
+    expect(faltaColumnaEspecialidad({
+      code: "PGRST204",
+      message: "Could not find the 'especialidad_id' column of 'atenciones_enfermeria' in the schema cache",
+    })).toBe(true);
+  });
+
+  it("reconoce el error del filtro por servicio", () => {
+    expect(faltaColumnaEspecialidad({
+      code: "42703",
+      message: 'column atenciones_enfermeria.especialidad_id does not exist',
+    })).toBe(true);
+  });
+
+  it("no confunde un servicio inexistente con la columna faltante", () => {
+    // Clave foránea: la columna existe, el id no. Eso SÍ es un error real.
+    expect(faltaColumnaEspecialidad({
+      code: "23503",
+      message: 'insert violates foreign key constraint "atenciones_enfermeria_especialidad_id_fkey"',
+    })).toBe(false);
+    expect(faltaColumnaEspecialidad({ code: "23514", message: "check constraint" })).toBe(false);
+    expect(faltaColumnaEspecialidad(null)).toBe(false);
+  });
+
+  it("la columna faltante se explica con su archivo SQL", () => {
+    const e = traducirErrorAtencion(
+      {
+        code: "PGRST204",
+        message: "Could not find the 'especialidad_id' column of 'atenciones_enfermeria' in the schema cache",
+      },
+      "No se pudo registrar la atención"
+    );
+    expect(e.message).toMatch(/SQL_Especialidad_Atencion/);
+    expect(e.message).toMatch(/administrador/);
   });
 });

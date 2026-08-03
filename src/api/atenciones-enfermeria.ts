@@ -67,12 +67,46 @@ export function labelDestinoAmbulatorio(destino?: string | null): string {
   return DESTINOS_AMBULATORIO.find((d) => d.value === destino)?.label ?? (destino || "—");
 }
 
+// --- Servicio (especialidad) que debe revisar -------------------------------
+// Lo mínimo que hace falta de una especialidad para elegirla y nombrarla; así
+// estas funciones se pueden probar sin arrastrar toda la capa de catálogos.
+export interface ServicioBasico {
+  id: number;
+  nombre: string;
+  activo?: boolean;
+}
+
+/**
+ * Con qué servicio arranca el formulario: Medicina General, que es lo que
+ * corresponde a la enorme mayoría de las atenciones. Si no existiera (nombre
+ * cambiado en el catálogo), no se inventa nada: queda sin elegir.
+ */
+export function especialidadPredeterminada(especialidades: ServicioBasico[]): ServicioBasico | null {
+  const activas = especialidades.filter((e) => e.activo !== false);
+  return activas.find((e) => /medicina\s+general/i.test(e.nombre)) ?? null;
+}
+
+/** Nombre del servicio para mostrarlo en las tarjetas. */
+export function nombreEspecialidad(
+  especialidadId: number | null | undefined,
+  especialidades: ServicioBasico[]
+): string | null {
+  if (!especialidadId) return null;
+  return especialidades.find((e) => e.id === especialidadId)?.nombre ?? null;
+}
+
 // --- Tipos ------------------------------------------------------------------
 
 export interface AtencionEnfermeria {
   id: number;
   clinica_id: number;
   paciente_id: number;
+  /**
+   * Servicio que tiene que revisar la atención. Lo elige enfermería: un dolor
+   * de muelas va a Odontología y no le aparece a la médica clínica. NULL = sin
+   * servicio (filas viejas): se le muestra a todos, para que nadie las pierda.
+   */
+  especialidad_id: number | null;
   fecha: string; // yyyy-mm-dd
   hora: string; // HH:mm:ss
   enfermero: string | null;
@@ -110,6 +144,8 @@ export interface AtencionEnfermeria {
 
 export interface CrearAtencionInput {
   paciente_id: number;
+  /** Servicio que debe revisarla (ver AtencionEnfermeria.especialidad_id). */
+  especialidad_id?: number | null;
   fecha: string;
   hora: string;
   enfermero?: string | null;
@@ -152,11 +188,44 @@ export function esTablaFaltante(error?: { code?: string; message?: string } | nu
   if (!error) return false;
   if (error.code === "PGRST205" || error.code === "42P01") return true;
   if (!error.message) return false;
+  // Que falte una COLUMNA no es que falte la tabla: la tabla está y le falta
+  // una migración nueva, que se avisa con su propio archivo SQL. El mensaje
+  // real de PostgREST ("Could not find the 'x' column of 'atenciones_enfermeria'
+  // in the schema cache") caía en el filtro de abajo y mandaba a crear una
+  // tabla que ya existía.
+  if (error.code === "PGRST204" || error.code === "42703") return false;
+  if (/\bcolumn\b/i.test(error.message)) return false;
   // También el error YA traducido: React Query le pasa al retry y al panel el
   // Error que lanzó el fetch, no el crudo de PostgREST.
   if (/SQL_Atencion_Ambulatoria/.test(error.message)) return true;
   return /atenciones_enfermeria/.test(error.message) &&
     /(does not exist|schema cache|no existe)/i.test(error.message);
+}
+
+/**
+ * True si la columna `especialidad_id` todavía no existe (falta aplicar
+ * SQL_Especialidad_Atencion.txt). El código sigue andando sin ella: se guarda
+ * la atención sin servicio y se muestran todas las pendientes.
+ */
+export function faltaColumnaEspecialidad(
+  error?: { code?: string; message?: string } | null
+): boolean {
+  if (!error?.message) return false;
+  if (!/especialidad_id/.test(error.message)) return false;
+  // PGRST204: el insert no encuentra la columna. 42703 / PGRST100: el filtro.
+  if (error.code === "PGRST204" || error.code === "42703" || error.code === "PGRST100") return true;
+  return /(does not exist|no existe|schema cache)/i.test(error.message);
+}
+
+/**
+ * Filtro por servicio: cada profesional revisa lo suyo. Las atenciones sin
+ * servicio (filas viejas, o guardadas antes de la migración) se le muestran a
+ * todos: es preferible que a alguien le sobre y no que una atención sin
+ * revisar quede escondida para siempre.
+ */
+function filtroEspecialidad(especialidadId?: number | null): string | null {
+  if (!especialidadId || !Number.isInteger(especialidadId)) return null;
+  return `especialidad_id.eq.${especialidadId},especialidad_id.is.null`;
 }
 
 /** Crea el Error traducido conservando el código de Postgres del original. */
@@ -197,6 +266,13 @@ export function traducirErrorAtencion(
       error.code
     );
   }
+  if (faltaColumnaEspecialidad(error)) {
+    return errorConCodigo(
+      "Falta aplicar la actualización de la base para el servicio que revisa la atención " +
+        "(archivo SQL_Especialidad_Atencion.txt del Escritorio). Avise al administrador.",
+      error.code
+    );
+  }
   if (error.code === "22P02") {
     return errorConCodigo(
       "Hay un valor con decimales donde va un número entero. Revise los signos vitales.",
@@ -213,15 +289,26 @@ export function traducirErrorAtencion(
  * la pantalla por un corte (la misma trampa que tuvo la lista de espera).
  * Las más antiguas primero: son las que más urge revisar.
  */
-export async function fetchAtencionesPendientes(): Promise<AtencionEnfermeria[]> {
-  const { data, error } = await supabase
+export async function fetchAtencionesPendientes(
+  especialidadId?: number | null
+): Promise<AtencionEnfermeria[]> {
+  const filtro = filtroEspecialidad(especialidadId);
+  const base = supabase
     .from("atenciones_enfermeria")
     .select(ATENCION_SELECT)
-    .is("revisada_at", null)
+    .is("revisada_at", null);
+  // El filtro va en la consulta, no en memoria: con el corte de 1000 filas,
+  // filtrar después escondería atenciones sin ningún error a la vista.
+  const { data, error } = await (filtro ? base.or(filtro) : base)
     .order("fecha", { ascending: true })
     .order("hora", { ascending: true })
     .limit(1000);
-  if (error) throw traducirErrorAtencion(error, "No se pudieron cargar las atenciones pendientes");
+  if (error) {
+    // Sin la columna todavía: mejor mostrar todas que dejar al médico creyendo
+    // que no hay nada para revisar.
+    if (filtro && faltaColumnaEspecialidad(error)) return fetchAtencionesPendientes();
+    throw traducirErrorAtencion(error, "No se pudieron cargar las atenciones pendientes");
+  }
   return (data as unknown as AtencionEnfermeria[]) || [];
 }
 
@@ -230,15 +317,22 @@ export async function fetchAtencionesPendientes(): Promise<AtencionEnfermeria[]>
  * en la consulta: si se trajeran "las últimas 50" y se filtrara en memoria,
  * un backlog de pendientes escondería a las revisadas sin ningún error.
  */
-export async function fetchAtencionesRevisadas(): Promise<AtencionEnfermeria[]> {
-  const { data, error } = await supabase
+export async function fetchAtencionesRevisadas(
+  especialidadId?: number | null
+): Promise<AtencionEnfermeria[]> {
+  const filtro = filtroEspecialidad(especialidadId);
+  const base = supabase
     .from("atenciones_enfermeria")
     .select(ATENCION_SELECT)
-    .not("revisada_at", "is", null)
+    .not("revisada_at", "is", null);
+  const { data, error } = await (filtro ? base.or(filtro) : base)
     .order("fecha", { ascending: false })
     .order("hora", { ascending: false })
     .limit(50);
-  if (error) throw traducirErrorAtencion(error, "No se pudieron cargar las atenciones");
+  if (error) {
+    if (filtro && faltaColumnaEspecialidad(error)) return fetchAtencionesRevisadas();
+    throw traducirErrorAtencion(error, "No se pudieron cargar las atenciones");
+  }
   return (data as unknown as AtencionEnfermeria[]) || [];
 }
 
@@ -261,19 +355,29 @@ export async function fetchAtencionesPaciente(pacienteId: number): Promise<Atenc
 }
 
 export async function crearAtencion(input: CrearAtencionInput): Promise<AtencionEnfermeria> {
-  const { reposo_hasta, enfermero_registro, procedimientos, ...resto } = input;
-  const { data, error } = await supabase
-    .from("atenciones_enfermeria")
-    // reposo_hasta solo viaja cuando hay reposo: así los demás destinos siguen
-    // funcionando aunque la columna todavía no exista en la base.
-    .insert({
-      ...resto,
-      clinica_id: CLINICA_ID,
-      ...(reposo_hasta ? { reposo_hasta } : {}),
-      ...(enfermero_registro ? { enfermero_registro } : {}),
-    })
-    .select(ATENCION_SELECT)
-    .single();
+  const { reposo_hasta, enfermero_registro, especialidad_id, procedimientos, ...resto } = input;
+  // reposo_hasta solo viaja cuando hay reposo: así los demás destinos siguen
+  // funcionando aunque la columna todavía no exista en la base.
+  const fila = {
+    ...resto,
+    clinica_id: CLINICA_ID,
+    ...(reposo_hasta ? { reposo_hasta } : {}),
+    ...(enfermero_registro ? { enfermero_registro } : {}),
+  };
+  const insertar = (extra: Record<string, unknown>) =>
+    supabase
+      .from("atenciones_enfermeria")
+      .insert({ ...fila, ...extra })
+      .select(ATENCION_SELECT)
+      .single();
+
+  let { data, error } = await insertar(especialidad_id ? { especialidad_id } : {});
+  // Sin la migración del servicio la atención se guarda igual (sin servicio):
+  // enfermería nunca debe quedarse sin poder anotar lo que hizo. El error de
+  // esquema es previo al insert, así que no queda ninguna fila a medias.
+  if (error && especialidad_id && faltaColumnaEspecialidad(error)) {
+    ({ data, error } = await insertar({}));
+  }
   if (error) throw traducirErrorAtencion(error, "No se pudo registrar la atención");
   const procedimientosGuardados = await insertarProcedimientos(procedimientos ?? [], { paciente_id: input.paciente_id, fecha: input.fecha, atencion_enfermeria_id: (data as unknown as { id: number }).id });
   return { ...(data as unknown as AtencionEnfermeria), procedimientos: procedimientosGuardados };
@@ -307,10 +411,14 @@ export async function revisarAtencion(input: RevisarAtencionInput): Promise<void
 // Hooks React Query
 // ---------------------------------------------------------------------------
 
-export function useAtencionesPendientes(enabled = true) {
+/**
+ * @param especialidadId servicio del profesional logueado; null = todas (es lo
+ *   que ven enfermería y el administrador).
+ */
+export function useAtencionesPendientes(enabled = true, especialidadId?: number | null) {
   return useQuery({
-    queryKey: queryKeys.enfermeria.ambulatoriasPendientes(),
-    queryFn: fetchAtencionesPendientes,
+    queryKey: queryKeys.enfermeria.ambulatoriasPendientes(especialidadId),
+    queryFn: () => fetchAtencionesPendientes(especialidadId),
     enabled,
     // Pantalla compartida entre turnos: conviene refrescar seguido. Pero si la
     // migración no está aplicada, no tiene sentido golpear cada minuto.
@@ -325,10 +433,10 @@ export function useAtencionesPendientes(enabled = true) {
   });
 }
 
-export function useAtencionesRevisadas(enabled = true) {
+export function useAtencionesRevisadas(enabled = true, especialidadId?: number | null) {
   return useQuery({
-    queryKey: queryKeys.enfermeria.ambulatoriasRecientes(),
-    queryFn: fetchAtencionesRevisadas,
+    queryKey: queryKeys.enfermeria.ambulatoriasRecientes(especialidadId),
+    queryFn: () => fetchAtencionesRevisadas(especialidadId),
     enabled,
     retry: (failureCount, error) =>
       !esTablaFaltante(error as { code?: string; message?: string }) && failureCount < 2,

@@ -22,8 +22,10 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { usePacientes, type Paciente } from "@/api/pacientes";
 import { usePerfilProfesional } from "@/api/perfil";
 import { fechaHoyISO } from "@/api/citas";
+import { useEspecialidades } from "@/api/mantenimiento";
 import {
-  DESTINOS_AMBULATORIO, TIPOS_ATENCION, destinoAmbulatorio, useCrearAtencion,
+  DESTINOS_AMBULATORIO, TIPOS_ATENCION, destinoAmbulatorio, especialidadPredeterminada,
+  useCrearAtencion,
 } from "@/api/atenciones-enfermeria";
 import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
 import { imprimirConstanciaDeAtencion } from "./imprimir-constancia";
@@ -65,6 +67,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const nombrePerfil = perfilProf?.nombre ?? null;
   // Va a la firma de la constancia; se toma del perfil de quien registra.
   const registroPerfil = perfilProf?.registro ?? null;
+  const { data: especialidades = [] } = useEspecialidades();
   const { data: camas = [] } = useEnfermeriaCamas();
   const { data: internaciones = [] } = useEnfermeriaIngresos();
   const crear = useCrearAtencion();
@@ -78,6 +81,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [hora, setHora] = useState(horaAhora());
   const [tipo, setTipo] = useState("curacion");
+  const [especialidadId, setEspecialidadId] = useState("");
   const [motivo, setMotivo] = useState("");
   const [procedimiento, setProcedimiento] = useState("");
   const [procedimientos, setProcedimientos] = useState<NuevoProcedimiento[]>([]);
@@ -108,6 +112,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
       setFecha(fechaHoyISO());
       setHora(horaAhora());
       setTipo("curacion");
+      setEspecialidadId("");
       setMotivo("");
       setProcedimiento("");
       setProcedimientos([]);
@@ -134,6 +139,24 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
     if (open && nombrePerfil) setEnfermero((prev) => prev || nombrePerfil);
   }, [open, nombrePerfil]);
 
+  // Servicios entre los que se reparte la revisión médica.
+  const especialidadesActivas = useMemo(
+    () => especialidades.filter((e) => e.activo !== false),
+    [especialidades]
+  );
+  const servicioPorDefecto = useMemo(
+    () => especialidadPredeterminada(especialidadesActivas),
+    [especialidadesActivas]
+  );
+
+  // Casi todo va a Medicina General; se prellena y la enfermera lo cambia
+  // cuando el motivo es de otro servicio (una muela, una lesión de kinesio).
+  useEffect(() => {
+    if (open && servicioPorDefecto) {
+      setEspecialidadId((prev) => prev || String(servicioPorDefecto.id));
+    }
+  }, [open, servicioPorDefecto]);
+
   const pacientesFiltrados = useMemo(() => {
     if (!busquedaPaciente.trim()) return [];
     return pacientes
@@ -154,6 +177,12 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const handleGuardar = async (opts?: { eImprimir?: boolean }) => {
     if (!pacienteId) { await showSwalError("Selecciona el paciente atendido."); return; }
     if (!motivo.trim()) { await showSwalError("Indica el motivo de la atención."); return; }
+    // Si el catálogo no cargó no se bloquea el registro: la atención queda sin
+    // servicio y la ve cualquier profesional, que es lo que pasaba antes.
+    if (especialidadesActivas.length > 0 && !especialidadId) {
+      await showSwalError("Elige el servicio que debe revisar la atención (Medicina General, Odontología, etc.).");
+      return;
+    }
     if (!enfermero.trim()) { await showSwalError("Indica quién atendió (nombre y apellido)."); return; }
     if (!fecha) { await showSwalError("Indica la fecha de la atención."); return; }
     if (!hora) { await showSwalError("Indica la hora de la atención."); return; }
@@ -197,6 +226,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
 
       const atencion = await crear.mutateAsync({
         paciente_id: Number(pacienteId),
+        especialidad_id: especialidadId ? Number(especialidadId) : null,
         fecha,
         hora,
         enfermero: sanitizePlainText(enfermero) || null,
@@ -344,6 +374,27 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
               <Textarea id="aa-motivo" rows={2}
                 placeholder="Ej: Herida cortante en mano derecha durante instrucción"
                 value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+            </div>
+
+            {/* Servicio que debe revisarla: decide en qué panel aparece */}
+            <div className="space-y-1.5">
+              <Label htmlFor="aa-especialidad" className="font-semibold text-sm">
+                Servicio que debe revisarla *
+              </Label>
+              <Select value={especialidadId} onValueChange={setEspecialidadId}>
+                <SelectTrigger id="aa-especialidad" className="h-10">
+                  <SelectValue placeholder="Elegir servicio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {especialidadesActivas.map((e) => (
+                    <SelectItem key={e.id} value={String(e.id)}>{e.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                La atención le aparece como pendiente al profesional de ese servicio. Un dolor
+                de muelas va a Odontología; ante la duda, Medicina General.
+              </p>
             </div>
 
             {/* Signos vitales */}

@@ -95,8 +95,12 @@ export default function Dashboard() {
   const { data: citasSemana = [], isLoading: loadingCitasSemana } = useCitasRango(hace7Dias, hoy)
   const { data: miMedico, isLoading: loadingMedico } = useMiMedico(user?.id)
   // Aviso a los médicos: atenciones de enfermería sin revisar. Solo se pide
-  // cuando la cuenta tiene ficha de médico.
-  const { data: atencionesPorRevisar = [] } = useAtencionesPendientes(!!miMedico)
+  // cuando la cuenta tiene ficha de médico, y solo las de SU servicio (a la
+  // odontóloga no le corresponde un dolor de cabeza).
+  const { data: atencionesPorRevisar = [] } = useAtencionesPendientes(
+    !!miMedico,
+    miMedico?.especialidad?.id ?? null
+  )
   // Urgencias que ya pasaron por enfermería y esperan al médico. Es la cola
   // completa (no solo la de hoy): una ficha abierta anoche sigue esperando.
   const { data: racEnEspera = [] } = useRacEnEspera(!!miMedico)
@@ -349,7 +353,9 @@ export default function Dashboard() {
                   : `Hay ${atencionesPorRevisar.length} atenciones de enfermería esperando revisión médica`}
               </p>
               <p className="text-xs text-amber-700 dark:text-amber-300">
-                Enfermería atendió sin médico de guardia. Toque para revisarlas.
+                Enfermería atendió sin médico de guardia
+                {miMedico.especialidad?.nombre ? ` y las derivó a ${miMedico.especialidad.nombre}` : ""}.
+                Toque para revisarlas.
               </p>
             </div>
           </Link>

@@ -21,7 +21,10 @@ import {
 } from "@/api/anulaciones";
 import { AnularDialog } from "./anular-dialog";
 import { useInternacionesPaciente } from "@/api/enfermeria";
-import { labelDestinoAmbulatorio, labelTipoAtencion, useAtencionesPaciente } from "@/api/atenciones-enfermeria";
+import {
+  labelDestinoAmbulatorio, labelTipoAtencion, nombreEspecialidad, useAtencionesPaciente,
+} from "@/api/atenciones-enfermeria";
+import { useEspecialidades } from "@/api/mantenimiento";
 import { labelTipoProcedimiento, useProcedimientosPaciente } from "@/api/procedimientos";
 import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } from "@/api/rac";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
@@ -154,6 +157,8 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const { data: fichasRac = [] } = useFichasRacPaciente(open ? (paciente?.id ?? null) : null);
   const { data: atencionesEnfermeria = [] } = useAtencionesPaciente(open ? (paciente?.id ?? null) : null);
   const { data: procedimientos = [] } = useProcedimientosPaciente(open ? (paciente?.id ?? null) : null);
+  // Para poner nombre al servicio que debe revisar cada atención de enfermería.
+  const { data: especialidades = [] } = useEspecialidades();
   const anularConsulta = useAnularConsulta();
   const anularReceta = useAnularReceta();
   const restaurarConsulta = useRestaurarConsulta();
@@ -614,6 +619,11 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{fmtFecha(a.fecha)} · {a.hora?.slice(0, 5)} hs</span>
                             <Badge variant="outline">{labelTipoAtencion(a.tipo_atencion)}</Badge>
+                            {nombreEspecialidad(a.especialidad_id, especialidades) && (
+                              <Badge variant="outline">
+                                Para {nombreEspecialidad(a.especialidad_id, especialidades)}
+                              </Badge>
+                            )}
                             {a.destino && !["alta", "cita_medico", "derivado"].includes(a.destino) && (
                               <Badge className="bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-200">
                                 {labelDestinoAmbulatorio(a.destino)}
@@ -920,7 +930,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
 
                           {m.indicaciones && (
                             <p className="text-xs text-muted-foreground pl-8 italic">
-                              "{m.indicaciones}"
+                              «{m.indicaciones}»
                             </p>
                           )}
 

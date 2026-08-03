@@ -7,15 +7,17 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertCircle, CheckCircle2, ClipboardCheck, HeartPulse, Loader2, Plus, Printer, Stethoscope,
+  AlertCircle, CheckCircle2, ClipboardCheck, Filter, HeartPulse, Loader2, Plus, Printer,
+  Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useMiMedico } from "@/api/citas";
+import { useEspecialidades } from "@/api/mantenimiento";
 import {
   esDestinoImprimible, esTablaFaltante, labelDestinoAmbulatorio, labelTipoAtencion,
-  useAtencionesPendientes, useAtencionesRevisadas, useRevisarAtencion,
+  nombreEspecialidad, useAtencionesPendientes, useAtencionesRevisadas, useRevisarAtencion,
   type AtencionEnfermeria,
 } from "@/api/atenciones-enfermeria";
 import { imprimirConstanciaDeAtencion } from "./imprimir-constancia";
@@ -59,9 +61,11 @@ function nombrePaciente(a: AtencionEnfermeria): string {
 
 /** Tarjeta de una atención (se usa en pendientes y en el historial). */
 function TarjetaAtencion({
-  atencion, acciones,
+  atencion, servicio, acciones,
 }: {
   atencion: AtencionEnfermeria;
+  /** Servicio que debe revisarla; null si la atención quedó sin asignar. */
+  servicio?: string | null;
   acciones?: React.ReactNode;
 }) {
   const vitales = resumenVitales(atencion);
@@ -78,6 +82,9 @@ function TarjetaAtencion({
         </span>
         <Badge className="bg-teal-100 text-teal-700 border-0 dark:bg-teal-900/40 dark:text-teal-200">
           {labelTipoAtencion(atencion.tipo_atencion)}
+        </Badge>
+        <Badge variant="outline" className="text-xs">
+          {servicio ? `Para ${servicio}` : "Sin servicio asignado"}
         </Badge>
         {pendiente ? (
           <Badge className="bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/40 dark:text-amber-200">
@@ -146,12 +153,21 @@ export function AtencionAmbulatoriaPanel() {
   const { hasPermission, isAdmin } = usePermissions();
   const puedeRegistrar = hasPermission("consultas", "editar");
   const { data: miMedico } = useMiMedico(user?.id);
+  const { data: especialidades = [] } = useEspecialidades();
   // Revisan los médicos con su propia ficha y también el administrador (la
   // base lo acepta: el trigger permite firmar a es_sanidad_admin()).
   const puedeRevisar = !!miMedico || isAdmin;
 
-  const pendientesQuery = useAtencionesPendientes();
-  const revisadasQuery = useAtencionesRevisadas();
+  // Cada profesional ve lo de SU servicio: a la odontóloga no le sirve un dolor
+  // de cabeza. Enfermería y el administrador no tienen servicio propio y ven
+  // todo, que es justamente lo que necesitan para no perder ninguna.
+  const miServicioId = miMedico?.especialidad?.id ?? null;
+  const miServicio = miMedico?.especialidad?.nombre ?? null;
+  const [verTodos, setVerTodos] = useState(false);
+  const filtroServicio = verTodos ? null : miServicioId;
+
+  const pendientesQuery = useAtencionesPendientes(true, filtroServicio);
+  const revisadasQuery = useAtencionesRevisadas(true, filtroServicio);
   const revisar = useRevisarAtencion();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -224,6 +240,22 @@ export function AtencionAmbulatoriaPanel() {
         )}
       </div>
 
+      {/* Filtro por servicio (solo para quien tiene ficha de profesional) */}
+      {miServicioId && (
+        <div className="flex items-center gap-2 flex-wrap rounded-lg border bg-muted/20 px-3 py-2">
+          <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">
+            {verTodos
+              ? "Viendo las atenciones de todos los servicios."
+              : `Viendo solo las de su servicio: ${miServicio}. Las de otros servicios las revisa cada profesional.`}
+          </span>
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs ml-auto"
+            onClick={() => setVerTodos((v) => !v)}>
+            {verTodos ? `Ver solo ${miServicio}` : "Ver todos los servicios"}
+          </Button>
+        </div>
+      )}
+
       {/* Pendientes de revisión */}
       <div className="space-y-2">
         <h4 className="text-sm font-semibold flex items-center gap-1.5">
@@ -244,14 +276,22 @@ export function AtencionAmbulatoriaPanel() {
             </Button>
           </div>
         ) : pendientes.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg border-dashed">
-            No hay atenciones esperando revisión. ✔
-          </p>
+          <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg border-dashed space-y-1">
+            <p>
+              {filtroServicio
+                ? `No hay atenciones de ${miServicio} esperando revisión. ✔`
+                : "No hay atenciones esperando revisión. ✔"}
+            </p>
+            {filtroServicio && (
+              <p className="text-xs">Si busca una de otro servicio, toque «Ver todos los servicios».</p>
+            )}
+          </div>
         ) : (
           pendientes.map((a) => (
             <TarjetaAtencion
               key={a.id}
               atencion={a}
+              servicio={nombreEspecialidad(a.especialidad_id, especialidades)}
               acciones={puedeRevisar ? (
                 <div className="flex gap-1.5">
                   <Button variant="outline" size="sm" className="h-9 sm:h-7 px-2.5 text-xs gap-1"
@@ -291,7 +331,13 @@ export function AtencionAmbulatoriaPanel() {
             Todavía no hay atenciones revisadas.
           </p>
         ) : (
-          revisadas.map((a) => <TarjetaAtencion key={a.id} atencion={a} />)
+          revisadas.map((a) => (
+            <TarjetaAtencion
+              key={a.id}
+              atencion={a}
+              servicio={nombreEspecialidad(a.especialidad_id, especialidades)}
+            />
+          ))
         )}
       </div>
 

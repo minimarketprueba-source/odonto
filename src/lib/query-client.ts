@@ -135,10 +135,12 @@ export const queryKeys = {
     salas: () => [...queryKeys.enfermeria.all, 'salas'] as const,
     camas: () => [...queryKeys.enfermeria.all, 'camas'] as const,
     internaciones: () => [...queryKeys.enfermeria.all, 'internaciones'] as const,
-    ambulatoriasPendientes: () =>
-      [...queryKeys.enfermeria.all, 'ambulatorias', 'pendientes'] as const,
-    ambulatoriasRecientes: () =>
-      [...queryKeys.enfermeria.all, 'ambulatorias', 'recientes'] as const,
+    // El servicio (especialidad) va en la clave: cada profesional ve su propia
+    // lista y las dos no se pisan en la caché.
+    ambulatoriasPendientes: (especialidadId?: number | null) =>
+      [...queryKeys.enfermeria.all, 'ambulatorias', 'pendientes', especialidadId ?? 'todas'] as const,
+    ambulatoriasRecientes: (especialidadId?: number | null) =>
+      [...queryKeys.enfermeria.all, 'ambulatorias', 'recientes', especialidadId ?? 'todas'] as const,
     ambulatoriasPaciente: (pacienteId: number) =>
       [...queryKeys.enfermeria.all, 'ambulatorias', 'paciente', pacienteId] as const,
   },
