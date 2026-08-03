@@ -1,0 +1,59 @@
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production (build/ es buildResources de electron-builder: contiene el icono, se versiona)
+/dist
+/release
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+!.env.example
+
+# sensitive backups
+docs/backup-*.json
+
+# vercel
+.vercel
+
+# supabase CLI (estado local del proyecto vinculado)
+supabase/.temp/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+.env*.local
+
+# artefactos de pruebas (capturas Playwright, etc.)
+/test-results
+scripts/_tmp-*
+
+# configuración local de Claude Code (permisos de sesión / tokens personales)
+.claude/settings.json
+.claude/settings.local.json
+
+# logs y volcados de herramientas
+*.log
+eslint-*.txt
+errors.txt
+out.txt
+
+# documentos generados con datos reales (no versionar)
+docs/*.docx
+*.xlsx
+
+# codigo descartado de la plantilla control-peso
+/_descartado
+vitest.config.ts.timestamp-*
