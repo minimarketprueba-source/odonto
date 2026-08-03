@@ -1,5 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trophy } from "lucide-react"
+import { Trophy, ArrowLeft } from "lucide-react"
+import { Link } from "react-router-dom"
+import { Button } from "@/components/ui/button"
 
 export default function SignUpSuccessPage() {
   return (
@@ -14,11 +16,19 @@ export default function SignUpSuccessPage() {
           <CardTitle className="text-2xl font-bold text-balance">¡Gracias por registrarte!</CardTitle>
           <CardDescription>Revisa tu correo para confirmar tu cuenta</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground text-center">
             Te hemos enviado un enlace de confirmación a tu correo electrónico. Por favor, revisa tu bandeja de entrada
             y haz clic en el enlace para activar tu cuenta.
           </p>
+          <div className="flex justify-center">
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/login">
+                <ArrowLeft className="w-4 h-4" />
+                Volver al Login
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -4,6 +4,20 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 
+/**
+ * Si el error es de red (el pedido nunca llegó al servidor) y no una respuesta
+ * del servidor. PostgREST siempre devuelve un `code`; un fetch que no sale, no.
+ */
+function esFalloDeRed(error: { code?: string; message?: string }): boolean {
+  const mensaje = error.message ?? '';
+  return (
+    mensaje.includes('Failed to fetch') ||
+    mensaje.includes('NetworkError') ||
+    mensaje.includes('ERR_CONNECTION') ||
+    error.code === 'ERR_CONNECTION_REFUSED'
+  );
+}
+
 export function NetworkStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
@@ -34,19 +48,33 @@ export function NetworkStatus() {
 
   const checkSupabaseConnection = async () => {
     try {
+      // Se consulta `especialidades`, un catálogo chico de este sistema. Antes
+      // preguntaba por `config_peso`, que es de Control-Peso y no existe acá:
+      // el servidor contestaba 404 y la app mostraba "no se puede conectar con
+      // la base de datos" a todo el mundo apenas entraba, siendo que la
+      // conexión estaba perfecta.
       const { error } = await supabase
-        .from('config_peso')
-        .select('id')
+        .from('especialidades')
+        .select('id', { head: true, count: 'exact' })
         .limit(1);
 
-      if (error) {
+      // Si el servidor contestó algo —aunque sea un error de tabla o de
+      // permisos— hay conexión. Solo un fallo de red real (fetch que ni sale)
+      // significa estar desconectado, y eso cae en el catch.
+      if (error && esFalloDeRed(error)) {
         console.error('Error conectando con Supabase:', error);
         setIsSupabaseConnected(false);
         setShowAlert(true);
-      } else {
-        setIsSupabaseConnected(true);
-        setShowAlert(false);
+        return;
       }
+
+      if (error) {
+        // La base respondió con un problema propio (permisos, tabla, etc.).
+        // Se registra para poder diagnosticarlo, pero no es un corte de red.
+        console.warn('La base respondió con un error (hay conexión):', error.message);
+      }
+      setIsSupabaseConnected(true);
+      setShowAlert(false);
     } catch (error) {
       console.error('Error de red:', error);
       setIsSupabaseConnected(false);

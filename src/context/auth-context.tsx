@@ -125,6 +125,29 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
  * cuya clave está ausente (`undefined`), se completan con los permisos por defecto
  * que le corresponden a ese rol para ese módulo.
  */
+/**
+ * Rol provisorio deducido del correo, para cuentas sin fila en `user_roles`.
+ * Es solo para que la persona pueda entrar: lo que de verdad limita qué ve y
+ * qué puede tocar es el RLS de la base.
+ */
+export function rolPorCorreo(email?: string | null): string {
+  const correo = (email ?? '').toLowerCase()
+  if (correo.includes('admin')) return 'admin'
+  if (correo.includes('recepcion')) return 'recepcion'
+  if (correo.includes('asistente') || correo.includes('enfermeria')) return 'enfermeria'
+  return 'medico'
+}
+
+/**
+ * Si el error es "la tabla `user_roles` no existe" (falta la migración) y no
+ * otra cosa. Solo por código: PGRST205 es tabla desconocida y 42P01 es la
+ * misma falta del lado de Postgres. OJO: PGRST204 es *columna* faltante, que
+ * es un problema distinto y no debe caer acá.
+ */
+function esTablaRolesFaltante(error: { code?: string }): boolean {
+  return error.code === 'PGRST205' || error.code === '42P01'
+}
+
 export function resolverPermisosSanidad(
   rol: string | null,
   permissions: Record<string, string[]> | null
@@ -388,7 +411,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (roleError) {
+        if (roleError && esTablaRolesFaltante(roleError)) {
+          // La base todavía no tiene `user_roles` (falta auth_roles_setup.sql).
+          // Sin esto la persona entraba y chocaba con "Sin acceso", que no dice
+          // nada de la migración que falta. El candado real es el RLS, no esta
+          // pantalla, así que se cae en el mismo rol por email que ya se usa
+          // cuando la cuenta no tiene fila de rol.
+          logger.warn(
+            'Falta la tabla user_roles (aplicar supabase/migrations/auth_roles_setup.sql). ' +
+              'Se asigna un rol provisorio por correo.'
+          )
+          const rolFallback = rolPorCorreo(user.email)
+          setRole(rolFallback)
+          setPermissions(resolverPermisosSanidad(rolFallback, null))
+        } else if (roleError) {
           logger.error('Error cargando rol del usuario:', {
             message: roleError.message,
             code: roleError.code,
@@ -411,11 +447,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           )
         } else {
           // Si aún no tiene rol explícito en DB, asignar por defecto segun email o admin para desarrollo
-          let rolFallback = 'medico'
-          if (user.email?.includes('admin')) rolFallback = 'admin'
-          if (user.email?.includes('recepcion')) rolFallback = 'recepcion'
-          if (user.email?.includes('asistente') || user.email?.includes('enfermeria')) rolFallback = 'enfermeria'
-
+          const rolFallback = rolPorCorreo(user.email)
           setRole(rolFallback)
           setPermissions(resolverPermisosSanidad(rolFallback, null))
         }

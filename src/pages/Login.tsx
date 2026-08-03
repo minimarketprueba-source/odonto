@@ -8,6 +8,31 @@ import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { useAuth, DEMO_USERS } from "@/context/auth-context"
 
+/**
+ * Traduce los errores de Supabase Auth a algo que se entienda y que diga qué
+ * hacer. El mensaje crudo viene en inglés y "Email not confirmed" no le dice a
+ * nadie que la cuenta existe pero le falta el clic del correo de confirmación.
+ */
+function mensajeErrorLogin(err: unknown): string {
+  const e = err as { message?: string; code?: string } | null
+  const codigo = (e as any)?.code ?? ""
+  const texto = e?.message ?? ""
+
+  if (codigo === "email_not_confirmed" || texto.includes("Email not confirmed")) {
+    return "La cuenta existe pero el correo no está confirmado. Pedí al administrador que la confirme desde Supabase (Authentication → Users)."
+  }
+  if (codigo === "invalid_credentials" || texto.includes("Invalid login credentials")) {
+    return "Correo o contraseña incorrectos, o la cuenta todavía no fue creada."
+  }
+  if (texto.includes("Failed to fetch") || texto.includes("NetworkError")) {
+    return "No se pudo contactar al servidor. Revisá la conexión a internet."
+  }
+  if (codigo === "over_request_rate_limit" || texto.includes("rate limit")) {
+    return "Demasiados intentos seguidos. Esperá un minuto y volvé a probar."
+  }
+  return texto || "No se pudo iniciar sesión."
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -26,12 +51,7 @@ export default function LoginPage() {
       await login(email, password)
       navigate("/")
     } catch (err: unknown) {
-      // Si el login falla pero es una cuenta demo, o para testing inicial, intentamos registro/ingreso
-      let message = "Credenciales incorrectas o usuario no registrado."
-      if (typeof err === "object" && err !== null && "message" in err && typeof (err as any).message === "string") {
-        message = (err as any).message
-      }
-      setError(`${message}. (Si aún no has creado tu usuario en Supabase, usa los botones de Acceso Rápido Demo).`)
+      setError(mensajeErrorLogin(err))
     } finally {
       setIsLoading(false)
     }
