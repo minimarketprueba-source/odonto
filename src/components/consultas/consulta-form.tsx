@@ -30,6 +30,8 @@ import {
 } from "@/api/consultas";
 import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
 import { imprimirCertificadoReposo, documentoReposo, cleanQrText, imprimirOrdenEstudios } from "@/lib/imprimir";
+import { ProcedimientosSection } from "./procedimientos-section";
+import type { NuevoProcedimiento } from "@/api/procedimientos";
 
 function sumarDiasISO(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T00:00:00`);
@@ -123,6 +125,7 @@ export function ConsultaForm({
   const [reposoHasta, setReposoHasta] = useState("");
   const [reposoDias, setReposoDias] = useState("");
   const [camaId, setCamaId] = useState("");
+  const [procedimientos, setProcedimientos] = useState<NuevoProcedimiento[]>([]);
 
   // Estado para Solicitud de Orden de Estudios Médicos
   const [ordenEstudiosOpen, setOrdenEstudiosOpen] = useState(false);
@@ -191,6 +194,7 @@ export function ConsultaForm({
       setReposoHasta(hastaInicial);
       setReposoDias(hastaInicial ? String(diasEntre(fechaBase, hastaInicial)) : "");
       setCamaId("");
+      setProcedimientos([]);
       setEstudiosSolicitados("");
       setEstudiosIndicaciones("");
       internacionCreada.current = null;
@@ -253,6 +257,10 @@ export function ConsultaForm({
       qrSvgHtml,
     });
 
+    // Guardar la orden en el tratamiento para que persista en la base de datos
+    const marca = `[ESTUDIOS SOLICITADOS: ${estudiosSolicitados.trim()}]`;
+    setTratamiento((prev) => (prev.includes(marca) ? prev : (prev ? `${prev.trim()}\n${marca}` : marca)));
+
     setOrdenEstudiosOpen(false);
     await showSwalSuccess("Orden de estudios emitida. Se abre para imprimir.");
   };
@@ -307,6 +315,7 @@ export function ConsultaForm({
         reposo_tipo: reposoTipo,
         reposo_desde: reposoTipo ? fecha : null,
         reposo_hasta: reposoTipo ? reposoHasta || null : null,
+        procedimientos,
       });
 
       onCreated?.(res);
@@ -581,6 +590,8 @@ export function ConsultaForm({
                 onChange={(e) => setTratamiento(e.target.value)}
               />
             </div>
+
+            <ProcedimientosSection value={procedimientos} onChange={setProcedimientos} />
 
             {/* Destino: con qué conducta termina la atención */}
             <div className="rounded-lg border p-4 space-y-4 bg-muted/20">

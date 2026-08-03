@@ -96,9 +96,18 @@ describe('permisos efectivos', () => {
     expect(resolverPermisosSanidad('medico', {})).toEqual(DEFAULT_PERMISOS_SANIDAD.medico)
   })
 
-  it('respeta los permisos explícitos no vacíos', () => {
-    const permisos = { citas: ['ver'] }
-    expect(resolverPermisosSanidad('medico', permisos)).toBe(permisos)
+  it('completa módulos faltantes (undefined) con los permisos por defecto del rol', () => {
+    const permisosPrevios = { pacientes: ['ver', 'editar'], citas: ['ver'] }
+    const res = resolverPermisosSanidad('nutricionista', permisosPrevios)
+    expect(res?.nutricion).toEqual(['ver', 'editar'])
+    expect(res?.citas).toEqual(['ver'])
+    expect(res?.pacientes).toEqual(['ver', 'editar'])
+  })
+
+  it('respeta las revocaciones explícitas de módulos (array vacío)', () => {
+    const permisosRevocados = { pacientes: ['ver', 'editar'], nutricion: [] }
+    const res = resolverPermisosSanidad('nutricionista', permisosRevocados)
+    expect(res?.nutricion).toEqual([])
   })
 
   it('sin rol no concede permisos', () => {

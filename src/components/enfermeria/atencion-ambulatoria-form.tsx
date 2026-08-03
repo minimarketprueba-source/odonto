@@ -28,6 +28,8 @@ import {
 import { useEnfermeriaCamas, useEnfermeriaIngresos, useIngresarPacienteCama } from "@/api/enfermeria";
 import { imprimirConstanciaDeAtencion } from "./imprimir-constancia";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
+import { ProcedimientosSection } from "@/components/consultas/procedimientos-section";
+import type { NuevoProcedimiento } from "@/api/procedimientos";
 
 function sumarDiasISO(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T00:00:00`);
@@ -78,6 +80,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
   const [tipo, setTipo] = useState("curacion");
   const [motivo, setMotivo] = useState("");
   const [procedimiento, setProcedimiento] = useState("");
+  const [procedimientos, setProcedimientos] = useState<NuevoProcedimiento[]>([]);
   const [observaciones, setObservaciones] = useState("");
   const [destino, setDestino] = useState("alta");
   const [reposoDias, setReposoDias] = useState("");
@@ -107,6 +110,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
       setTipo("curacion");
       setMotivo("");
       setProcedimiento("");
+      setProcedimientos([]);
       setObservaciones("");
       setDestino("alta");
       setReposoDias("");
@@ -212,6 +216,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
         fr: enteroSignoONull(fr),
         temp: numeroSignoONull(temp),
         spo2: enteroSignoONull(spo2),
+        procedimientos,
       });
 
       if (opts?.eImprimir) imprimirConstanciaDeAtencion(atencion);
@@ -381,6 +386,7 @@ export function AtencionAmbulatoriaForm({ open, onOpenChange, pacienteInicial }:
             </div>
 
             {/* Procedimiento */}
+            <ProcedimientosSection value={procedimientos} onChange={setProcedimientos} />
             <div className="space-y-1.5">
               <Label htmlFor="aa-procedimiento" className="font-semibold text-sm">Qué se hizo (procedimiento)</Label>
               <Textarea id="aa-procedimiento" rows={2}

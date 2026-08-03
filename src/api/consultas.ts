@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
 import { cambiarEstadoCita } from "./citas";
+import { insertarProcedimientos, type NuevoProcedimiento } from "./procedimientos";
 
 export type ReposoTipo = "local" | "domiciliario";
 
@@ -93,6 +94,7 @@ export interface Consulta {
     especialidad: { nombre: string; color: string | null } | null;
   } | null;
   cie10?: { id: number; codigo: string; descripcion: string } | null;
+  procedimientos?: import("./procedimientos").ProcedimientoSanitario[];
 }
 
 export interface Cie10 {
@@ -115,10 +117,11 @@ export interface CreateConsultaInput {
   reposo_tipo?: ReposoTipo | null;
   reposo_desde?: string | null;
   reposo_hasta?: string | null;
+  procedimientos?: NuevoProcedimiento[];
 }
 
 const CONSULTA_SELECT =
-  "*, medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color)), cie10:cie10(id, codigo, descripcion), cita:citas(id, hora)";
+  "*, medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color)), cie10:cie10(id, codigo, descripcion), cita:citas(id, hora), procedimientos:procedimientos_sanitarios(*)";
 
 export async function fetchConsultasPaciente(
   pacienteId: number,
@@ -137,9 +140,10 @@ export async function fetchConsultasPaciente(
 }
 
 export async function createConsulta(input: CreateConsultaInput): Promise<Consulta> {
+  const { procedimientos, ...consultaInput } = input;
   const { data, error } = await supabase
     .from("consultas")
-    .insert({ ...input, clinica_id: CLINICA_ID })
+    .insert({ ...consultaInput, clinica_id: CLINICA_ID })
     .select(CONSULTA_SELECT)
     .single();
   if (error) throw new Error(`No se pudo registrar la consulta: ${error.message}`);
@@ -148,7 +152,8 @@ export async function createConsulta(input: CreateConsultaInput): Promise<Consul
   if (input.cita_id) {
     await cambiarEstadoCita(input.cita_id, "atendida");
   }
-  return data as unknown as Consulta;
+  const procedimientosGuardados = await insertarProcedimientos(procedimientos ?? [], { paciente_id: input.paciente_id, fecha: input.fecha, consulta_id: (data as { id: number }).id });
+  return { ...(data as unknown as Consulta), procedimientos: procedimientosGuardados };
 }
 
 export async function searchCie10(q: string): Promise<Cie10[]> {

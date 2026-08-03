@@ -146,14 +146,32 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
 /**
  * Usa los permisos explícitos cuando existen y los del rol cuando la fila
  * todavía tiene el JSON vacío que deja la Edge Function compartida.
+ *
+ * Si existen permisos explícitos pero se agregaron módulos nuevos (ej. nutrición)
+ * cuya clave está ausente (`undefined`), se completan con los permisos por defecto
+ * que le corresponden a ese rol para ese módulo.
  */
 export function resolverPermisosSanidad(
   rol: string | null,
   permissions: Record<string, string[]> | null
 ): Record<string, string[]> | null {
   if (!rol) return null
-  if (permissions && Object.keys(permissions).length > 0) return permissions
-  return DEFAULT_PERMISOS_SANIDAD[rol] ?? null
+  const defaults = DEFAULT_PERMISOS_SANIDAD[rol] ?? null
+  if (!permissions || Object.keys(permissions).length === 0) return defaults
+
+  if (!defaults) return permissions
+
+  const merged = { ...permissions }
+  let changed = false
+
+  for (const [modKey, defPerms] of Object.entries(defaults)) {
+    if (merged[modKey] === undefined) {
+      merged[modKey] = defPerms
+      changed = true
+    }
+  }
+
+  return changed ? merged : permissions
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)

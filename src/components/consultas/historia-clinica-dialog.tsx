@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance, HeartPulse, Lock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Stethoscope, FileText, Printer, ShieldAlert, Ban, RotateCcw, BedDouble, Ambulance, HeartPulse, Lock, Pill, Search, FileSpreadsheet, ClipboardPlus } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { labelDestinoAtencion, useConsultasPaciente, type Consulta } from "@/api/consultas";
@@ -21,6 +22,7 @@ import {
 import { AnularDialog } from "./anular-dialog";
 import { useInternacionesPaciente } from "@/api/enfermeria";
 import { labelDestinoAmbulatorio, labelTipoAtencion, useAtencionesPaciente } from "@/api/atenciones-enfermeria";
+import { labelTipoProcedimiento, useProcedimientosPaciente } from "@/api/procedimientos";
 import { labelDestino, numeroRac, triaje as nivelTriaje, useFichasRacPaciente } from "@/api/rac";
 import { labelTipoPaciente, type Paciente } from "@/api/pacientes";
 import { ConsultaForm } from "./consulta-form";
@@ -66,6 +68,8 @@ const GRID_PESTANAS: Record<number, string> = {
   1: "grid-cols-1",
   2: "grid-cols-2",
   3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-5",
 };
 
 function cleanQrText(text: string): string {
@@ -149,6 +153,7 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const { data: internaciones = [] } = useInternacionesPaciente(open ? (paciente?.id ?? null) : null);
   const { data: fichasRac = [] } = useFichasRacPaciente(open ? (paciente?.id ?? null) : null);
   const { data: atencionesEnfermeria = [] } = useAtencionesPaciente(open ? (paciente?.id ?? null) : null);
+  const { data: procedimientos = [] } = useProcedimientosPaciente(open ? (paciente?.id ?? null) : null);
   const anularConsulta = useAnularConsulta();
   const anularReceta = useAnularReceta();
   const restaurarConsulta = useRestaurarConsulta();
@@ -159,6 +164,8 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
   const [formOpen, setFormOpen] = useState(false);
   const [recetaOpen, setRecetaOpen] = useState(false);
   const [servicioFiltro, setServicioFiltro] = useState("todos");
+  const [busquedaMedicamento, setBusquedaMedicamento] = useState("");
+  const [busquedaEstudio, setBusquedaEstudio] = useState("");
 
   const nombre = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : "";
 
@@ -328,7 +335,128 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
       ? vigentes
       : vigentes.filter((c) => c.medico?.especialidad?.nombre === servicioFiltro);
 
-  const cantidadPestanas = 1 + (veRecetas ? 1 : 0) + (isAdmin ? 1 : 0);
+  // Consolida todos los ítems prescriptos en las recetas vigentes del paciente
+  const todosLosMedicamentos = useMemo(() => {
+    const lista: {
+      id: string;
+      medicamento: string;
+      dosis: string | null;
+      frecuencia: string | null;
+      duracion: string | null;
+      indicaciones: string | null;
+      fecha: string;
+      recetaNumero: string;
+      medicoNombre: string | null;
+    }[] = [];
+
+    for (const r of recetasVigentes) {
+      const medicoNombre = r.medico ? `Dr(a). ${r.medico.apellidos}, ${r.medico.nombres}` : null;
+      for (const item of r.items ?? []) {
+        lista.push({
+          id: `${r.id}-${item.id || item.medicamento}`,
+          medicamento: item.medicamento,
+          dosis: item.dosis ?? null,
+          frecuencia: item.frecuencia ?? null,
+          duracion: item.duracion ?? null,
+          indicaciones: item.indicaciones ?? null,
+          fecha: r.fecha,
+          recetaNumero: r.numero,
+          medicoNombre,
+        });
+      }
+    }
+
+    return lista;
+  }, [recetasVigentes]);
+
+  const medicamentosFiltrados = useMemo(() => {
+    if (!busquedaMedicamento.trim()) return todosLosMedicamentos;
+    const q = busquedaMedicamento.toLowerCase();
+    return todosLosMedicamentos.filter(
+      (m) =>
+        m.medicamento.toLowerCase().includes(q) ||
+        m.dosis?.toLowerCase().includes(q) ||
+        m.frecuencia?.toLowerCase().includes(q) ||
+        m.indicaciones?.toLowerCase().includes(q) ||
+        m.recetaNumero.toLowerCase().includes(q)
+    );
+  }, [todosLosMedicamentos, busquedaMedicamento]);
+
+  // Consolida órdenes de laboratorio y radiología (RAC) más solicitudes de estudios (consultas)
+  const estudiosHistoricos = useMemo(() => {
+    const lista: {
+      id: string;
+      tipo: "laboratorio" | "radiologia" | "estudio_medico";
+      titulo: string;
+      descripcion: string;
+      fecha: string;
+      medico: string | null;
+      origen: string;
+      diagnostico?: string | null;
+    }[] = [];
+
+    // 1. Laboratorio y Radiología registrados en RAC / Urgencias
+    for (const f of fichasRac) {
+      if (f.laboratorio?.trim()) {
+        lista.push({
+          id: `rac-lab-${f.id}`,
+          tipo: "laboratorio",
+          titulo: "Análisis de Laboratorio",
+          descripcion: f.laboratorio.trim(),
+          fecha: f.fecha,
+          medico: f.enfermero ? `Enf. ${f.enfermero}` : "Urgencias / RAC",
+          origen: "Urgencias (RAC)",
+          diagnostico: f.diagnostico,
+        });
+      }
+      if (f.radiologia?.trim()) {
+        lista.push({
+          id: `rac-rad-${f.id}`,
+          tipo: "radiologia",
+          titulo: "Radiología / Imagen",
+          descripcion: f.radiologia.trim(),
+          fecha: f.fecha,
+          medico: f.enfermero ? `Enf. ${f.enfermero}` : "Urgencias / RAC",
+          origen: "Urgencias (RAC)",
+          diagnostico: f.diagnostico,
+        });
+      }
+    }
+
+    // 2. Órdenes de estudios emitidas en Consultas Médicas
+    for (const c of vigentes) {
+      const texto = c.tratamiento || "";
+      const match = texto.match(/\[ESTUDIOS SOLICITADOS:\s*([^\]]+)\]/i);
+      if (match && match[1]?.trim()) {
+        lista.push({
+          id: `con-est-${c.id}`,
+          tipo: "estudio_medico",
+          titulo: "Solicitud de Estudios Médicos",
+          descripcion: match[1].trim(),
+          fecha: c.fecha,
+          medico: c.medico ? `Dr(a). ${c.medico.apellidos}, ${c.medico.nombres}` : null,
+          origen: c.medico?.especialidad?.nombre || "Consulta Médica",
+          diagnostico: c.diagnostico,
+        });
+      }
+    }
+
+    return lista.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [fichasRac, vigentes]);
+
+  const estudiosFiltrados = useMemo(() => {
+    if (!busquedaEstudio.trim()) return estudiosHistoricos;
+    const q = busquedaEstudio.toLowerCase();
+    return estudiosHistoricos.filter(
+      (e) =>
+        e.titulo.toLowerCase().includes(q) ||
+        e.descripcion.toLowerCase().includes(q) ||
+        e.origen.toLowerCase().includes(q) ||
+        (e.diagnostico && e.diagnostico.toLowerCase().includes(q))
+    );
+  }, [estudiosHistoricos, busquedaEstudio]);
+
+  const cantidadPestanas = 1 + (veRecetas ? 2 : 0) + 2 + (isAdmin ? 1 : 0);
 
   const detalleConsulta = (c: Consulta) =>
     `Consulta del ${fmtFecha(c.fecha)}${c.medico?.especialidad ? ` — ${c.medico.especialidad.nombre}` : ""} — ${nombre}`;
@@ -401,6 +529,9 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
             <TabsList className={`grid w-full ${GRID_PESTANAS[cantidadPestanas]}`}>
               <TabsTrigger value="consultas" className="min-w-0 text-xs sm:text-sm">Consultas ({vigentes.length})</TabsTrigger>
               {veRecetas && <TabsTrigger value="recetas" className="min-w-0 text-xs sm:text-sm">Recetas ({recetasVigentes.length})</TabsTrigger>}
+              {veRecetas && <TabsTrigger value="medicamentos" className="min-w-0 text-xs sm:text-sm">Medicamentos ({todosLosMedicamentos.length})</TabsTrigger>}
+              <TabsTrigger value="estudios" className="min-w-0 text-xs sm:text-sm">Estudios ({estudiosHistoricos.length})</TabsTrigger>
+              <TabsTrigger value="procedimientos" className="min-w-0 text-xs sm:text-sm">Prácticas ({procedimientos.length})</TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="anuladas" className="min-w-0 text-xs sm:text-sm">
                   Anuladas ({anuladas.length + recetasAnuladas.length})
@@ -737,6 +868,161 @@ export function HistoriaClinicaDialog({ open, onOpenChange, paciente }: Historia
                 )}
               </TabsContent>
             )}
+
+            {veRecetas && (
+              <TabsContent value="medicamentos" className="flex-1 overflow-y-auto space-y-3 py-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por medicamento, posología, indicación o número de receta..."
+                    value={busquedaMedicamento}
+                    onChange={(e) => setBusquedaMedicamento(e.target.value)}
+                    className="pl-9 h-9 text-sm"
+                  />
+                </div>
+
+                {medicamentosFiltrados.length === 0 ? (
+                  <div className="text-center py-8 border rounded-lg bg-muted/20">
+                    <Pill className="w-10 h-10 mx-auto text-muted-foreground opacity-50 mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {busquedaMedicamento ? "No se encontraron medicamentos con esa búsqueda" : "Sin fármacos prescriptos registrados"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-2.5">
+                    {medicamentosFiltrados.map((m) => {
+                      const posologia = [m.dosis, m.frecuencia, m.duracion].filter(Boolean).join(" · ");
+                      return (
+                        <div
+                          key={m.id}
+                          className="p-3 rounded-lg border bg-card hover:border-primary/50 transition-colors space-y-1.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 rounded-full bg-primary/10 text-primary">
+                                <Pill className="w-4 h-4" />
+                              </div>
+                              <h4 className="font-semibold text-sm">{m.medicamento}</h4>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground">
+                              <Badge variant="outline" className="font-mono text-[10px]">
+                                {m.recetaNumero}
+                              </Badge>
+                              <span>{fmtFecha(m.fecha)}</span>
+                            </div>
+                          </div>
+
+                          {posologia && (
+                            <p className="text-xs font-medium text-primary dark:text-primary-foreground pl-8">
+                              {posologia}
+                            </p>
+                          )}
+
+                          {m.indicaciones && (
+                            <p className="text-xs text-muted-foreground pl-8 italic">
+                              "{m.indicaciones}"
+                            </p>
+                          )}
+
+                          {m.medicoNombre && (
+                            <div className="text-[11px] text-muted-foreground pl-8 pt-0.5 border-t border-border/50">
+                              Prescripto por: <span className="font-medium text-foreground">{m.medicoNombre}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            )}
+
+            <TabsContent value="procedimientos" className="flex-1 overflow-y-auto space-y-2 py-2">
+              {procedimientos.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-6">Sin procedimientos o prácticas registradas.</p>
+              ) : procedimientos.map((p) => (
+                <div key={p.id} className="rounded-lg border p-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2"><ClipboardPlus className="w-4 h-4 text-violet-600" /><span className="font-semibold text-sm">{labelTipoProcedimiento(p.tipo)}</span><Badge variant="outline">× {p.cantidad}</Badge></div>
+                    <span className="text-xs text-muted-foreground">{fmtFecha(p.fecha)}</span>
+                  </div>
+                  {p.detalle && <p className="text-sm whitespace-pre-wrap">{p.detalle}</p>}
+                </div>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="estudios" className="flex-1 overflow-y-auto space-y-3 py-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por tipo de estudio, laboratorio, radiología o diagnóstico..."
+                  value={busquedaEstudio}
+                  onChange={(e) => setBusquedaEstudio(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+
+              {estudiosFiltrados.length === 0 ? (
+                <div className="text-center py-8 border rounded-lg bg-muted/20">
+                  <FileSpreadsheet className="w-10 h-10 mx-auto text-muted-foreground opacity-50 mb-2" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {busquedaEstudio ? "No se encontraron estudios con esa búsqueda" : "Sin órdenes de estudios ni análisis registrados"}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-2.5">
+                  {estudiosFiltrados.map((item) => {
+                    const badgeColor =
+                      item.tipo === "laboratorio"
+                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200 border-purple-200"
+                        : item.tipo === "radiologia"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 border-blue-200"
+                        : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-200";
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-lg border bg-card hover:border-primary/50 transition-colors space-y-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-full bg-primary/10 text-primary">
+                              <FileSpreadsheet className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-sm">{item.titulo}</h4>
+                              <p className="text-xs text-muted-foreground">{item.origen}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground">
+                            <Badge variant="outline" className={badgeColor}>
+                              {item.tipo === "laboratorio" ? "Laboratorio" : item.tipo === "radiologia" ? "Radiología / Imagen" : "Estudio Médico"}
+                            </Badge>
+                            <span>{fmtFecha(item.fecha)}</span>
+                          </div>
+                        </div>
+
+                        <div className="pl-8 pt-1">
+                          <p className="text-xs font-medium text-foreground whitespace-pre-wrap">
+                            {item.descripcion}
+                          </p>
+                          {item.diagnostico && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Dx presuntivo: {item.diagnostico}
+                            </p>
+                          )}
+                          {item.medico && (
+                            <p className="text-[11px] text-muted-foreground mt-1 border-t border-border/50 pt-0.5">
+                              Solicitado por: <span className="font-medium text-foreground">{item.medico}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
 
             {isAdmin && (
               <TabsContent value="anuladas" className="flex-1 overflow-y-auto space-y-2 py-2">

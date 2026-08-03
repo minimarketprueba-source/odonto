@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
+import { insertarProcedimientos, type NuevoProcedimiento } from "./procedimientos";
 
 // --- Catálogos (viven en el código, la columna es texto libre) --------------
 
@@ -104,6 +105,7 @@ export interface AtencionEnfermeria {
     grado?: string | null; unidad?: string | null;
   } | null;
   medico_revisor?: { id: number; nombres: string; apellidos: string } | null;
+  procedimientos?: import("./procedimientos").ProcedimientoSanitario[];
 }
 
 export interface CrearAtencionInput {
@@ -125,6 +127,7 @@ export interface CrearAtencionInput {
   fr?: number | null;
   temp?: number | null;
   spo2?: number | null;
+  procedimientos?: NuevoProcedimiento[];
 }
 
 export interface RevisarAtencionInput {
@@ -140,7 +143,7 @@ export interface RevisarAtencionInput {
 
 const ATENCION_SELECT =
   "*, paciente:pacientes(id, nombres, apellidos, documento, tipo, grado, unidad), " +
-  "medico_revisor:medicos(id, nombres, apellidos)";
+  "medico_revisor:medicos(id, nombres, apellidos), procedimientos:procedimientos_sanitarios(*)";
 
 // --- Errores ----------------------------------------------------------------
 
@@ -258,7 +261,7 @@ export async function fetchAtencionesPaciente(pacienteId: number): Promise<Atenc
 }
 
 export async function crearAtencion(input: CrearAtencionInput): Promise<AtencionEnfermeria> {
-  const { reposo_hasta, enfermero_registro, ...resto } = input;
+  const { reposo_hasta, enfermero_registro, procedimientos, ...resto } = input;
   const { data, error } = await supabase
     .from("atenciones_enfermeria")
     // reposo_hasta solo viaja cuando hay reposo: así los demás destinos siguen
@@ -272,7 +275,8 @@ export async function crearAtencion(input: CrearAtencionInput): Promise<Atencion
     .select(ATENCION_SELECT)
     .single();
   if (error) throw traducirErrorAtencion(error, "No se pudo registrar la atención");
-  return data as unknown as AtencionEnfermeria;
+  const procedimientosGuardados = await insertarProcedimientos(procedimientos ?? [], { paciente_id: input.paciente_id, fecha: input.fecha, atencion_enfermeria_id: (data as unknown as { id: number }).id });
+  return { ...(data as unknown as AtencionEnfermeria), procedimientos: procedimientosGuardados };
 }
 
 /**
