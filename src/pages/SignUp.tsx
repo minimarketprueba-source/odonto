@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Trophy, Eye, EyeOff } from "lucide-react"
+import { Activity, Eye, EyeOff, Sparkles } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 
@@ -15,67 +15,63 @@ export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  // const [formTouched, setFormTouched] = useState(false); // Eliminado: no se usa
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [repeatPasswordError, setRepeatPasswordError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [repeatPasswordError, setRepeatPasswordError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const validateEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
 
-  // Validaciones en tiempo real
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
+    setEmail(e.target.value)
     if (!validateEmail(e.target.value)) {
-      setEmailError("Correo electrónico inválido");
+      setEmailError("Correo electrónico inválido")
     } else {
-      setEmailError(null);
+      setEmailError(null)
     }
-  };
+  }
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
+    setPassword(e.target.value)
     if (e.target.value.length < 6) {
-      setPasswordError("La contraseña debe tener al menos 6 caracteres");
+      setPasswordError("La contraseña debe tener al menos 6 caracteres")
     } else {
-      setPasswordError(null);
+      setPasswordError(null)
     }
-    // También validar coincidencia de contraseñas
     if (repeatPassword && e.target.value !== repeatPassword) {
-      setRepeatPasswordError("Las contraseñas no coinciden");
+      setRepeatPasswordError("Las contraseñas no coinciden")
     } else {
-      setRepeatPasswordError(null);
+      setRepeatPasswordError(null)
     }
-  };
+  }
 
   const handleRepeatPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setRepeatPassword(e.target.value);
+    setRepeatPassword(e.target.value)
     if (password !== e.target.value) {
-      setRepeatPasswordError("Las contraseñas no coinciden");
+      setRepeatPasswordError("Las contraseñas no coinciden")
     } else {
-      setRepeatPasswordError(null);
+      setRepeatPasswordError(null)
     }
-  };
+  }
 
   const validateForm = () => {
-    if (!validateEmail(email)) return false;
-    if (password.length < 6) return false;
-    if (password !== repeatPassword) return false;
-    if (emailError || passwordError || repeatPasswordError) return false;
-    return true;
-  };
+    if (!validateEmail(email)) return false
+    if (password.length < 6) return false
+    if (password !== repeatPassword) return false
+    if (emailError || passwordError || repeatPasswordError) return false
+    return true
+  }
 
   const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+    e.preventDefault()
+    setError(null)
     if (!validateForm()) {
-      setError("Por favor corrige los errores antes de continuar.");
-      return;
+      setError("Por favor corrige los errores antes de continuar.")
+      return
     }
-    // Validar datos antes de enviar
-    setIsLoading(true);
+    setIsLoading(true)
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -83,63 +79,73 @@ export default function SignUpPage() {
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
-      });
-      if (error) throw error;
-      navigate("/auth/sign-up-success");
+      })
+      if (error) throw error
+      navigate("/auth/sign-up-success")
     } catch (error: unknown) {
-      let errorMessage = "Ocurrió un error";
+      let errorMessage = "Ocurrió un error al registrar el usuario"
       if (typeof error === "object" && error !== null && "message" in error && typeof (error as any).message === "string") {
-        errorMessage = (error as any).message;
+        errorMessage = (error as any).message
       }
-      setError(errorMessage);
+      setError(errorMessage)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-50">
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-bl from-cyan-400/10 via-slate-50 to-blue-500/10" />
-      <div className="absolute inset-0 bg-gradient-to-tl from-blue-400/5 via-transparent to-cyan-500/5" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-900 text-slate-100">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-900/40 via-slate-900 to-slate-950" />
+      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:32px_32px]" />
 
-      {/* Floating elements */}
-      <div className="absolute top-32 right-32 w-64 h-64 bg-cyan-400/5 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-32 left-32 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}} />
-      <div className="absolute top-1/3 left-1/3 w-72 h-72 bg-cyan-500/3 rounded-full blur-3xl animate-pulse" style={{animationDelay: '3s'}} />
+      <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" />
 
-      <Card className="w-full max-w-md relative z-10 bg-card/80 backdrop-blur-md border border-border/50 shadow-2xl">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-accent to-primary rounded-2xl flex items-center justify-center shadow-lg ring-4 ring-accent/20">
-              <Trophy className="w-8 h-8 text-primary-foreground drop-shadow-sm" />
+      <Card className="w-full max-w-lg relative z-10 bg-slate-900/80 backdrop-blur-xl border border-teal-500/20 shadow-2xl shadow-teal-950/50">
+        <CardHeader className="text-center pb-2">
+          <div className="flex justify-center mb-3">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 shadow-lg shadow-teal-500/30">
+              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
+                <Activity className="w-8 h-8 text-teal-400" />
+              </div>
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-            Crear Cuenta
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold mb-2 mx-auto">
+            <Sparkles className="w-3.5 h-3.5" />
+            Registro de Personal Clínico
+          </div>
+
+          <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-teal-200 via-cyan-200 to-white bg-clip-text text-transparent">
+            Crear Cuenta de Usuario
           </CardTitle>
-          <CardDescription className="text-muted-foreground font-medium">
-            Regístrate para gestionar tus ligas deportivas
+          <CardDescription className="text-slate-400 text-sm mt-1">
+            Sanidad ISEPOL — Clínica Odontológica
           </CardDescription>
         </CardHeader>
-        <CardContent>
+
+        <CardContent className="space-y-4 pt-2">
           <form onSubmit={handleSignUp} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground font-medium">Correo electrónico</Label>
+              <Label htmlFor="email" className="text-slate-200 font-medium text-xs uppercase tracking-wider">
+                Correo electrónico
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="tu@email.com"
+                placeholder="doctor@odonto.com"
                 value={email}
                 onChange={handleEmailChange}
-                className={`text-foreground placeholder:text-muted-foreground bg-background/50 ${emailError ? 'border-destructive' : ''}`}
+                className="bg-slate-950/60 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500/20 h-11"
                 required
                 autoComplete="email"
               />
-              {emailError && <p className="text-xs text-destructive mt-1">{emailError}</p>}
+              {emailError && <p className="text-xs text-red-400">{emailError}</p>}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground font-medium">Contraseña</Label>
+              <Label htmlFor="password" className="text-slate-200 font-medium text-xs uppercase tracking-wider">
+                Contraseña
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -147,7 +153,7 @@ export default function SignUpPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={handlePasswordChange}
-                  className={`text-foreground placeholder:text-muted-foreground bg-background/50 ${passwordError ? 'border-destructive' : ''}`}
+                  className="bg-slate-950/60 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500/20 h-11 pr-10"
                   required
                   autoComplete="new-password"
                 />
@@ -155,41 +161,46 @@ export default function SignUpPage() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                  className="absolute right-0 top-0 h-full px-3 text-slate-400 hover:text-slate-200 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {passwordError && <p className="text-xs text-destructive mt-1">{passwordError}</p>}
+              {passwordError && <p className="text-xs text-red-400">{passwordError}</p>}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="repeat-password" className="text-foreground font-medium">Repetir Contraseña</Label>
+              <Label htmlFor="repeat-password" className="text-slate-200 font-medium text-xs uppercase tracking-wider">
+                Repetir Contraseña
+              </Label>
               <Input
                 id="repeat-password"
                 type="password"
                 placeholder="••••••••"
                 value={repeatPassword}
                 onChange={handleRepeatPasswordChange}
-                className={`text-foreground placeholder:text-muted-foreground bg-background/50 ${repeatPasswordError ? 'border-destructive' : ''}`}
+                className="bg-slate-950/60 border-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500/20 h-11"
                 required
                 autoComplete="new-password"
               />
-              {repeatPasswordError && <p className="text-xs text-destructive mt-1">{repeatPasswordError}</p>}
+              {repeatPasswordError && <p className="text-xs text-red-400">{repeatPasswordError}</p>}
             </div>
+
             {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                <p className="text-sm text-destructive font-medium">{error}</p>
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
+                {error}
               </div>
             )}
+
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90 text-primary-foreground font-semibold py-3 shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105"
+              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-bold h-11 shadow-lg shadow-teal-500/20 transition-all duration-200"
               disabled={isLoading || !validateForm()}
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
                   Creando cuenta...
                 </div>
               ) : (
@@ -198,14 +209,11 @@ export default function SignUpPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="text-center pt-4 border-t border-slate-800">
+            <p className="text-xs text-slate-500">
               ¿Ya tienes cuenta?{" "}
-              <Link
-                to="/auth/login"
-                className="font-medium text-blue-600 hover:text-cyan-500 transition-colors duration-200 underline underline-offset-4"
-              >
-                Inicia sesión
+              <Link to="/auth/login" className="text-teal-400 hover:text-teal-300 font-semibold underline underline-offset-4">
+                Inicia sesión aquí
               </Link>
             </p>
           </div>

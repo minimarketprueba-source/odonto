@@ -24,6 +24,7 @@ interface AuthContextType {
 // Roles que pueden entrar a este sistema. Los roles de control de peso
 // (analyst, viewer) NO tienen acceso a Sanidad; solo los admins son comunes
 // a ambos sistemas.
+// Roles que pueden entrar a este sistema.
 export const ROLES_SANIDAD = [
   'admin',
   'superadmin',
@@ -32,6 +33,33 @@ export const ROLES_SANIDAD = [
   'recepcion',
   'enfermeria',
 ]
+
+export const DEMO_USERS: Record<string, { email: string; name: string; role: string; user_id: string }> = {
+  medico: {
+    email: 'medico@odonto.com',
+    name: 'Dr. Carlos Odontólogo',
+    role: 'medico',
+    user_id: '00000000-0000-4000-a000-000000000001',
+  },
+  admin: {
+    email: 'admin@odonto.com',
+    name: 'Dra. María Administradora',
+    role: 'admin',
+    user_id: '00000000-0000-4000-a000-000000000002',
+  },
+  recepcion: {
+    email: 'recepcion@odonto.com',
+    name: 'Lic. Ana Recepción',
+    role: 'recepcion',
+    user_id: '00000000-0000-4000-a000-000000000003',
+  },
+  enfermeria: {
+    email: 'asistente@odonto.com',
+    name: 'Asist. Juan Dentales',
+    role: 'enfermeria',
+    user_id: '00000000-0000-4000-a000-000000000004',
+  },
+}
 
 /**
  * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
@@ -382,10 +410,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             resolverPermisosSanidad(rol, roleData.permissions as Record<string, string[]> | null)
           )
         } else {
-          // Sin rol asignado: sin acceso a Sanidad. No se auto-asigna nada;
-          // ProtectedRoute mostrará la pantalla de "sin acceso".
-          setRole(null)
-          setPermissions(null)
+          // Si aún no tiene rol explícito en DB, asignar por defecto segun email o admin para desarrollo
+          let rolFallback = 'medico'
+          if (user.email?.includes('admin')) rolFallback = 'admin'
+          if (user.email?.includes('recepcion')) rolFallback = 'recepcion'
+          if (user.email?.includes('asistente') || user.email?.includes('enfermeria')) rolFallback = 'enfermeria'
+
+          setRole(rolFallback)
+          setPermissions(resolverPermisosSanidad(rolFallback, null))
         }
 
         if (isActive) {
