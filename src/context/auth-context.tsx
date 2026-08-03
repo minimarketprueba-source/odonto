@@ -31,52 +31,34 @@ export const ROLES_SANIDAD = [
   'medico',
   'recepcion',
   'enfermeria',
-  'nutricionista',
-  'fisioterapeuta',
-  'psicologo',
-  'ginecologo',
 ]
 
 /**
  * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
- * Es la única lista: si se agrega un rol acá, aparece en el alta y en el
- * cuadro de permisos sin tocar nada más.
  */
 export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'medico', label: 'Médico / Profesional' },
-  { value: 'recepcion', label: 'Recepción / Admisión' },
-  { value: 'enfermeria', label: 'Enfermería' },
-  { value: 'nutricionista', label: 'Nutricionista / Lic. en Nutrición' },
-  { value: 'fisioterapeuta', label: 'Fisioterapeuta / Kinesiólogo/a' },
-  { value: 'psicologo', label: 'Psicólogo/a / Lic. en Psicología' },
-  { value: 'ginecologo', label: 'Ginecólogo/a - Obstetra / Lic. en Obstetricia' },
+  { value: 'admin', label: 'Administrador Odontológico' },
+  { value: 'medico', label: 'Odontólogo / Cirujano Dentista' },
+  { value: 'recepcion', label: 'Recepción / Admisión Dental' },
+  { value: 'enfermeria', label: 'Asistente Dental / Auxiliar' },
 ]
 
 /**
- * Módulos del sistema, en el orden del menú. `permissions` de `user_roles` se
- * indexa por estas claves y son las mismas que piden las rutas y `canView`.
- * OJO: los módulos de control de peso (cadetes, ergometría, respaldo…) no van
- * acá — son de la otra app aunque compartan la tabla `user_roles`.
+ * Módulos del sistema odontológico.
  */
 export const MODULOS_SANIDAD: { key: string; label: string }[] = [
-  { key: 'pacientes', label: 'Pacientes' },
-  { key: 'citas', label: 'Citas y horarios' },
-  { key: 'consultas', label: 'Consultas, urgencias y enfermería' },
-  { key: 'recetas', label: 'Recetas' },
-  { key: 'nutricion', label: 'Nutrición' },
-  { key: 'lista_espera', label: 'Lista de espera' },
-  { key: 'reportes', label: 'Reportes' },
-  { key: 'mantenimiento', label: 'Mantenimiento' },
-  { key: 'usuarios', label: 'Usuarios' },
+  { key: 'pacientes', label: 'Pacientes y Ficha Dental' },
+  { key: 'citas', label: 'Citas y Horarios' },
+  { key: 'consultas', label: 'Presupuestos y Facturación' },
+  { key: 'reportes', label: 'Reportes y Métricas' },
+  { key: 'mantenimiento', label: 'Mantenimiento de Tarifas' },
+  { key: 'usuarios', label: 'Control de Usuarios' },
 ]
 
 const TODOS_LOS_PERMISOS = ['ver', 'editar', 'exportar', 'eliminar']
 
 /**
- * Si `user_roles.status` habilita el acceso. Es el mismo estado que mira la
- * base en `es_sanidad_activo()`, así que suspender ahí cierra la puerta de
- * verdad. `null` se toma como activo: hay filas viejas sin estado.
+ * Si `user_roles.status` habilita el acceso.
  */
 export function esEstadoActivo(status?: string | null): boolean {
   if (status == null || status === '') return true
@@ -92,54 +74,18 @@ export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> 
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
     consultas: ['ver', 'editar'],
-    nutricion: ['ver', 'editar'],
-    recetas: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
     reportes: ['ver'],
   },
   recepcion: {
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
     consultas: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
     reportes: ['ver'],
   },
   enfermeria: {
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
-    consultas: ['ver', 'editar'],
-    nutricion: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
-    reportes: ['ver'],
-  },
-  nutricionista: {
-    pacientes: ['ver', 'editar'],
-    citas: ['ver', 'editar'],
-    nutricion: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
-    reportes: ['ver'],
-  },
-  fisioterapeuta: {
-    pacientes: ['ver', 'editar'],
-    citas: ['ver', 'editar'],
-    consultas: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
-    reportes: ['ver'],
-  },
-  psicologo: {
-    pacientes: ['ver', 'editar'],
-    citas: ['ver', 'editar'],
-    consultas: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
-    reportes: ['ver'],
-  },
-  ginecologo: {
-    pacientes: ['ver', 'editar'],
-    citas: ['ver', 'editar'],
-    consultas: ['ver', 'editar'],
-    recetas: ['ver', 'editar'],
-    lista_espera: ['ver', 'editar'],
-    reportes: ['ver'],
+    consultas: ['ver'],
   },
 }
 

@@ -119,6 +119,16 @@ export async function fetchPacientes(): Promise<Paciente[]> {
   return data || [];
 }
 
+export async function fetchPaciente(id: number): Promise<Paciente> {
+  const { data, error } = await supabase
+    .from("pacientes")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(`Error al cargar paciente: ${error.message}`);
+  return data;
+}
+
 export async function createPaciente(input: CreatePacienteInput): Promise<Paciente> {
   const { data, error } = await supabase
     .from("pacientes")
@@ -159,6 +169,14 @@ export function usePacientes() {
   return useQuery({
     queryKey: queryKeys.pacientes.list(),
     queryFn: fetchPacientes,
+  });
+}
+
+export function usePaciente(id: number) {
+  return useQuery({
+    queryKey: ["pacientes", "detail", id],
+    queryFn: () => fetchPaciente(id),
+    enabled: !!id,
   });
 }
 

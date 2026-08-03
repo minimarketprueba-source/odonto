@@ -32,13 +32,11 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 const Pacientes = lazy(() => import('./pages/Pacientes'))
+const FichaPaciente = lazy(() => import('./pages/FichaPaciente'))
 const Citas = lazy(() => import('./pages/Citas'))
 const Horarios = lazy(() => import('./pages/Horarios'))
-const Enfermeria = lazy(() => import('./pages/Enfermeria'))
-const Rac = lazy(() => import('./pages/Rac'))
-const Nutricion = lazy(() => import('./pages/Nutricion'))
+const Presupuestos = lazy(() => import('./pages/Presupuestos'))
 const PerfilUsuario = lazy(() => import('./pages/PerfilUsuario'))
-const ListaEspera = lazy(() => import('./pages/ListaEspera'))
 const Reportes = lazy(() => import('./pages/Reportes'))
 const Mantenimiento = lazy(() => import('./pages/Mantenimiento'))
 const Usuarios = lazy(() => import('./pages/Usuarios'))
@@ -104,13 +102,11 @@ function App() {
           <Route path="/auth/forgot-password" element={<AuthRedirect><ForgotPassword /></AuthRedirect>} />
           <Route path="/auth/reset-password" element={<AuthRedirect><ResetPassword /></AuthRedirect>} />
           <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
+          <Route path="/pacientes/:id" element={<ProtectedRoute moduleKey="pacientes"><FichaPaciente /></ProtectedRoute>} />
           <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
           <Route path="/horarios" element={<ProtectedRoute moduleKey="citas"><Horarios /></ProtectedRoute>} />
-          <Route path="/enfermeria" element={<ProtectedRoute moduleKey="consultas"><Enfermeria /></ProtectedRoute>} />
-          <Route path="/rac" element={<ProtectedRoute moduleKey="consultas"><Rac /></ProtectedRoute>} />
-          <Route path="/nutricion" element={<ProtectedRoute moduleKey="nutricion"><Nutricion /></ProtectedRoute>} />
+          <Route path="/presupuestos" element={<ProtectedRoute moduleKey="consultas"><Presupuestos /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><PerfilUsuario /></ProtectedRoute>} />
-          <Route path="/lista-espera" element={<ProtectedRoute moduleKey="lista_espera"><ListaEspera /></ProtectedRoute>} />
           <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
           <Route path="/mantenimiento" element={<ProtectedRoute moduleKey="mantenimiento"><Mantenimiento /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute moduleKey="usuarios"><Usuarios /></ProtectedRoute>} />

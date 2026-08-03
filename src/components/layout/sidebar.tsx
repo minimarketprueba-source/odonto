@@ -3,9 +3,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
-import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, ClipboardList, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, BedDouble, Ambulance, Apple } from "lucide-react"
+import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
-import { useRacEnEspera } from "@/api/rac"
 
 // Helper para obtener la ruta correcta del logo
 const getLogoPath = () => {
@@ -23,19 +22,13 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   const { isOpen, setIsOpen, isCollapsed, setIsCollapsed } = useSidebar()
   const { canView } = usePermissions()
-  // Contador de urgencias esperando al médico: se ve desde cualquier pantalla.
-  const puedeVerRac = canView("consultas")
-  const { data: racEnEspera = [] } = useRacEnEspera(puedeVerRac)
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: Home, badge: null as number | null },
     { name: "Pacientes", href: "/pacientes", icon: Users, badge: null as number | null, moduleKey: "pacientes" },
     { name: "Citas", href: "/citas", icon: CalendarDays, badge: null as number | null, moduleKey: "citas" },
     { name: "Horarios", href: "/horarios", icon: Clock, badge: null as number | null, moduleKey: "citas" },
-    { name: "Urgencias (RAC)", href: "/rac", icon: Ambulance, badge: (racEnEspera.length || null) as number | null, moduleKey: "consultas" },
-    { name: "Enfermería", href: "/enfermeria", icon: BedDouble, badge: null as number | null, moduleKey: "consultas" },
-    { name: "Nutrición", href: "/nutricion", icon: Apple, badge: null as number | null, moduleKey: "nutricion" },
-    { name: "Lista de espera", href: "/lista-espera", icon: ClipboardList, badge: null as number | null, moduleKey: "lista_espera" },
+    { name: "Presupuestos", href: "/presupuestos", icon: DollarSign, badge: null as number | null, moduleKey: "consultas" },
     { name: "Reportes", href: "/reportes", icon: BarChart2, badge: null as number | null, moduleKey: "reportes" },
     { name: "Mantenimiento", href: "/mantenimiento", icon: Settings, badge: null as number | null, moduleKey: "mantenimiento" },
     { name: "Usuarios", href: "/usuarios", icon: Shield, badge: null as number | null, moduleKey: "usuarios" },

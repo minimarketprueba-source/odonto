@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,37 +9,18 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, Stethoscope, Ambulance, HeartPulse, BicepsFlexed, Apple,
+  Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, FolderOpen
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchPaciente } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
-import { HistoriaClinicaDialog } from "@/components/consultas/historia-clinica-dialog";
-import { SalvoconductoForm } from "@/components/consultas/salvoconducto-form";
-import { AtencionAmbulatoriaForm } from "@/components/enfermeria/atencion-ambulatoria-form";
 import {
   TIPOS_PACIENTE, labelTipoPaciente, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
-import { useUltimasAtenciones } from "@/api/consultas";
 
 const POR_PAGINA = 24;
-
-/** Etiquetas que cuentan como "Médico / Personal de Sanidad" en fichas viejas. */
-const TIPOS_SANIDAD = [
-  "medico", "personal_sanidad", "personal", "sanidad", "funcionario", "doctor", "enfermero",
-];
-
-const FILTROS_ATENCION = [
-  { value: "todos", label: "Con o sin atención" },
-  { value: "hoy", label: "Atendidos: hoy" },
-  { value: "semana", label: "Atendidos: última semana" },
-  { value: "mes", label: "Atendidos: último mes" },
-  { value: "alguna_vez", label: "Atendidos: alguna vez" },
-] as const;
-
-type FiltroAtencion = (typeof FILTROS_ATENCION)[number]["value"];
 
 function fmtFecha(f: string | null): string {
   if (!f) return "—";
@@ -47,26 +28,11 @@ function fmtFecha(f: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-function fechaHaceDias(dias: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - dias);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export default function Pacientes() {
   const navigate = useNavigate();
-  const { hasPermission, canView, canDelete } = usePermissions();
+  const { hasPermission, canDelete } = usePermissions();
   const canEdit = hasPermission("pacientes", "editar");
-  // Dar de baja es una decisión de padrón (afecta a control de peso): solo admin.
   const puedeDarDeBaja = canDelete("pacientes");
-  // La historia clínica la lee todo el personal de salud: enfermería necesita
-  // los antecedentes para curar y medicar con criterio. Quién puede REGISTRAR
-  // una consulta se decide adentro del diálogo (solo médicos y admin).
-  const veHistoria = canView("consultas");
-  // El salvoconducto lo expide el profesional o la enfermera de turno.
-  const puedeExpedirSalvoconducto = hasPermission("consultas", "editar");
-  // La atención ambulatoria la registra enfermería (mismo permiso que el panel).
-  const puedeRegistrarAtencion = hasPermission("consultas", "editar");
 
   const { data: pacientes = [], isLoading } = usePacientes();
   const cambiarEstado = useCambiarEstadoPaciente();
@@ -74,61 +40,27 @@ export default function Pacientes() {
   const [busqueda, setBusqueda] = useState("");
   const [tipoSel, setTipoSel] = useState("todos");
   const [estadoSel, setEstadoSel] = useState<"activos" | "inactivos" | "todos">("activos");
-  // El filtro de atención puede venir preseleccionado desde el Dashboard (?atencion=hoy|mes|...)
-  const [searchParams] = useSearchParams();
-  const [atencionSel, setAtencionSel] = useState<FiltroAtencion>(() => {
-    const p = searchParams.get("atencion");
-    return FILTROS_ATENCION.some((f) => f.value === p) ? (p as FiltroAtencion) : "todos";
-  });
   const [pagina, setPagina] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [seleccionado, setSeleccionado] = useState<Paciente | null>(null);
-  const [historiaOpen, setHistoriaOpen] = useState(false);
-  const [pacienteHistoria, setPacienteHistoria] = useState<Paciente | null>(null);
-  const [pacienteSalvoconducto, setPacienteSalvoconducto] = useState<Paciente | null>(null);
-  const [pacienteAtencion, setPacienteAtencion] = useState<Paciente | null>(null);
 
   const busquedaDebounced = useDebounce(busqueda, 300);
 
-  // Última consulta de cada paciente; se carga solo si el filtro lo necesita.
-  const { data: ultimasAtenciones = {} } = useUltimasAtenciones(atencionSel !== "todos");
-
   const filtrados = useMemo(() => {
-    const corte =
-      atencionSel === "hoy" ? fechaHaceDias(0) :
-      atencionSel === "semana" ? fechaHaceDias(7) :
-      atencionSel === "mes" ? fechaHaceDias(30) : null;
-    const lista = pacientes.filter((p) => {
+    return pacientes.filter((p) => {
       if (estadoSel === "activos" && !p.activo) return false;
       if (estadoSel === "inactivos" && p.activo) return false;
       if (tipoSel !== "todos") {
         const pTipo = (p.tipo || "").toLowerCase();
         const sel = tipoSel.toLowerCase();
-        if (sel === "medico") {
-          if (!TIPOS_SANIDAD.includes(pTipo)) return false;
-        } else if (pTipo !== sel) {
+        if (pTipo !== sel) {
           return false;
         }
       }
-      if (atencionSel !== "todos") {
-        const ultima = ultimasAtenciones[p.id];
-        if (!ultima) return false;
-        if (corte && ultima < corte) return false;
-      }
       return matchPaciente(p, busquedaDebounced);
     });
-    // Con filtro de atención activo, los atendidos más recientemente van primero.
-    if (atencionSel !== "todos") {
-      lista.sort((a, b) => (ultimasAtenciones[b.id] || "").localeCompare(ultimasAtenciones[a.id] || ""));
-    }
-    return lista;
-  }, [pacientes, busquedaDebounced, tipoSel, estadoSel, atencionSel, ultimasAtenciones]);
+  }, [pacientes, busquedaDebounced, tipoSel, estadoSel]);
 
-  /**
-   * Cuántas fichas hay de cada tipo con el estado elegido. Se muestra en el
-   * desplegable para que se vea de entrada que un tipo está en cero porque
-   * todavía no se cargó ninguna ficha, no porque el filtro falle.
-   */
   const conteoPorTipo = useMemo(() => {
     const acc: Record<string, number> = {};
     for (const p of pacientes) {
@@ -136,10 +68,6 @@ export default function Pacientes() {
       if (estadoSel === "inactivos" && p.activo) continue;
       const t = (p.tipo || "").toLowerCase();
       acc[t] = (acc[t] ?? 0) + 1;
-      // "Médico / Personal de Sanidad" agrupa varias etiquetas heredadas.
-      if (TIPOS_SANIDAD.includes(t) && t !== "medico") {
-        acc.medico = (acc.medico ?? 0) + 1;
-      }
     }
     return acc;
   }, [pacientes, estadoSel]);
@@ -148,11 +76,8 @@ export default function Pacientes() {
   const paginaActual = Math.min(pagina, totalPaginas);
   const visibles = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
 
-  /** Datos secundarios de la tarjeta, según de qué tipo de paciente se trate. */
   const detalle = (p: Paciente): string => {
     const pTipo = (p.tipo || "").toLowerCase();
-    // En el personal de la Academia, `unidad` guarda el cargo de la lista de
-    // revista ("JEFE DE SECC. EDUCACION FISICA"); en un policía de afuera, su unidad.
     const esPersonalANP = ["oficial", "suboficial", "funcionario", "medico", "personal"].includes(pTipo);
     const partes =
       pTipo === "familiar"
@@ -191,11 +116,11 @@ export default function Pacientes() {
               </span>
             </h2>
             <p className="text-sm text-muted-foreground">
-              Padrón de la Sanidad — cadetes, policías, familiares y civiles.
+              Padrón de la Clínica Odontológica — cadetes, policías, familiares y civiles.
             </p>
           </div>
           {canEdit && (
-            <Button className="gap-2" onClick={() => { setSeleccionado(null); setFormOpen(true); }}>
+            <Button className="gap-2 shadow-sm" onClick={() => { setSeleccionado(null); setFormOpen(true); }}>
               <Plus className="w-4 h-4" /> Registrar paciente
             </Button>
           )}
@@ -230,21 +155,13 @@ export default function Pacientes() {
               <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={atencionSel} onValueChange={(v) => { setAtencionSel(v as FiltroAtencion); setPagina(1); }}>
-            <SelectTrigger className="sm:w-56"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {FILTROS_ATENCION.map((f) => (
-                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {isLoading ? (
           <p className="text-center text-sm text-muted-foreground py-12">Cargando pacientes...</p>
         ) : visibles.length === 0 ? (
-          <div className="text-center py-12">
-            <User className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <div className="text-center py-12 border-2 border-dashed rounded-2xl bg-card">
+            <User className="w-12 h-12 text-muted-foreground/60 mx-auto mb-3" />
             <p className="text-muted-foreground">
               {busquedaDebounced
                 ? `No se encontró ningún paciente con «${busquedaDebounced}».`
@@ -266,9 +183,10 @@ export default function Pacientes() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {visibles.map((p) => (
-              <Card key={p.id} className={!p.activo ? "opacity-60" : undefined}>
+              <Card key={p.id} className={`${!p.activo ? "opacity-60 bg-muted/20" : "bg-card"} hover:shadow-md transition-shadow relative overflow-hidden`}>
+                <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-full blur-xl" />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base leading-tight">
+                  <CardTitle className="text-base leading-tight font-bold text-slate-800 dark:text-slate-200">
                     {p.apellidos}, {p.nombres}
                   </CardTitle>
                   <CardDescription>CI: {p.documento || "sin cédula"}</CardDescription>
@@ -276,67 +194,28 @@ export default function Pacientes() {
                 <CardContent className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline">{labelTipoPaciente(p.tipo)}</Badge>
-                    {p.sexo && <Badge variant="outline">{p.sexo === "F" ? "Femenino" : "Masculino"}</Badge>}
+                    {p.sexo && <Badge variant="outline">{p.sexo === "F" ? "F" : "M"}</Badge>}
                     {!p.activo && <Badge variant="destructive">Inactivo</Badge>}
-                    {atencionSel !== "todos" && ultimasAtenciones[p.id] && (
-                      <Badge className="bg-green-100 text-green-700 border-0 dark:bg-green-900/40 dark:text-green-200">
-                        Atendido: {fmtFecha(ultimasAtenciones[p.id])}
-                      </Badge>
-                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">{detalle(p)}</p>
-                  {(canEdit || veHistoria || puedeDarDeBaja || puedeRegistrarAtencion || puedeExpedirSalvoconducto) && (
-                    <div className="flex items-center gap-1 pt-2 border-t">
-                      {veHistoria && (
-                        <>
-                          <Button
-                            variant="ghost" size="icon" title="Historia clínica médica"
-                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                            onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
-                          >
-                            <Stethoscope className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost" size="icon"
-                            title="Fisioterapia y Kinesiología (Tratamientos, ejercicios y rehabilitación)"
-                            className="text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30"
-                            onClick={() => { setPacienteHistoria(p); setHistoriaOpen(true); }}
-                          >
-                            <BicepsFlexed className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                      {puedeRegistrarAtencion && (
-                        <Button
-                          variant="ghost" size="icon"
-                          title="Registrar atención de enfermería (curación, medicación, control)"
-                          className="text-teal-600 hover:text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/30"
-                          onClick={() => setPacienteAtencion(p)}
-                        >
-                          <HeartPulse className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost" size="icon"
-                        title="Ir a Gestión Nutricional y Control Antropométrico"
-                        className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                        onClick={() => navigate(`/nutricion?q=${encodeURIComponent(p.documento || `${p.apellidos} ${p.nombres}`)}`)}
-                      >
-                        <Apple className="w-4 h-4" />
-                      </Button>
-                      {puedeExpedirSalvoconducto && (
-                        <Button
-                          variant="ghost" size="icon"
-                          title="Expedir salvoconducto (traslado al hospital o a estudios)"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => setPacienteSalvoconducto(p)}
-                        >
-                          <Ambulance className="w-4 h-4" />
-                        </Button>
-                      )}
+                  
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="gap-1.5 h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+                      onClick={() => navigate(`/pacientes/${p.id}`)}
+                    >
+                      <FolderOpen className="w-4 h-4" /> Ficha Dental
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
                       {canEdit && (
                         <Button
-                          variant="ghost" size="icon" title="Editar paciente"
+                          variant="ghost"
+                          size="icon"
+                          title="Editar paciente"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-800"
                           onClick={() => { setSeleccionado(p); setFormOpen(true); }}
                         >
                           <Edit className="w-4 h-4" />
@@ -344,15 +223,17 @@ export default function Pacientes() {
                       )}
                       {puedeDarDeBaja && (
                         <Button
-                          variant="ghost" size="icon"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           title={p.activo ? "Dar de baja" : "Reactivar"}
                           onClick={() => handleToggleActivo(p)}
                         >
-                          {p.activo ? <Minus className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                          {p.activo ? <Minus className="w-4 h-4 text-red-500" /> : <Shield className="w-4 h-4 text-emerald-500" />}
                         </Button>
                       )}
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -378,21 +259,11 @@ export default function Pacientes() {
         paciente={seleccionado}
         busquedaInicial={seleccionado ? undefined : busquedaDebounced}
         onCreated={(nuevo) => {
-          // Recién registrado: se abre su historia clínica para atenderlo enseguida.
           setBusqueda("");
-          if (veHistoria) { setPacienteHistoria(nuevo); setHistoriaOpen(true); }
+          toast.success("Paciente registrado con éxito. Abriendo Ficha Dental...");
+          // Redirigir directamente a la ficha dental
+          navigate(`/pacientes/${nuevo.id}`);
         }}
-      />
-      <HistoriaClinicaDialog open={historiaOpen} onOpenChange={setHistoriaOpen} paciente={pacienteHistoria} />
-      <SalvoconductoForm
-        open={!!pacienteSalvoconducto}
-        onOpenChange={(abierto) => { if (!abierto) setPacienteSalvoconducto(null); }}
-        paciente={pacienteSalvoconducto}
-      />
-      <AtencionAmbulatoriaForm
-        open={!!pacienteAtencion}
-        onOpenChange={(abierto) => { if (!abierto) setPacienteAtencion(null); }}
-        pacienteInicial={pacienteAtencion}
       />
     </AppLayout>
   );

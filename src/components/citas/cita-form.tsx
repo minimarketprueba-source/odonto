@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Loader2, Search, UserPlus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle, Loader2, Search, UserPlus, Clock } from "lucide-react";
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { matchPaciente, matchTexto } from "@/lib/utils";
 import { sanitizePlainText } from "@/lib/security";
@@ -16,6 +17,7 @@ import { PacienteForm } from "@/components/pacientes/paciente-form";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
 import { useMedicosActivos, useCreateCita, fechaHoyISO } from "@/api/citas";
 import { useAusencias, useHorarios, evaluarDisponibilidad } from "@/api/horarios";
+import { useOdontoPrecios } from "@/api/odontologia";
 
 interface CitaFormProps {
   open: boolean;
@@ -32,6 +34,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const { data: medicos = [] } = useMedicosActivos();
   const { data: horarios = [] } = useHorarios();
   const { data: ausencias = [] } = useAusencias();
+  const { data: precios = [] } = useOdontoPrecios();
   const crear = useCreateCita();
 
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
@@ -41,6 +44,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const [mostrarListaMedicos, setMostrarListaMedicos] = useState(false);
   const [fecha, setFecha] = useState(fechaInicial || fechaHoyISO());
   const [hora, setHora] = useState("08:00");
+  const [tratamientoId, setTratamientoId] = useState("");
   const [motivo, setMotivo] = useState("");
 
   useEffect(() => {
@@ -52,6 +56,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
       setMostrarListaMedicos(false);
       setFecha(fechaInicial || fechaHoyISO());
       setHora("08:00");
+      setTratamientoId("");
       setMotivo("");
     }
   }, [open, fechaInicial]);
@@ -82,23 +87,53 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
     return evaluarDisponibilidad(Number(medicoId), fecha, hora, horarios, ausencias);
   }, [medicoId, fecha, hora, horarios, ausencias]);
 
+  // Duración dinámica estimada basada en el tipo de tratamiento
+  const duracionEstimada = useMemo(() => {
+    if (!tratamientoId) return 30; // default 30 min
+    const selected = precios.find((p) => String(p.id) === tratamientoId);
+    if (!selected) return 30;
+
+    const nombre = selected.nombre.toLowerCase();
+    if (nombre.includes("limpieza") || nombre.includes("profilaxis") || nombre.includes("consulta")) {
+      return 30;
+    }
+    if (nombre.includes("empaste") || nombre.includes("resina") || nombre.includes("corona") || nombre.includes("perno")) {
+      return 60;
+    }
+    if (nombre.includes("endodoncia") || nombre.includes("molar") || nombre.includes("cirugía")) {
+      return 90;
+    }
+    if (nombre.includes("implante")) {
+      return 120; // 2 horas
+    }
+    return 45; // default general
+  }, [tratamientoId, precios]);
+
   const handleAgendar = async () => {
     if (!paciente) { await showSwalError("Selecciona el paciente."); return; }
-    if (!medicoId) { await showSwalError("Selecciona el médico."); return; }
+    if (!medicoId) { await showSwalError("Selecciona el odontólogo."); return; }
     if (!fecha || !hora) { await showSwalError("Indica fecha y hora."); return; }
+    if (!tratamientoId) { await showSwalError("Selecciona un tratamiento para establecer la duración."); return; }
+
+    const selectedPre = precios.find((p) => String(p.id) === tratamientoId);
+    const nombreTratamiento = selectedPre ? selectedPre.nombre : "Consulta";
+    const motivoFinal = motivo
+      ? `${nombreTratamiento} - ${sanitizePlainText(motivo)} (${duracionEstimada} min)`
+      : `${nombreTratamiento} (${duracionEstimada} min)`;
+
     try {
       await crear.mutateAsync({
         paciente_id: paciente.id,
         medico_id: Number(medicoId),
         fecha,
         hora,
-        motivo: sanitizePlainText(motivo) || null,
+        motivo: motivoFinal,
         agendado_por: user?.email ?? null,
       });
       onOpenChange(false);
       await showSwalSuccess(
         `Cita agendada para ${paciente.apellidos}, ${paciente.nombres} — ` +
-          `${fecha.split("-").reverse().join("/")} a las ${hora} hs.`
+          `${fecha.split("-").reverse().join("/")} a las ${hora} hs. (Duración: ${duracionEstimada} min)`
       );
     } catch (e) {
       await showSwalError((e as Error).message);
@@ -110,11 +145,12 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Agendar cita</DialogTitle>
-          <DialogDescription>La cita se crea en estado «Pendiente».</DialogDescription>
+          <DialogTitle>Agendar Cita Odontológica</DialogTitle>
+          <DialogDescription>Establezca una cita. La duración se adaptará al tratamiento.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Paciente */}
           <div className="space-y-1">
             <Label htmlFor="c-paciente">Paciente *</Label>
             {paciente ? (
@@ -171,8 +207,9 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
             )}
           </div>
 
+          {/* Odontólogo */}
           <div className="space-y-1 relative">
-            <Label htmlFor="c-medico">Médico *</Label>
+            <Label htmlFor="c-medico">Odontólogo / Profesional *</Label>
             {medicoSeleccionado ? (
               <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30">
                 <span className="text-sm font-medium">
@@ -203,7 +240,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                 <Input
                   id="c-medico"
                   className="pl-9"
-                  placeholder="Buscar por nombre o especialidad..."
+                  placeholder="Buscar odontólogo por nombre..."
                   value={busquedaMedico}
                   onChange={(e) => {
                     setBusquedaMedico(e.target.value);
@@ -215,7 +252,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                 {mostrarListaMedicos && (
                   <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-48 overflow-y-auto divide-y">
                     {medicosFiltrados.length === 0 ? (
-                      <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron médicos</p>
+                      <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron profesionales</p>
                     ) : (
                       medicosFiltrados.map((m) => (
                         <button
@@ -238,6 +275,29 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Tratamiento / Duración */}
+          <div className="space-y-1">
+            <Label htmlFor="c-tratamiento">Tratamiento Clínico (Establece Duración) *</Label>
+            <Select value={tratamientoId} onValueChange={setTratamientoId}>
+              <SelectTrigger id="c-tratamiento" className="bg-background">
+                <SelectValue placeholder="Seleccione tratamiento..." />
+              </SelectTrigger>
+              <SelectContent>
+                {precios.filter(pr => pr.activo).map((pr) => (
+                  <SelectItem key={pr.id} value={String(pr.id)}>
+                    {pr.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {tratamientoId && (
+              <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Duración estimada del turno: {duracionEstimada} minutos.</span>
               </div>
             )}
           </div>
@@ -267,8 +327,8 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
           )}
 
           <div className="space-y-1">
-            <Label htmlFor="c-motivo">Motivo</Label>
-            <Input id="c-motivo" placeholder="Ej: Control, dolor lumbar..." value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+            <Label htmlFor="c-motivo">Notas / Comentarios adicionales</Label>
+            <Input id="c-motivo" placeholder="Ej: Dolor agudo, primer control..." value={motivo} onChange={(e) => setMotivo(e.target.value)} />
           </div>
 
           <Button onClick={handleAgendar} disabled={crear.isPending} className="w-full">
