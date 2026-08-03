@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
-import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign } from "lucide-react"
+import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
 
 // Helper para obtener la ruta correcta del logo
@@ -29,6 +29,7 @@ export function Sidebar() {
     { name: "Citas", href: "/citas", icon: CalendarDays, badge: null as number | null, moduleKey: "citas" },
     { name: "Horarios", href: "/horarios", icon: Clock, badge: null as number | null, moduleKey: "citas" },
     { name: "Presupuestos", href: "/presupuestos", icon: DollarSign, badge: null as number | null, moduleKey: "consultas" },
+    { name: "Liquidaciones", href: "/liquidaciones", icon: Receipt, badge: null as number | null, moduleKey: "consultas" },
     { name: "Reportes", href: "/reportes", icon: BarChart2, badge: null as number | null, moduleKey: "reportes" },
     { name: "Mantenimiento", href: "/mantenimiento", icon: Settings, badge: null as number | null, moduleKey: "mantenimiento" },
     { name: "Usuarios", href: "/usuarios", icon: Shield, badge: null as number | null, moduleKey: "usuarios" },

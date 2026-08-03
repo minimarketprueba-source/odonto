@@ -30,6 +30,8 @@ import {
   uploadImagenFile
 } from "@/api/odontologia";
 import { Odontograma } from "@/components/odontograma/Odontograma";
+import { EvolucionClinica } from "@/components/pacientes/EvolucionClinica";
+import { Periodontograma } from "@/components/pacientes/Periodontograma";
 import { FirmaCanvas } from "@/components/pacientes/FirmaCanvas";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -45,7 +47,9 @@ import {
   AlertTriangle,
   Activity,
   Calendar,
-  CreditCard
+  CreditCard,
+  FileText,
+  ListTodo
 } from "lucide-react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
@@ -385,17 +389,37 @@ export default function FichaPaciente() {
 
         {/* Tabs navigation */}
         <Tabs defaultValue="odontograma" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 h-auto p-1.5 bg-muted rounded-xl">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7 h-auto p-1.5 bg-muted rounded-xl gap-1">
             <TabsTrigger value="odontograma" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><Activity className="w-4 h-4" /> Odontograma</TabsTrigger>
-            <TabsTrigger value="anamnesis" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><HeartPulse className="w-4 h-4" /> Anamnesis</TabsTrigger>
-            <TabsTrigger value="presupuestos" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><DollarSign className="w-4 h-4" /> Presupuestos</TabsTrigger>
-            <TabsTrigger value="imagenes" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><ImageIcon className="w-4 h-4" /> Radiografías</TabsTrigger>
-            <TabsTrigger value="consentimientos" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><FileSignature className="w-4 h-4" /> Consentimientos</TabsTrigger>
+            <TabsTrigger value="evolucion" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><ListTodo className="w-4 h-4" /> Evolución</TabsTrigger>
+            <TabsTrigger value="periodontograma" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><HeartPulse className="w-4 h-4" /> Perio.</TabsTrigger>
+            <TabsTrigger value="anamnesis" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><FileText className="w-4 h-4" /> Anamnesis</TabsTrigger>
+            <TabsTrigger value="presupuestos" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><DollarSign className="w-4 h-4" /> Planes</TabsTrigger>
+            <TabsTrigger value="imagenes" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><ImageIcon className="w-4 h-4" /> Imágenes</TabsTrigger>
+            <TabsTrigger value="consentimientos" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><FileSignature className="w-4 h-4" /> Firmas</TabsTrigger>
           </TabsList>
 
           {/* 1. Odontograma Tab Content */}
           <TabsContent value="odontograma" className="pt-3">
             <Odontograma pacienteId={pacienteId} />
+          </TabsContent>
+          
+          {/* Evolución Clínica */}
+          <TabsContent value="evolucion" className="pt-3">
+            <Card className="shadow-sm">
+              <CardContent className="pt-6">
+                <EvolucionClinica pacienteId={pacienteId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Periodontograma */}
+          <TabsContent value="periodontograma" className="pt-3">
+            <Card className="shadow-sm">
+              <CardContent className="pt-6">
+                <Periodontograma pacienteId={pacienteId} />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* 2. Anamnesis Tab Content */}

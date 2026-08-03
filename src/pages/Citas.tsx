@@ -23,6 +23,7 @@ import {
 } from "@/api/citas";
 import { PreconsultaDialog } from "@/components/citas/preconsulta-dialog";
 import { useBorrarCita } from "@/api/anulaciones";
+import { useSillones } from "@/api/sillones";
 
 // Auxiliar para plurales simples en los avisos
 function plural(n: number, singular: string, plural: string): string {
@@ -65,7 +66,7 @@ export default function Citas() {
   const canEdit = hasPermission("citas", "editar");
 
 
-  const [vista, setVista] = useState<"dia" | "mes">("dia");
+  const [vista, setVista] = useState<"dia" | "mes" | "sillones">("dia");
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [mes, setMes] = useState(mesActualISO());
   const [busqueda, setBusqueda] = useState("");
@@ -80,6 +81,7 @@ export default function Citas() {
     vista === "mes" ? desde : "",
     vista === "mes" ? hasta : ""
   );
+  const { data: sillones = [] } = useSillones();
   const { data: miMedico } = useMiMedico(user?.id);
   const cambiarEstado = useCambiarEstadoCita();
   const admitir = useAdmitirCita();
@@ -302,6 +304,14 @@ export default function Citas() {
               <CalendarDays className="w-4 h-4 mr-1.5" /> Vista por Día
             </Button>
             <Button
+              variant={vista === "sillones" ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-lg text-xs"
+              onClick={() => setVista("sillones")}
+            >
+              <ClipboardCheck className="w-4 h-4 mr-1.5" /> Agenda Sillones
+            </Button>
+            <Button
               variant={vista === "mes" ? "secondary" : "ghost"}
               size="sm"
               className="rounded-lg text-xs"
@@ -427,6 +437,105 @@ export default function Citas() {
                 {citasMes.map((c) => filaCita(c, true))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Vista por Sillones */}
+        {vista === "sillones" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Button variant="outline" size="sm" onClick={() => {
+                const d = new Date(fecha);
+                d.setDate(d.getDate() - 1);
+                setFecha(d.toISOString().split("T")[0]);
+              }}>&lt;</Button>
+              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-40 h-9 font-semibold text-center" />
+              <Button variant="outline" size="sm" onClick={() => {
+                const d = new Date(fecha);
+                d.setDate(d.getDate() + 1);
+                setFecha(d.toISOString().split("T")[0]);
+              }}>&gt;</Button>
+              <Button variant="ghost" size="sm" onClick={() => setFecha(fechaHoyISO())}>Hoy</Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+              {sillones.map((s) => {
+                const citasSillon = citas.filter((c: any) => c.sillon_id === s.id);
+                return (
+                  <div key={s.id} className="border rounded-xl bg-card overflow-hidden">
+                    <div className="px-4 py-3 font-semibold text-white flex items-center gap-2" style={{ backgroundColor: s.color }}>
+                      {s.nombre}
+                      <span className="ml-auto bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                        {citasSillon.length}
+                      </span>
+                    </div>
+                    <div className="p-2 space-y-2 max-h-[60vh] overflow-y-auto">
+                      {citasSillon.length === 0 ? (
+                        <p className="text-sm text-center text-muted-foreground py-6">Sin pacientes asignados</p>
+                      ) : (
+                        citasSillon.map((c) => (
+                          <div key={c.id} className="p-2 border rounded bg-background shadow-sm flex flex-col gap-1 text-sm">
+                            <div className="flex justify-between items-start">
+                              <span className="font-bold">{(c.hora || "").slice(0, 5)}</span>
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-muted/50 border">
+                                {c.estado}
+                              </span>
+                            </div>
+                            <span className="font-medium truncate" title={c.paciente ? `${c.paciente.apellidos}, ${c.paciente.nombres}` : `Paciente #${c.paciente_id}`}>
+                              {c.paciente ? `${c.paciente.apellidos}, ${c.paciente.nombres}` : `Paciente #${c.paciente_id}`}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate" title={c.motivo || ""}>
+                              {c.motivo}
+                            </span>
+                            {c.estado === "admitida" && canEdit && (
+                               <Button size="sm" className="w-full mt-2 h-7 text-xs" onClick={() => navigate(`/pacientes/${c.paciente_id}`)}>
+                                 Atender
+                               </Button>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Sin asignar */}
+              <div className="border rounded-xl bg-muted/30 overflow-hidden border-dashed">
+                <div className="px-4 py-3 font-semibold text-muted-foreground border-b border-dashed flex items-center gap-2">
+                  Sin Sillón Asignado
+                  <span className="ml-auto bg-muted px-2 py-0.5 rounded-full text-xs text-foreground">
+                    {citas.filter((c: any) => !c.sillon_id).length}
+                  </span>
+                </div>
+                <div className="p-2 space-y-2 max-h-[60vh] overflow-y-auto">
+                  {citas.filter((c: any) => !c.sillon_id).length === 0 ? (
+                    <p className="text-sm text-center text-muted-foreground py-6">Todos los pacientes tienen sillón</p>
+                  ) : (
+                    citas.filter((c: any) => !c.sillon_id).map((c) => (
+                      <div key={c.id} className="p-2 border rounded bg-background shadow-sm flex flex-col gap-1 text-sm">
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold">{(c.hora || "").slice(0, 5)}</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-muted/50 border">
+                            {c.estado}
+                          </span>
+                        </div>
+                        <span className="font-medium truncate">
+                          {c.paciente ? `${c.paciente.apellidos}, ${c.paciente.nombres}` : `Paciente #${c.paciente_id}`}
+                        </span>
+                        <div className="flex gap-1 mt-1">
+                          {canEdit && (
+                            <Button variant="outline" size="sm" className="flex-1 h-7 text-[10px]" onClick={() => setReagendarCita(c)}>
+                              Asignar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

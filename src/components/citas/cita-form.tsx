@@ -18,6 +18,7 @@ import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes"
 import { useMedicosActivos, useCreateCita, fechaHoyISO } from "@/api/citas";
 import { useAusencias, useHorarios, evaluarDisponibilidad } from "@/api/horarios";
 import { useOdontoPrecios } from "@/api/odontologia";
+import { useSillones } from "@/api/sillones";
 
 interface CitaFormProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const { data: horarios = [] } = useHorarios();
   const { data: ausencias = [] } = useAusencias();
   const { data: precios = [] } = useOdontoPrecios();
+  const { data: sillones = [] } = useSillones();
   const crear = useCreateCita();
 
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
@@ -45,6 +47,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const [fecha, setFecha] = useState(fechaInicial || fechaHoyISO());
   const [hora, setHora] = useState("08:00");
   const [tratamientoId, setTratamientoId] = useState("");
+  const [sillonId, setSillonId] = useState("");
   const [motivo, setMotivo] = useState("");
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
       setFecha(fechaInicial || fechaHoyISO());
       setHora("08:00");
       setTratamientoId("");
+      setSillonId("");
       setMotivo("");
     }
   }, [open, fechaInicial]);
@@ -129,6 +133,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
         hora,
         motivo: motivoFinal,
         agendado_por: user?.email ?? null,
+        sillon_id: sillonId && sillonId !== "none" ? Number(sillonId) : null,
       });
       onOpenChange(false);
       await showSwalSuccess(
@@ -300,6 +305,27 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                 <span>Duración estimada del turno: {duracionEstimada} minutos.</span>
               </div>
             )}
+          </div>
+
+          {/* Sillón Dental */}
+          <div className="space-y-1">
+            <Label htmlFor="c-sillon">Sillón Dental (Opcional)</Label>
+            <Select value={sillonId} onValueChange={setSillonId}>
+              <SelectTrigger id="c-sillon" className="bg-background">
+                <SelectValue placeholder="Asignar sillón..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin asignar</SelectItem>
+                {sillones.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }}></div>
+                      {s.nombre}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

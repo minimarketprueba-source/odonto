@@ -88,6 +88,7 @@ export interface CreateCitaInput {
   motivo?: string | null;
   notas?: string | null;
   agendado_por?: string | null;
+  sillon_id?: number | null;
 }
 
 const CITA_SELECT =
@@ -132,7 +133,7 @@ export function useCitasRango(desde: string, hasta: string) {
 export async function createCita(input: CreateCitaInput): Promise<Cita> {
   const { data, error } = await supabase
     .from("citas")
-    .insert({ ...input, clinica_id: CLINICA_ID, estado: "pendiente" })
+    .insert({ ...input, clinica_id: CLINICA_ID, estado: "Confirmada" })
     .select(CITA_SELECT)
     .single();
   if (error) throw new Error(`No se pudo agendar la cita: ${error.message}`);

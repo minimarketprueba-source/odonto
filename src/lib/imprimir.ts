@@ -1550,4 +1550,100 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
   ejecutarImpresionIframe(tituloDoc, html);
 }
 
+export interface DatosImpresionPresupuesto {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  titulo: string;
+  fecha: string;
+  estado: string;
+  total: number;
+  saldoPendiente: number;
+  detalles: {
+    pieza?: number | null;
+    cara?: string | null;
+    tratamiento: string;
+    costo: number;
+    descuento: number;
+  }[];
+  pagos: {
+    fecha: string;
+    monto: number;
+    metodo: string;
+  }[];
+}
 
+export function imprimirPresupuesto(datos: DatosImpresionPresupuesto) {
+  const tituloDoc = "PRESUPUESTO ODONTOLÓGICO";
+
+  const trsDetalles = datos.detalles.map((d) => `
+    <tr>
+      <td style="padding: 6px; border: 1px solid #cbd5e1;">${d.pieza ? `${d.pieza} (${d.cara || "Completo"})` : "Boca entera"}</td>
+      <td style="padding: 6px; border: 1px solid #cbd5e1;">${d.tratamiento}</td>
+      <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">${d.costo.toLocaleString()} ₲</td>
+      <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right; color: #b91c1c;">-${d.descuento.toLocaleString()} ₲</td>
+      <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right; font-weight: bold;">${(d.costo - d.descuento).toLocaleString()} ₲</td>
+    </tr>
+  `).join("");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a; max-width: 800px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">
+        <h1 style="margin: 0; font-size: 18px; color: #1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h2 style="margin: 5px 0; font-size: 14px;">${tituloDoc}</h2>
+        <p style="margin: 0; font-size: 11px; color: #475569;">Fecha: ${datos.fecha}</p>
+      </div>
+
+      <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
+        <p style="margin: 4px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin: 4px 0;"><strong>Documento:</strong> ${datos.pacienteDocumento || "—"}</p>
+        <p style="margin: 4px 0;"><strong>Plan de Tratamiento:</strong> ${datos.titulo} <span style="padding: 2px 6px; background-color: #e2e8f0; border-radius: 4px; font-size: 10px; text-transform: uppercase;">${datos.estado}</span></p>
+      </div>
+
+      <h3 style="font-size: 13px; font-weight: bold; margin-bottom: 8px;">DETALLE DE TRATAMIENTOS</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+        <thead>
+          <tr style="background-color: #f1f5f9;">
+            <th style="padding: 6px; border: 1px solid #cbd5e1; text-align: left;">Diente/Cara</th>
+            <th style="padding: 6px; border: 1px solid #cbd5e1; text-align: left;">Tratamiento</th>
+            <th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Costo</th>
+            <th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Descuento</th>
+            <th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${trsDetalles || `<tr><td colspan="5" style="text-align:center; padding: 10px;">Sin procedimientos</td></tr>`}
+        </tbody>
+      </table>
+
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 30px;">
+        <div style="width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f1f5f9;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Total Cotizado:</span>
+            <strong>${datos.total.toLocaleString()} ₲</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Total Abonado:</span>
+            <strong style="color: #16a34a;">${(datos.total - datos.saldoPendiente).toLocaleString()} ₲</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #cbd5e1; font-size: 14px;">
+            <strong>SALDO PENDIENTE:</strong>
+            <strong style="color: #dc2626;">${datos.saldoPendiente.toLocaleString()} ₲</strong>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 60px; display: flex; justify-content: space-around; text-align: center;">
+        <div>
+          <div style="width: 200px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
+          <span style="font-size: 11px;">Firma del Paciente</span>
+        </div>
+        <div>
+          <div style="width: 200px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
+          <span style="font-size: 11px;">Firma y Sello del Odontólogo</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
