@@ -15,7 +15,7 @@ import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PacienteForm } from "@/components/pacientes/paciente-form";
 import { labelTipoPaciente, usePacientes, type Paciente } from "@/api/pacientes";
-import { useMedicosActivos, useCreateCita, fechaHoyISO } from "@/api/citas";
+import { useMedicosActivos, useCreateCita, fechaHoyISO, useMiMedico } from "@/api/citas";
 import { useAusencias, useHorarios, evaluarDisponibilidad } from "@/api/horarios";
 import { useOdontoPrecios } from "@/api/odontologia";
 import { useSillones } from "@/api/sillones";
@@ -50,12 +50,20 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
   const [sillonId, setSillonId] = useState("");
   const [motivo, setMotivo] = useState("");
 
+  // La ficha del profesional que está usando el sistema, si la cuenta tiene una
+  // vinculada (`medicos.user_id`). Recepción y administración no tienen, y por
+  // eso siguen eligiendo a mano de la lista.
+  const { data: miMedico } = useMiMedico(user?.id);
+
   useEffect(() => {
     if (open) {
       setBusquedaPaciente("");
       setPaciente(null);
-      setMedicoId("");
-      setBusquedaMedico("");
+      // Un odontólogo agenda para sí mismo: el campo viene con su nombre en vez
+      // de obligarlo a buscarse en la lista, y queda fijo para que nadie agende
+      // a nombre de otro profesional.
+      setMedicoId(miMedico ? String(miMedico.id) : "");
+      setBusquedaMedico(miMedico ? `${miMedico.apellidos}, ${miMedico.nombres}` : "");
       setMostrarListaMedicos(false);
       setFecha(fechaInicial || fechaHoyISO());
       setHora("08:00");
@@ -63,7 +71,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
       setSillonId("");
       setMotivo("");
     }
-  }, [open, fechaInicial]);
+  }, [open, fechaInicial, miMedico]);
 
   const medicosFiltrados = useMemo(() => {
     if (!busquedaMedico.trim()) return medicos;
@@ -88,7 +96,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
 
   const disponibilidad = useMemo(() => {
     if (!medicoId || !fecha || !hora) return null;
-    return evaluarDisponibilidad(Number(medicoId), fecha, hora, horarios, ausencias);
+    return evaluarDisponibilidad(medicoId, fecha, hora, horarios, ausencias);
   }, [medicoId, fecha, hora, horarios, ausencias]);
 
   // Duración dinámica estimada basada en el tipo de tratamiento
@@ -128,12 +136,12 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
     try {
       await crear.mutateAsync({
         paciente_id: paciente.id,
-        medico_id: Number(medicoId),
+        medico_id: medicoId,
         fecha,
         hora,
         motivo: motivoFinal,
         agendado_por: user?.email ?? null,
-        sillon_id: sillonId && sillonId !== "none" ? Number(sillonId) : null,
+        sillon_id: sillonId && sillonId !== "none" ? sillonId : null,
       });
       onOpenChange(false);
       await showSwalSuccess(
@@ -225,19 +233,26 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                     </Badge>
                   )}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  className="h-9 text-xs"
-                  onClick={() => {
-                    setMedicoId("");
-                    setBusquedaMedico("");
-                    setMostrarListaMedicos(true);
-                  }}
-                >
-                  Cambiar
-                </Button>
+                {/* Quien tiene ficha propia agenda para sí: no puede cambiarlo,
+                    así nadie agenda a nombre de otro profesional. Recepción y
+                    administración no tienen ficha y sí eligen de la lista. */}
+                {miMedico && String(miMedico.id) === medicoId ? (
+                  <span className="text-xs text-muted-foreground shrink-0">Es su agenda</span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    className="h-9 text-xs"
+                    onClick={() => {
+                      setMedicoId("");
+                      setBusquedaMedico("");
+                      setMostrarListaMedicos(true);
+                    }}
+                  >
+                    Cambiar
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="relative">

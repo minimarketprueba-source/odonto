@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 export interface EvolucionClinica {
-  id: number;
+  id: string;
   paciente_id: string;
-  medico_id: number | null;
-  cita_id: number | null;
+  medico_id: string | null;
+  cita_id: string | null;
   pieza: string | null;
   procedimiento: string | null;
   nota_clinica: string;

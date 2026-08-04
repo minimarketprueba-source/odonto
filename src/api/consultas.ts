@@ -67,7 +67,7 @@ export interface Consulta {
   id: number;
   clinica_id: string;
   paciente_id: number;
-  medico_id: number;
+  medico_id: string;
   cita_id: number | null;
   fecha: string; // yyyy-mm-dd
   motivo_consulta: string | null;
@@ -105,8 +105,8 @@ export interface Cie10 {
 
 export interface CreateConsultaInput {
   paciente_id: number;
-  medico_id: number;
-  cita_id?: number | null;
+  medico_id: string;
+  cita_id?: string | null;
   fecha: string;
   motivo_consulta?: string | null;
   examen_fisico?: string | null;
@@ -195,7 +195,7 @@ export function useConsultasPaciente(pacienteId: number | null, incluirAnuladas 
 export interface AtencionRegistro {
   paciente_id: number;
   fecha: string;
-  medico_id: number;
+  medico_id: string;
 }
 
 /** Todas las atenciones (paciente + fecha + profesional), para estadísticas y filtros. */

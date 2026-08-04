@@ -47,7 +47,7 @@ function verificarUnaFila(filas: unknown[] | null, accionFallida: string): void 
 export interface AnularConsultaInput {
   id: number;
   motivo: string;
-  citaId?: number | null;
+  citaId?: string | null;
   /** Devolver la cita a la agenda para que el paciente sea atendido de nuevo. */
   reabrirCita?: boolean;
 }
@@ -67,7 +67,7 @@ export async function anularConsulta({ id, motivo, citaId, reabrirCita }: Anular
   }
 }
 
-export async function restaurarConsulta(id: number, citaId?: number | null): Promise<void> {
+export async function restaurarConsulta(id: number, citaId?: string | null): Promise<void> {
   const { data, error } = await supabase
     .from("consultas")
     .update({ anulada_at: null })
@@ -106,7 +106,7 @@ export async function restaurarReceta(id: number): Promise<void> {
 // --- Citas ---
 
 /** Una cita con consulta registrada no se puede borrar: primero se anula la consulta. */
-export async function citaTieneConsulta(citaId: number): Promise<boolean> {
+export async function citaTieneConsulta(citaId: string): Promise<boolean> {
   const { count, error } = await supabase
     .from("consultas")
     .select("id", { count: "exact", head: true })
@@ -115,7 +115,7 @@ export async function citaTieneConsulta(citaId: number): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-export async function borrarCita(id: number): Promise<void> {
+export async function borrarCita(id: string): Promise<void> {
   if (await citaTieneConsulta(id)) {
     throw new Error(
       "Esta cita ya tiene una consulta registrada. Anule primero la consulta desde la historia clínica del paciente."
@@ -148,7 +148,7 @@ export function useAnularConsulta() {
 export function useRestaurarConsulta() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, citaId }: { id: number; citaId?: number | null }) => restaurarConsulta(id, citaId),
+    mutationFn: ({ id, citaId }: { id: number; citaId?: string | null }) => restaurarConsulta(id, citaId),
     retry: 0,
     onSuccess: () => invalidarTodo(queryClient),
   });

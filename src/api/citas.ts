@@ -28,11 +28,14 @@ export function turnoDeHora(hora: string): "Mañana" | "Tarde" | "Noche" {
   return "Noche";
 }
 
+// Los identificadores de esta base son UUID (texto). Estaban declarados como
+// `number` por herencia del esquema anterior, y de ahí salían los `Number(id)`
+// que devolvían NaN y hacían fallar el guardado.
 export interface Cita {
-  id: number;
+  id: string;
   clinica_id: string;
   paciente_id: string;
-  medico_id: number;
+  medico_id: string;
   fecha: string; // yyyy-mm-dd
   hora: string; // HH:mm:ss
   estado: EstadoCita | string;
@@ -55,7 +58,7 @@ export interface Cita {
   preconsulta_at?: string | null;
   preconsulta_nota?: string | null;
   paciente?: {
-    id: number;
+    id: string;
     nombres: string;
     apellidos: string;
     documento: string;
@@ -64,7 +67,7 @@ export interface Cita {
     unidad?: string | null;
   } | null;
   medico?: {
-    id: number;
+    id: string;
     nombres: string;
     apellidos: string;
     especialidad: { nombre: string; color: string | null } | null;
@@ -72,23 +75,23 @@ export interface Cita {
 }
 
 export interface Medico {
-  id: number;
+  id: string;
   nombres: string;
   apellidos: string;
   activo: boolean;
   user_id?: string | null;
-  especialidad: { id: number; nombre: string; color: string | null } | null;
+  especialidad: { id: string; nombre: string; color: string | null } | null;
 }
 
 export interface CreateCitaInput {
   paciente_id: string;
-  medico_id: number;
+  medico_id: string;
   fecha: string;
   hora: string;
   motivo?: string | null;
   notas?: string | null;
   agendado_por?: string | null;
-  sillon_id?: number | null;
+  sillon_id?: string | null;
 }
 
 const CITA_SELECT =
@@ -140,12 +143,12 @@ export async function createCita(input: CreateCitaInput): Promise<Cita> {
   return data as unknown as Cita;
 }
 
-export async function cambiarEstadoCita(id: number, estado: EstadoCita): Promise<void> {
+export async function cambiarEstadoCita(id: string, estado: EstadoCita): Promise<void> {
   const { error } = await supabase.from("citas").update({ estado }).eq("id", id);
   if (error) throw new Error(`No se pudo cambiar el estado: ${error.message}`);
 }
 
-export async function reprogramarCita(id: number, fecha: string, hora: string): Promise<void> {
+export async function reprogramarCita(id: string, fecha: string, hora: string): Promise<void> {
   const { error } = await supabase
     .from("citas")
     .update({ fecha, hora, estado: "pendiente", admitida_at: null, orden_llegada: null })
@@ -177,7 +180,7 @@ export async function admitirCita(cita: Cita): Promise<void> {
 }
 
 export interface PreconsultaInput {
-  cita_id: number;
+  cita_id: string;
   enfermero?: string | null;
   nota?: string | null;
   pa_sistolica?: number | null;
@@ -315,7 +318,7 @@ export function useCreateCita() {
 export function useCambiarEstadoCita() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, estado }: { id: number; estado: EstadoCita }) => cambiarEstadoCita(id, estado),
+    mutationFn: ({ id, estado }: { id: string; estado: EstadoCita }) => cambiarEstadoCita(id, estado),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.citas.all }),
   });
 }
@@ -331,7 +334,7 @@ export function useAdmitirCita() {
 export function useReprogramarCita() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, fecha, hora }: { id: number; fecha: string; hora: string }) =>
+    mutationFn: ({ id, fecha, hora }: { id: string; fecha: string; hora: string }) =>
       reprogramarCita(id, fecha, hora),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.citas.all }),
   });

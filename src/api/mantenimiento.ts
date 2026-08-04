@@ -8,8 +8,11 @@ import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 import { CLINICA_ID } from "./pacientes";
 
+// Los identificadores de la base son UUID (texto), no números. Decían `number`
+// por herencia del esquema anterior: el valor que llegaba en tiempo de
+// ejecución era un UUID igual, así que el tipo mentía sin dar error.
 export interface Especialidad {
-  id: number;
+  id: string;
   nombre: string;
   descripcion: string | null;
   color: string | null;
@@ -17,17 +20,17 @@ export interface Especialidad {
 }
 
 export interface MedicoAdmin {
-  id: number;
+  id: string;
   nombres: string;
   apellidos: string;
   documento: string | null;
   email: string | null;
   telefono: string | null;
-  especialidad_id: number | null;
+  especialidad_id: string | null;
   numero_colegiatura: string | null;
   activo: boolean;
   user_id: string | null;
-  especialidad?: { id: number; nombre: string } | null;
+  especialidad?: { id: string; nombre: string } | null;
 }
 
 export interface CreateMedicoInput {
@@ -36,9 +39,53 @@ export interface CreateMedicoInput {
   documento?: string | null;
   email?: string | null;
   telefono?: string | null;
-  especialidad_id?: number | null;
+  especialidad_id?: string | null;
   numero_colegiatura?: string | null;
   activo?: boolean;
+  /** Cuenta con la que entra al sistema (`auth.users.id`). Ver CuentaVinculable. */
+  user_id?: string | null;
+}
+
+/** Una cuenta del sistema, para poder vincularla con la ficha del profesional. */
+export interface CuentaVinculable {
+  id: string;
+  email: string;
+  nombre: string | null;
+  rol: string | null;
+  /** Nombre de la ficha que ya la tiene tomada, si la hay. */
+  tomadaPor: string | null;
+}
+
+/**
+ * Cuentas que se pueden vincular a una ficha de profesional.
+ *
+ * La ficha (`medicos`) y la cuenta de acceso (`auth.users`) son cosas
+ * distintas: la ficha es quién atiende y firma, la cuenta es con qué entra.
+ * `medicos.user_id` las une, y de ese vínculo dependen dos cosas: que la firma
+ * de los documentos quede fija en la persona correcta y que cada profesional
+ * pueda corregir su propia ficha desde «Mi perfil».
+ */
+export async function fetchCuentasVinculables(): Promise<CuentaVinculable[]> {
+  const [{ data: perfiles, error: errPerfiles }, { data: roles }, { data: fichas }] =
+    await Promise.all([
+      supabase.from("profiles").select("id, email, nombre, apellido").order("email"),
+      supabase.from("user_roles").select("user_id, role"),
+      supabase.from("medicos").select("user_id, nombres, apellidos").not("user_id", "is", null),
+    ]);
+  if (errPerfiles) throw new Error(`No se pudieron cargar las cuentas: ${errPerfiles.message}`);
+
+  const rolPorCuenta = new Map((roles ?? []).map((r) => [r.user_id, r.role as string | null]));
+  const fichaPorCuenta = new Map(
+    (fichas ?? []).map((f) => [f.user_id as string, `${f.apellidos ?? ""}, ${f.nombres ?? ""}`.trim()])
+  );
+
+  return (perfiles ?? []).map((p) => ({
+    id: p.id as string,
+    email: (p.email as string) ?? "sin correo",
+    nombre: [p.nombre, p.apellido].filter(Boolean).join(" ") || null,
+    rol: rolPorCuenta.get(p.id as string) ?? null,
+    tomadaPor: fichaPorCuenta.get(p.id as string) ?? null,
+  }));
 }
 
 // --- Especialidades ---
@@ -59,7 +106,7 @@ export async function createEspecialidad(nombre: string, color: string): Promise
   if (error) throw new Error(`No se pudo crear la especialidad: ${error.message}`);
 }
 
-export async function updateEspecialidad(id: number, cambios: Partial<Especialidad>): Promise<void> {
+export async function updateEspecialidad(id: string, cambios: Partial<Especialidad>): Promise<void> {
   const { error } = await supabase.from("especialidades").update(cambios).eq("id", id);
   if (error) throw new Error(`No se pudo actualizar la especialidad: ${error.message}`);
 }
@@ -82,7 +129,7 @@ export async function createMedico(input: CreateMedicoInput): Promise<void> {
   if (error) throw new Error(`No se pudo registrar el médico: ${error.message}`);
 }
 
-export async function updateMedico(id: number, cambios: Partial<CreateMedicoInput>): Promise<void> {
+export async function updateMedico(id: string, cambios: Partial<CreateMedicoInput>): Promise<void> {
   const { error } = await supabase.from("medicos").update(cambios).eq("id", id);
   if (error) throw new Error(`No se pudo actualizar el médico: ${error.message}`);
 }
@@ -110,6 +157,14 @@ export function useEspecialidades() {
 
 export function useMedicosAdmin() {
   return useQuery({ queryKey: queryKeys.medicos.admin(), queryFn: fetchMedicosAdmin });
+}
+
+export function useCuentasVinculables(habilitado = true) {
+  return useQuery({
+    queryKey: [...queryKeys.medicos.all, "cuentas"],
+    queryFn: fetchCuentasVinculables,
+    enabled: habilitado,
+  });
 }
 
 export function useCountCie10() {

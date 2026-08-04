@@ -24,9 +24,23 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Registro profesional del odontólogo ---------------------------------------
+-- 2. Datos del odontólogo --------------------------------------------------------
+-- La tabla se creó con lo mínimo (nombres, apellidos, especialidad) pero la
+-- pantalla de Mantenimiento pide también la cédula, el contacto y el registro
+-- profesional. Sin estas columnas el alta fallaba con
+-- "Could not find the 'clinica_id' column of 'medicos'": NO SE PODÍA DAR DE
+-- ALTA NINGÚN ODONTÓLOGO.
 ALTER TABLE public.medicos
-    ADD COLUMN IF NOT EXISTS numero_colegiatura TEXT;
+    ADD COLUMN IF NOT EXISTS numero_colegiatura TEXT,
+    ADD COLUMN IF NOT EXISTS documento TEXT,
+    ADD COLUMN IF NOT EXISTS email TEXT,
+    ADD COLUMN IF NOT EXISTS telefono TEXT,
+    ADD COLUMN IF NOT EXISTS clinica_id UUID REFERENCES public.clinicas(id) ON DELETE SET NULL;
+
+-- Dos fichas con la misma cédula serían la misma persona cargada dos veces.
+-- Índice parcial: deja convivir varias fichas sin cédula (todavía sin cargar).
+CREATE UNIQUE INDEX IF NOT EXISTS medicos_documento_unico
+    ON public.medicos (documento) WHERE documento IS NOT NULL;
 
 -- 3. Ausencias: los nombres de columna que usa el código ------------------------
 -- La tabla se creó con fecha_inicio/fecha_fin y el código pide desde/hasta.

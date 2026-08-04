@@ -16,14 +16,14 @@ import { toast } from "sonner";
 import { sanitizePlainText } from "@/lib/security";
 import { queryKeys } from "@/lib/query-client";
 import {
-  useEspecialidades, useMedicosAdmin, useCountCie10, useMantenimientoMutation,
+  useEspecialidades, useMedicosAdmin, useCountCie10, useMantenimientoMutation, useCuentasVinculables,
   createEspecialidad, updateEspecialidad, createMedico, updateMedico, createCie10,
   type MedicoAdmin,
 } from "@/api/mantenimiento";
 
 const MEDICO_VACIO = {
   nombres: "", apellidos: "", documento: "", email: "", telefono: "",
-  especialidad_id: "", numero_colegiatura: "",
+  especialidad_id: "", numero_colegiatura: "", user_id: "",
 };
 
 export default function Mantenimiento() {
@@ -33,20 +33,26 @@ export default function Mantenimiento() {
 
   // --- Médicos ---
   const [medicoOpen, setMedicoOpen] = useState(false);
+  // Las cuentas se cargan solo al abrir el diálogo: es una consulta de admin
+  // que no hace falta para el listado.
   const [medicoSel, setMedicoSel] = useState<MedicoAdmin | null>(null);
   const [formMedico, setFormMedico] = useState(MEDICO_VACIO);
   const [soloActivos, setSoloActivos] = useState(true);
+  const { data: cuentas = [] } = useCuentasVinculables(medicoOpen);
 
   const guardarMedico = useMantenimientoMutation(
-    async (args: { id: number | null; datos: typeof MEDICO_VACIO }) => {
+    async (args: { id: string | null; datos: typeof MEDICO_VACIO }) => {
       const payload = {
         nombres: sanitizePlainText(args.datos.nombres),
         apellidos: sanitizePlainText(args.datos.apellidos),
         documento: sanitizePlainText(args.datos.documento) || null,
         email: sanitizePlainText(args.datos.email) || null,
         telefono: sanitizePlainText(args.datos.telefono) || null,
-        especialidad_id: args.datos.especialidad_id ? Number(args.datos.especialidad_id) : null,
+        // El id de la especialidad es un UUID. Acá decía `Number(...)`, que
+        // sobre un UUID da NaN y hacía fallar el alta entera.
+        especialidad_id: args.datos.especialidad_id || null,
         numero_colegiatura: sanitizePlainText(args.datos.numero_colegiatura) || null,
+        user_id: args.datos.user_id || null,
       };
       if (args.id) await updateMedico(args.id, payload);
       else await createMedico(payload);
@@ -69,6 +75,7 @@ export default function Mantenimiento() {
         telefono: medicoSel.telefono ?? "",
         especialidad_id: medicoSel.especialidad_id ? String(medicoSel.especialidad_id) : "",
         numero_colegiatura: medicoSel.numero_colegiatura ?? "",
+        user_id: medicoSel.user_id ?? "",
       } : MEDICO_VACIO);
     }
   }, [medicoOpen, medicoSel]);
@@ -94,7 +101,7 @@ export default function Mantenimiento() {
     [queryKeys.especialidades.all]
   );
   const toggleEsp = useMantenimientoMutation(
-    async (args: { id: number; activo: boolean }) => updateEspecialidad(args.id, { activo: args.activo }),
+    async (args: { id: string; activo: boolean }) => updateEspecialidad(args.id, { activo: args.activo }),
     [queryKeys.especialidades.all]
   );
 
@@ -290,6 +297,41 @@ export default function Mantenimiento() {
             <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="m-email">Email</Label>
               <Input id="m-email" type="email" value={formMedico.email} onChange={(e) => setFormMedico((f) => ({ ...f, email: e.target.value }))} />
+            </div>
+
+            {/* La ficha y la cuenta de acceso son cosas distintas: sin este
+                vínculo el profesional no puede corregir su propia ficha desde
+                «Mi perfil» y su firma no queda fija en los documentos. */}
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="m-cuenta">Cuenta de acceso</Label>
+              <Select
+                value={formMedico.user_id || "ninguna"}
+                onValueChange={(v) => setFormMedico((f) => ({ ...f, user_id: v === "ninguna" ? "" : v }))}
+              >
+                <SelectTrigger id="m-cuenta">
+                  <SelectValue placeholder="Sin cuenta vinculada" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ninguna">Sin cuenta vinculada</SelectItem>
+                  {cuentas.map((c) => {
+                    // Una cuenta ya usada por OTRA ficha no se puede reasignar:
+                    // dos profesionales compartiendo cuenta firmarían igual.
+                    const ocupada = Boolean(c.tomadaPor) && c.id !== medicoSel?.user_id;
+                    return (
+                      <SelectItem key={c.id} value={c.id} disabled={ocupada}>
+                        {c.email}
+                        {c.nombre ? ` — ${c.nombre}` : ""}
+                        {ocupada ? ` (ya es de ${c.tomadaPor})` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Con qué usuario entra al sistema. Al vincularla, esta persona podrá
+                corregir su propia ficha desde «Mi perfil» y sus documentos saldrán
+                firmados a su nombre.
+              </p>
             </div>
           </div>
           <Button onClick={handleGuardarMedico} disabled={guardarMedico.isPending} className="w-full">

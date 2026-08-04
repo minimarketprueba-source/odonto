@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 export interface Sillon {
-  id: number;
+  id: string;
   clinica_id: string;
   nombre: string;
   color: string;

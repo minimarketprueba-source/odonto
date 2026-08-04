@@ -23,30 +23,30 @@ export const DIAS_SEMANA = [
 ] as const;
 
 export interface Horario {
-  id: number;
-  medico_id: number;
+  id: string;
+  medico_id: string;
   dia_semana: number;
   hora_inicio: string; // HH:mm:ss
   hora_fin: string;
 }
 
 export interface Ausencia {
-  id: number;
-  medico_id: number;
+  id: string;
+  medico_id: string;
   desde: string; // yyyy-mm-dd
   hasta: string;
   motivo: string | null;
 }
 
 export interface CreateHorarioInput {
-  medico_id: number;
+  medico_id: string;
   dia_semana: number;
   hora_inicio: string;
   hora_fin: string;
 }
 
 export interface CreateAusenciaInput {
-  medico_id: number;
+  medico_id: string;
   desde: string;
   hasta: string;
   motivo?: string | null;
@@ -71,7 +71,7 @@ export async function createHorario(input: CreateHorarioInput): Promise<void> {
   if (error) throw new Error(`No se pudo guardar el horario: ${error.message}`);
 }
 
-export async function deleteHorario(id: number): Promise<void> {
+export async function deleteHorario(id: string): Promise<void> {
   const { error } = await supabase.from("horarios_medicos").delete().eq("id", id);
   if (error) throw new Error(`No se pudo quitar el horario: ${error.message}`);
 }
@@ -95,7 +95,7 @@ export async function createAusencia(input: CreateAusenciaInput): Promise<void> 
   if (error) throw new Error(`No se pudo guardar la ausencia: ${error.message}`);
 }
 
-export async function deleteAusencia(id: number): Promise<void> {
+export async function deleteAusencia(id: string): Promise<void> {
   const { error } = await supabase.from("ausencias_medicos").delete().eq("id", id);
   if (error) throw new Error(`No se pudo quitar la ausencia: ${error.message}`);
 }
@@ -113,7 +113,7 @@ export interface Disponibilidad {
 
 /** Evalúa si un médico atiende en la fecha/hora dadas según sus horarios y ausencias. */
 export function evaluarDisponibilidad(
-  medicoId: number,
+  medicoId: string,
   fecha: string,
   hora: string,
   horarios: Horario[],

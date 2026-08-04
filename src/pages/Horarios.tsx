@@ -46,7 +46,9 @@ export default function Horarios() {
     if (!medicoId && miMedico) setMedicoId(String(miMedico.id));
   }, [miMedico, medicoId]);
 
-  const idSel = Number(medicoId) || null;
+  // El id del médico es un UUID: `Number(...)` daba NaN y esta pantalla se
+  // quedaba sin cargar los horarios de nadie.
+  const idSel = medicoId || null;
   const medicoSeleccionado = useMemo(
     () => medicos.find((m) => String(m.id) === medicoId) || null,
     [medicos, medicoId]
