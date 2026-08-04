@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useOdontograma, useSaveOdontogramaRegistro, OdontogramaRegistro } from "@/api/odontologia";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Info, MousePointer2, History } from "lucide-react";
+import { RefreshCw, Info, MousePointer2, History, Save, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -33,6 +33,15 @@ const TEMP_INF_IZQ = [71, 72, 73, 74, 75];
 
 const SIN_COLOR = "#ffffff";
 
+/** Las cinco caras del esquema, cada una con su polígono. */
+const CARAS_DIBUJO: { cara: string; puntos: string }[] = [
+  { cara: "vestibular", puntos: "0,0 40,0 30,10 10,10" },
+  { cara: "distal", puntos: "40,0 40,40 30,30 30,10" },
+  { cara: "palatina", puntos: "0,40 40,40 30,30 10,30" },
+  { cara: "mesial", puntos: "0,0 0,40 10,30 10,10" },
+  { cara: "oclusal", puntos: "10,10 30,10 30,30 10,30" },
+];
+
 interface MarcaCara {
   estado: EstadoDental;
   fecha?: string;
@@ -47,6 +56,33 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
   // papel: se agarra el lápiz rojo y se recorre la boca.
   const [herramienta, setHerramienta] = useState<EstadoDental | null>(null);
   const [ultimoDetalle, setUltimoDetalle] = useState<string | null>(null);
+
+  // Lo marcado en esta sesión, todavía SIN guardar. Antes cada clic escribía
+  // derecho en la base: un clic por error quedaba asentado para siempre en la
+  // historia clínica del paciente y no había forma de arrepentirse. Ahora se
+  // marca en pantalla y recién se asienta al confirmar con «Guardar».
+  const [pendientes, setPendientes] = useState<Record<string, EstadoDental>>({});
+  const [guardando, setGuardando] = useState(false);
+
+  const cantidadPendiente = Object.keys(pendientes).length;
+  const hayPendientes = cantidadPendiente > 0;
+
+  // Al cambiar de paciente, lo no guardado no debe arrastrarse a la otra ficha.
+  useEffect(() => {
+    setPendientes({});
+  }, [pacienteId]);
+
+  // Cerrar la pestaña con marcas sin guardar tiene que avisar: el navegador
+  // muestra su propio cartel de confirmación.
+  useEffect(() => {
+    if (!hayPendientes) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [hayPendientes]);
 
   /** Estado vigente de cada cara y de cada pieza completa. */
   const { porCara, porPieza } = useMemo(() => {
@@ -105,12 +141,23 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
       });
   }, [registros]);
 
-  const aplicar = async (pieza: number, cara: string) => {
+  /** Lo que hay que mostrar en una cara: lo pendiente pisa a lo guardado. */
+  const marcaVigente = (pieza: number, cara: string): EstadoDental | undefined => {
+    const pendiente = pendientes[`${pieza}_${cara}`];
+    if (pendiente) return pendiente;
+    const guardada = cara === "completo" ? porPieza[pieza] : porCara[`${pieza}_${cara}`];
+    return guardada?.estado;
+  };
+
+  /** Si esa cara está marcada pero todavía sin guardar. */
+  const estaPendiente = (pieza: number, cara: string) => Boolean(pendientes[`${pieza}_${cara}`]);
+
+  const aplicar = (pieza: number, cara: string) => {
     if (!herramienta) {
-      const marca = cara === "completo" ? porPieza[pieza] : porCara[`${pieza}_${cara}`];
+      const marca = marcaVigente(pieza, cara);
       setUltimoDetalle(
         marca
-          ? `Pieza ${pieza} · ${NOMBRE_CARA[cara] ?? cara}: ${marca.estado.label}`
+          ? `Pieza ${pieza} · ${NOMBRE_CARA[cara] ?? cara}: ${marca.label}`
           : `Pieza ${pieza} · ${NOMBRE_CARA[cara] ?? cara}: sin hallazgos`
       );
       return;
@@ -119,35 +166,70 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
     // Una corona, una endodoncia o una extracción son de la pieza entera: no
     // tiene sentido registrarlas en una cara suelta.
     const caraFinal = herramienta.piezaCompleta ? "completo" : cara;
+    const clave = `${pieza}_${caraFinal}`;
 
+    // Volver a marcar lo mismo lo saca: sirve para deshacer sin tener que
+    // buscar la herramienta «Sano / Borrar».
+    setPendientes((previas) => {
+      const siguientes = { ...previas };
+      if (siguientes[clave]?.id === herramienta.id) delete siguientes[clave];
+      else siguientes[clave] = herramienta;
+      return siguientes;
+    });
+    setUltimoDetalle(`Pieza ${pieza} · ${NOMBRE_CARA[caraFinal] ?? caraFinal}: ${herramienta.label}`);
+  };
+
+  const descartar = () => {
+    setPendientes({});
+    setUltimoDetalle(null);
+  };
+
+  const guardar = async () => {
+    const entradas = Object.entries(pendientes);
+    if (entradas.length === 0) return;
+
+    setGuardando(true);
     try {
-      const payload: OdontogramaRegistro = {
-        paciente_id: pacienteId,
-        pieza,
-        cara: caraFinal,
-        diagnostico: herramienta.diagnostico,
-        tratamiento: herramienta.tratamiento,
-        estado: herramienta.estado,
-        color: herramienta.color,
-        notas: null,
-      };
-      await saveRegistro.mutateAsync(payload);
-      setUltimoDetalle(`Pieza ${pieza} · ${NOMBRE_CARA[caraFinal] ?? caraFinal}: ${herramienta.label}`);
+      // De a uno y en orden: son pocos registros y así, si uno falla, se sabe
+      // cuál y los anteriores ya quedaron asentados.
+      for (const [clave, estado] of entradas) {
+        const [piezaTexto, cara] = clave.split("_");
+        const payload: OdontogramaRegistro = {
+          paciente_id: pacienteId,
+          pieza: Number(piezaTexto),
+          cara,
+          diagnostico: estado.diagnostico,
+          tratamiento: estado.tratamiento,
+          estado: estado.estado,
+          color: estado.color,
+          notas: null,
+        };
+        await saveRegistro.mutateAsync(payload);
+      }
+      setPendientes({});
+      toast.success(
+        entradas.length === 1
+          ? "Se guardó 1 marca en la historia clínica"
+          : `Se guardaron ${entradas.length} marcas en la historia clínica`
+      );
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(`No se pudo guardar: ${(err as Error).message}`);
+    } finally {
+      setGuardando(false);
     }
   };
 
   const Diente = ({ numero }: { numero: number }) => {
-    const marcaPieza = porPieza[numero];
-    const colorPieza = marcaPieza?.estado.color ?? SIN_COLOR;
-    const ausente = marcaPieza?.estado.ausente || marcaPieza?.estado.id === "extraccion";
+    const marcaPieza = marcaVigente(numero, "completo");
+    const colorPieza = marcaPieza?.color ?? SIN_COLOR;
+    const ausente = marcaPieza?.ausente || marcaPieza?.id === "extraccion";
+    const piezaSinGuardar = estaPendiente(numero, "completo");
 
     const colorDe = (cara: string) =>
-      porCara[`${numero}_${cara}`]?.estado.color ?? (marcaPieza ? colorPieza : SIN_COLOR);
+      marcaVigente(numero, cara)?.color ?? (marcaPieza ? colorPieza : SIN_COLOR);
 
     const titulo = marcaPieza
-      ? `Pieza ${numero}: ${marcaPieza.estado.label}`
+      ? `Pieza ${numero}: ${marcaPieza.label}${piezaSinGuardar ? " (sin guardar)" : ""}`
       : `Pieza ${numero}`;
 
     // En la arcada inferior se invierte el orden (esquema arriba, número
@@ -165,46 +247,35 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
           type="button"
           title={titulo}
           onClick={() => aplicar(numero, "completo")}
-          className="rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
-          disabled={saveRegistro.isPending}
+          className={`rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${
+            piezaSinGuardar ? "ring-2 ring-dashed ring-amber-500" : ""
+          }`}
+          disabled={guardando}
         >
           <DienteFigura numero={numero} color={colorPieza} tachado={ausente} className="w-7 h-11" />
         </button>
 
         {/* Esquema de las cinco caras: es donde se marca una caries o una
-            obturación, que afectan a una cara y no a toda la pieza. */}
+            obturación, que afectan a una cara y no a toda la pieza.
+            Lo que todavía no se guardó lleva borde punteado. */}
         <svg viewBox="0 0 40 40" className="w-8 h-8" role="group" aria-label={`Caras de la pieza ${numero}`}>
-          <g stroke="#94a3b8" strokeWidth="1">
-            <polygon
-              points="0,0 40,0 30,10 10,10"
-              fill={colorDe("vestibular")}
-              className="cursor-pointer hover:brightness-90"
-              onClick={() => aplicar(numero, "vestibular")}
-            />
-            <polygon
-              points="40,0 40,40 30,30 30,10"
-              fill={colorDe("distal")}
-              className="cursor-pointer hover:brightness-90"
-              onClick={() => aplicar(numero, "distal")}
-            />
-            <polygon
-              points="0,40 40,40 30,30 10,30"
-              fill={colorDe("palatina")}
-              className="cursor-pointer hover:brightness-90"
-              onClick={() => aplicar(numero, "palatina")}
-            />
-            <polygon
-              points="0,0 0,40 10,30 10,10"
-              fill={colorDe("mesial")}
-              className="cursor-pointer hover:brightness-90"
-              onClick={() => aplicar(numero, "mesial")}
-            />
-            <polygon
-              points="10,10 30,10 30,30 10,30"
-              fill={colorDe("oclusal")}
-              className="cursor-pointer hover:brightness-90"
-              onClick={() => aplicar(numero, "oclusal")}
-            />
+          <g strokeWidth="1">
+            {CARAS_DIBUJO.map(({ cara, puntos }) => {
+              // Una corona o una extracción sin guardar tiñen la pieza entera:
+              // el punteado tiene que verse en todas las caras, no en ninguna.
+              const sinGuardar = estaPendiente(numero, cara) || piezaSinGuardar;
+              return (
+                <polygon
+                  key={cara}
+                  points={puntos}
+                  fill={colorDe(cara)}
+                  stroke={sinGuardar ? "#0f172a" : "#94a3b8"}
+                  strokeDasharray={sinGuardar ? "3 2" : undefined}
+                  className="cursor-pointer hover:brightness-90"
+                  onClick={() => aplicar(numero, cara)}
+                />
+              );
+            })}
           </g>
         </svg>
       </div>
@@ -291,8 +362,46 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
               Marcando <strong style={{ color: herramienta.color }}>{herramienta.label}</strong>
               {herramienta.piezaCompleta
                 ? " — se aplica a la pieza entera."
-                : " — haga clic en una cara del esquema de abajo."}
+                : " — haga clic en una cara del esquema de abajo."}{" "}
+              Volver a marcar lo mismo lo deshace.
             </p>
+          )}
+
+          {/* Nada se asienta en la historia clínica hasta que se confirma acá. */}
+          {hayPendientes && (
+            <div className="flex flex-wrap items-center gap-2 mt-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+              <span className="text-xs font-medium text-amber-900 dark:text-amber-200 flex-1 min-w-[180px]">
+                {cantidadPendiente === 1
+                  ? "1 marca sin guardar"
+                  : `${cantidadPendiente} marcas sin guardar`}{" "}
+                — se ven con borde punteado.
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs gap-1.5"
+                onClick={descartar}
+                disabled={guardando}
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                Descartar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={guardar}
+                disabled={guardando}
+              >
+                {guardando ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                Guardar en la historia clínica
+              </Button>
+            </div>
           )}
         </CardHeader>
 
