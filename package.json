@@ -1,7 +1,7 @@
 {
-  "name": "sanidad-citas",
+  "name": "odonto",
   "version": "0.1.0",
-  "description": "Sistema de citas médicas de la Sanidad — pacientes, agenda e historia clínica (web, Supabase)",
+  "description": "Sistema de gestión odontológica — pacientes, odontograma, agenda y presupuestos (web, Supabase)",
   "author": "Sanidad Policial ISEPOL",
   "private": true,
   "type": "module",

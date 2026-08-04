@@ -138,7 +138,7 @@ export default function PerfilUsuario() {
             <CardTitle className="flex items-center gap-2">
               <UserCircle2 className="w-6 h-6 text-primary" /> Mi perfil
             </CardTitle>
-            <CardDescription>Sus datos de acceso y su ficha en la Sanidad.</CardDescription>
+            <CardDescription>Sus datos de acceso y su ficha profesional.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm break-words">
             <p><span className="text-muted-foreground">Usuario:</span> <span className="font-medium">{user?.email ?? "—"}</span></p>

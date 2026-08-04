@@ -4,7 +4,7 @@ import { Loader2, Save, Printer, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 interface PeriodontogramaProps {
-  pacienteId: number;
+  pacienteId: string;
 }
 
 export function Periodontograma({ pacienteId }: PeriodontogramaProps) {

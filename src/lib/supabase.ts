@@ -9,11 +9,11 @@ import { logger } from './logger';
 // esta clave. localStorage y las env vars siguen teniendo prioridad, por si se
 // quiere apuntar a otro proyecto.
 //
-// OJO: hasta el 2026-08-03 esto apuntaba al proyecto de la Sanidad
-// (vnkstlvqzkhdfeoqskcf), herencia del clon del que nació esta app. Ahí no
-// existe NINGUNA de las tablas dentales (odontograma, periodontograma,
-// presupuestos, sillones), así que el login fallaba y las pantallas clínicas
-// nunca habrían funcionado.
+// OJO: hasta el 2026-08-03 esto apuntaba a otro proyecto Supabase, herencia
+// del clon del que nació esta app. Ahí no existe NINGUNA de las tablas
+// dentales (odontograma, periodontograma, presupuestos, sillones), así que el
+// login fallaba y las pantallas clínicas nunca habrían funcionado. Esta app no
+// comparte base ni datos con ningún otro sistema.
 const DEFAULT_SUPABASE_URL = 'https://othuhgapvnpdjhartrut.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90aHVoZ2Fwdm5wZGpoYXJ0cnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NDE5MTgsImV4cCI6MjEwMTMxNzkxOH0.hcri60V24NIbUnUvs0HPy3pw7ei3kFymw78mvUa8TJM';
 
@@ -57,12 +57,36 @@ try {
   }
 } catch { /* noop */ }
 
-const AUTH_STORAGE_KEY = `sanidad-citas-${projectRef}-auth-v1`;
+const AUTH_STORAGE_KEY = `odonto-${projectRef}-auth-v1`;
+
+/** Nombre anterior de la clave de sesión, de cuando la app se llamaba distinto. */
+const CLAVE_SESION_ANTERIOR = `sanidad-citas-${projectRef}-auth-v1`;
+
 const LEGACY_KEYS = [
   'supabase.auth.token',
   `sb-${projectRef}-auth-token`,
   `sanidad-citas-${projectRef}-admin-auth-v1`,
+  `odonto-${projectRef}-admin-auth-v1`,
 ];
+
+/**
+ * Traslada la sesión guardada bajo el nombre anterior al nuevo.
+ *
+ * Sin esto, renombrar la clave dejaba afuera a todo el que tuviera la sesión
+ * abierta: al recargar, la app no encontraba nada y lo mandaba al login. La
+ * sesión es la misma, solo cambió el nombre del cajón donde se guarda.
+ */
+function migrarClaveDeSesion(): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (localStorage.getItem(AUTH_STORAGE_KEY)) return; // ya está en la nueva
+    const anterior = localStorage.getItem(CLAVE_SESION_ANTERIOR);
+    if (anterior) {
+      localStorage.setItem(AUTH_STORAGE_KEY, anterior);
+      localStorage.removeItem(CLAVE_SESION_ANTERIOR);
+    }
+  } catch { /* sin almacenamiento: se pedirá iniciar sesión de nuevo */ }
+}
 
 type SupabaseGlobal = typeof globalThis & {
   __supabaseClient?: SupabaseClient;
@@ -100,6 +124,10 @@ function initSupabaseClient(): SupabaseClient | null {
     return globalForSupabase.__supabaseClient;
   }
 
+  // Antes de crear el cliente: si la sesión está guardada con el nombre viejo,
+  // pasarla al nuevo para no obligar a iniciar sesión de nuevo.
+  migrarClaveDeSesion();
+
   if (globalForSupabase.__supabaseClient && globalForSupabase.__supabaseInstanceId !== INSTANCE_ID) {
     logger.warn('Detectada instancia anterior de Supabase client, reemplazando...');
   }
@@ -114,7 +142,7 @@ function initSupabaseClient(): SupabaseClient | null {
     },
     global: {
       headers: {
-        'X-Client-Info': 'sanidad-citas-app',
+        'X-Client-Info': 'odonto-app',
       },
     },
   });

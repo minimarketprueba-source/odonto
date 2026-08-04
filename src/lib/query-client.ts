@@ -71,7 +71,7 @@ export const queryKeys = {
     porDia: (dia: string) => [...queryKeys.diasLibres.all, dia] as const,
     porOficial: (oficialId: string) => [...queryKeys.diasLibres.all, 'oficial', oficialId] as const,
   },
-  // Pacientes de la Sanidad
+  // Pacientes de la clínica
   pacientes: {
     all: ['pacientes'] as const,
     list: () => [...queryKeys.pacientes.all, 'list'] as const,

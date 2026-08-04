@@ -1,7 +1,7 @@
 import type React from "react"
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { useAuth, ROLES_SANIDAD } from "@/context/auth-context"
+import { useAuth, ROLES_CLINICA } from "@/context/auth-context"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useRealtimeSubscriptions } from "@/hooks/use-realtime-subscriptions"
 import { Button } from "@/components/ui/button"
@@ -12,17 +12,17 @@ interface ProtectedRouteProps {
   moduleKey?: string
 }
 
-/** Usuario autenticado pero sin rol de Sanidad (p. ej. personal de control de peso). */
+/** Usuario autenticado pero sin un rol que dé acceso a la clínica. */
 function SinAcceso() {
   const { user, logout } = useAuth()
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full p-6 rounded-xl border bg-card text-center space-y-4">
         <ShieldAlert className="w-12 h-12 text-destructive mx-auto" />
-        <h2 className="text-xl font-bold">Sin acceso a Sanidad</h2>
+        <h2 className="text-xl font-bold">Sin acceso al sistema</h2>
         <p className="text-sm text-muted-foreground">
-          La cuenta {user?.email} no tiene un rol asignado en el sistema de citas médicas de la
-          Sanidad. Si crees que es un error, contacta al administrador.
+          La cuenta {user?.email} no tiene un rol asignado en el sistema de la clínica
+          odontológica. Si crees que es un error, contacta al administrador.
         </p>
         <Button variant="outline" onClick={logout} className="gap-2">
           <LogOut className="w-4 h-4" /> Cerrar sesión
@@ -37,20 +37,20 @@ export function ProtectedRoute({ children, moduleKey }: ProtectedRouteProps) {
   const { canView } = usePermissions()
   const navigate = useNavigate()
 
-  const esPersonalSanidad = !!role && ROLES_SANIDAD.includes(role)
+  const esPersonalClinica = !!role && ROLES_CLINICA.includes(role)
 
   // Suscripción automática a Realtime Postgres Changes
-  useRealtimeSubscriptions(!!user && esPersonalSanidad)
+  useRealtimeSubscriptions(!!user && esPersonalClinica)
 
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
       navigate("/auth/login")
-    } else if (esPersonalSanidad && moduleKey && !canView(moduleKey)) {
+    } else if (esPersonalClinica && moduleKey && !canView(moduleKey)) {
       // Si el usuario está autenticado pero no tiene permiso para el módulo
       navigate("/", { replace: true })
     }
-  }, [user, isLoading, navigate, moduleKey, canView, esPersonalSanidad])
+  }, [user, isLoading, navigate, moduleKey, canView, esPersonalClinica])
 
   if (isLoading) {
     return (
@@ -60,8 +60,8 @@ export function ProtectedRoute({ children, moduleKey }: ProtectedRouteProps) {
     )
   }
 
-  // Autenticado pero con rol ajeno a Sanidad (o sin rol): pantalla de sin acceso.
-  if (user && !esPersonalSanidad) {
+  // Autenticado pero con rol ajeno (o sin rol): pantalla de sin acceso.
+  if (user && !esPersonalClinica) {
     return <SinAcceso />
   }
 

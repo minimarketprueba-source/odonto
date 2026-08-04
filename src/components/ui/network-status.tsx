@@ -49,10 +49,10 @@ export function NetworkStatus() {
   const checkSupabaseConnection = async () => {
     try {
       // Se consulta `especialidades`, un catálogo chico de este sistema. Antes
-      // preguntaba por `config_peso`, que es de Control-Peso y no existe acá:
-      // el servidor contestaba 404 y la app mostraba "no se puede conectar con
-      // la base de datos" a todo el mundo apenas entraba, siendo que la
-      // conexión estaba perfecta.
+      // preguntaba por `config_peso`, una tabla que no existe en esta base: el
+      // servidor contestaba 404 y la app mostraba "no se puede conectar con la
+      // base de datos" a todo el mundo apenas entraba, siendo que la conexión
+      // estaba perfecta.
       const { error } = await supabase
         .from('especialidades')
         .select('id', { head: true, count: 'exact' })

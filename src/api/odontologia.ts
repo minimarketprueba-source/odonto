@@ -15,7 +15,7 @@ export interface OdontoPrecio {
 }
 
 export interface PacienteAnamnesis {
-  paciente_id: number;
+  paciente_id: string;
   alergias: string | null;
   alergia_latex: boolean;
   alergia_anestesia: boolean;
@@ -29,7 +29,7 @@ export interface PacienteAnamnesis {
 
 export interface OdontogramaRegistro {
   id?: number;
-  paciente_id: number;
+  paciente_id: string;
   pieza: number; // 11-48, 51-85
   cara: string; // vestibular, palatina, oclusal, mesial, distal, completo
   diagnostico: string | null; // caries, fractura, etc.
@@ -43,7 +43,7 @@ export interface OdontogramaRegistro {
 
 export interface Presupuesto {
   id: number;
-  paciente_id: number;
+  paciente_id: string;
   titulo: string;
   estado: "borrador" | "aprobado" | "rechazado" | "finalizado";
   total: number;
@@ -84,7 +84,7 @@ export interface PagoPresupuesto {
 
 export interface PacienteImagen {
   id: number;
-  paciente_id: number;
+  paciente_id: string;
   url: string;
   tipo: "panoramica" | "periapical" | "clinica" | "otra" | string;
   descripcion: string | null;
@@ -95,7 +95,7 @@ export interface PacienteImagen {
 
 export interface ConsentimientoPaciente {
   id: number;
-  paciente_id: number;
+  paciente_id: string;
   titulo: string;
   contenido: string;
   firma: string; // Base64 de la firma
@@ -109,13 +109,13 @@ export interface ConsentimientoPaciente {
 export const odontoKeys = {
   all: ["odontologia"] as const,
   precios: () => [...odontoKeys.all, "precios"] as const,
-  anamnesis: (pacienteId: number) => [...odontoKeys.all, "anamnesis", pacienteId] as const,
-  odontograma: (pacienteId: number) => [...odontoKeys.all, "odontograma", pacienteId] as const,
-  presupuestos: (pacienteId?: number) => [...odontoKeys.all, "presupuestos", pacienteId].filter(Boolean) as string[],
+  anamnesis: (pacienteId: string) => [...odontoKeys.all, "anamnesis", pacienteId] as const,
+  odontograma: (pacienteId: string) => [...odontoKeys.all, "odontograma", pacienteId] as const,
+  presupuestos: (pacienteId?: string) => [...odontoKeys.all, "presupuestos", pacienteId].filter(Boolean) as string[],
   presupuestoDetalles: (presupuestoId: number) => [...odontoKeys.all, "presupuesto_detalles", presupuestoId] as const,
   pagos: (presupuestoId: number) => [...odontoKeys.all, "pagos", presupuestoId] as const,
-  imagenes: (pacienteId: number) => [...odontoKeys.all, "imagenes", pacienteId] as const,
-  consentimientos: (pacienteId: number) => [...odontoKeys.all, "consentimientos", pacienteId] as const,
+  imagenes: (pacienteId: string) => [...odontoKeys.all, "imagenes", pacienteId] as const,
+  consentimientos: (pacienteId: string) => [...odontoKeys.all, "consentimientos", pacienteId] as const,
 };
 
 // Helper para atrapar errores de tabla inexistente y dar una guía clara al usuario
@@ -172,7 +172,7 @@ export function useSaveOdontoPrecio() {
 // ---------------------------------------------------------------------------
 // 2. API: Anamnesis
 // ---------------------------------------------------------------------------
-export async function fetchPacienteAnamnesis(pacienteId: number): Promise<PacienteAnamnesis | null> {
+export async function fetchPacienteAnamnesis(pacienteId: string): Promise<PacienteAnamnesis | null> {
   const { data, error } = await supabase
     .from("paciente_anamnesis")
     .select("*")
@@ -192,7 +192,7 @@ export async function savePacienteAnamnesis(anamnesis: PacienteAnamnesis): Promi
   return data;
 }
 
-export function usePacienteAnamnesis(pacienteId: number) {
+export function usePacienteAnamnesis(pacienteId: string) {
   return useQuery({
     queryKey: odontoKeys.anamnesis(pacienteId),
     queryFn: () => fetchPacienteAnamnesis(pacienteId),
@@ -213,7 +213,7 @@ export function useSavePacienteAnamnesis() {
 // ---------------------------------------------------------------------------
 // 3. API: Odontograma
 // ---------------------------------------------------------------------------
-export async function fetchOdontograma(pacienteId: number): Promise<OdontogramaRegistro[]> {
+export async function fetchOdontograma(pacienteId: string): Promise<OdontogramaRegistro[]> {
   const { data, error } = await supabase
     .from("odontograma_registros")
     .select("*")
@@ -233,7 +233,7 @@ export async function saveOdontogramaRegistro(registro: OdontogramaRegistro): Pr
   return data;
 }
 
-export function useOdontograma(pacienteId: number) {
+export function useOdontograma(pacienteId: string) {
   return useQuery({
     queryKey: odontoKeys.odontograma(pacienteId),
     queryFn: () => fetchOdontograma(pacienteId),
@@ -254,7 +254,7 @@ export function useSaveOdontogramaRegistro() {
 // ---------------------------------------------------------------------------
 // 4. API: Presupuestos y Planes de Tratamiento
 // ---------------------------------------------------------------------------
-export async function fetchPresupuestos(pacienteId?: number): Promise<Presupuesto[]> {
+export async function fetchPresupuestos(pacienteId?: string): Promise<Presupuesto[]> {
   let query = supabase.from("presupuestos").select("*, pacientes(nombres, apellidos, documento)");
   if (pacienteId) {
     query = query.eq("paciente_id", pacienteId);
@@ -264,7 +264,7 @@ export async function fetchPresupuestos(pacienteId?: number): Promise<Presupuest
   return data || [];
 }
 
-export async function createPresupuesto(pacienteId: number, titulo: string): Promise<Presupuesto> {
+export async function createPresupuesto(pacienteId: string, titulo: string): Promise<Presupuesto> {
   const { data, error } = await supabase
     .from("presupuestos")
     .insert({
@@ -296,7 +296,7 @@ export async function deletePresupuesto(id: number): Promise<void> {
   if (error) handleDbError(error, "presupuestos");
 }
 
-export function usePresupuestos(pacienteId?: number) {
+export function usePresupuestos(pacienteId?: string) {
   return useQuery({
     queryKey: odontoKeys.presupuestos(pacienteId),
     queryFn: () => fetchPresupuestos(pacienteId),
@@ -306,7 +306,7 @@ export function usePresupuestos(pacienteId?: number) {
 export function useCreatePresupuesto() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ pacienteId, titulo }: { pacienteId: number; titulo: string }) => createPresupuesto(pacienteId, titulo),
+    mutationFn: ({ pacienteId, titulo }: { pacienteId: string; titulo: string }) => createPresupuesto(pacienteId, titulo),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos(data.paciente_id) });
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos() });
@@ -328,7 +328,7 @@ export function useUpdatePresupuesto() {
 export function useDeletePresupuesto() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (variables: { id: number; pacienteId: number }) => deletePresupuesto(variables.id),
+    mutationFn: (variables: { id: number; pacienteId: string }) => deletePresupuesto(variables.id),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos(variables.pacienteId) });
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos() });
@@ -460,7 +460,7 @@ export function useAddPagoPresupuesto() {
 // ---------------------------------------------------------------------------
 // 5. API: Imágenes Clínicas / Radiografías
 // ---------------------------------------------------------------------------
-export async function fetchPacienteImagenes(pacienteId: number): Promise<PacienteImagen[]> {
+export async function fetchPacienteImagenes(pacienteId: string): Promise<PacienteImagen[]> {
   const { data, error } = await supabase
     .from("paciente_imagenes")
     .select("*")
@@ -480,7 +480,7 @@ export async function createPacienteImagen(imagen: Partial<PacienteImagen>): Pro
   return data;
 }
 
-export async function uploadImagenFile(file: File, pacienteId: number): Promise<string> {
+export async function uploadImagenFile(file: File, pacienteId: string): Promise<string> {
   // Intentar subir al bucket 'radiografias' de Supabase
   const fileExt = file.name.split(".").pop();
   const fileName = `${pacienteId}/${Date.now()}.${fileExt}`;
@@ -511,7 +511,7 @@ export async function uploadImagenFile(file: File, pacienteId: number): Promise<
   return publicUrlData.publicUrl;
 }
 
-export function usePacienteImagenes(pacienteId: number) {
+export function usePacienteImagenes(pacienteId: string) {
   return useQuery({
     queryKey: odontoKeys.imagenes(pacienteId),
     queryFn: () => fetchPacienteImagenes(pacienteId),
@@ -532,7 +532,7 @@ export function useCreatePacienteImagen() {
 // ---------------------------------------------------------------------------
 // 6. API: Consentimientos Informados
 // ---------------------------------------------------------------------------
-export async function fetchConsentimientos(pacienteId: number): Promise<ConsentimientoPaciente[]> {
+export async function fetchConsentimientos(pacienteId: string): Promise<ConsentimientoPaciente[]> {
   const { data, error } = await supabase
     .from("consentimientos_paciente")
     .select("*")
@@ -552,7 +552,7 @@ export async function createConsentimiento(consentimiento: Partial<Consentimient
   return data;
 }
 
-export function useConsentimientos(pacienteId: number) {
+export function useConsentimientos(pacienteId: string) {
   return useQuery({
     queryKey: odontoKeys.consentimientos(pacienteId),
     queryFn: () => fetchConsentimientos(pacienteId),

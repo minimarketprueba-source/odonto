@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export interface Sillon {
   id: number;
-  clinica_id: number;
+  clinica_id: string;
   nombre: string;
   color: string;
   activo: boolean;

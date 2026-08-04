@@ -50,8 +50,8 @@ describe("ProtectedRoute - Guardias de Navegación y Roles", () => {
     expect(screen.queryByText("Contenido Privado")).toBeNull();
   });
 
-  it("permite el acceso si la persona tiene rol de Sanidad y permiso en el módulo", () => {
-    authState.user = { id: "user-123", email: "medico@sanidad-citas.local" };
+  it("permite el acceso si la persona tiene un rol válido y permiso en el módulo", () => {
+    authState.user = { id: "user-123", email: "medico@odonto.com" };
     authState.role = "medico";
     authState.permissions = { pacientes: ["ver", "editar"] };
 
@@ -73,8 +73,8 @@ describe("ProtectedRoute - Guardias de Navegación y Roles", () => {
     expect(screen.getByText("Pacientes Registrados")).toBeDefined();
   });
 
-  it("redirecciona al Dashboard (/) si tiene rol de Sanidad pero carece de permiso en el módulo", () => {
-    authState.user = { id: "user-123", email: "medico@sanidad-citas.local" };
+  it("redirecciona al Dashboard (/) si tiene rol válido pero carece de permiso en el módulo", () => {
+    authState.user = { id: "user-123", email: "medico@odonto.com" };
     authState.role = "medico";
     authState.permissions = { citas: ["ver"] }; // Sin permiso en 'usuarios'
 
@@ -98,10 +98,10 @@ describe("ProtectedRoute - Guardias de Navegación y Roles", () => {
     expect(screen.queryByText("Gestión de Usuarios")).toBeNull();
   });
 
-  it("muestra la pantalla 'Sin acceso a Sanidad' para roles ajenos como analyst/viewer (Control-Peso)", () => {
-    authState.user = { id: "user-cp", email: "analista@control-peso.local" };
-    authState.role = "analyst"; // Rol exclusivo de la otra app
-    authState.permissions = { cadetes: ["ver"] };
+  it("muestra la pantalla «Sin acceso al sistema» para un rol que no da acceso", () => {
+    authState.user = { id: "user-ajeno", email: "ajeno@ejemplo.com" };
+    authState.role = "analyst"; // Rol que no está en ROLES_CLINICA
+    authState.permissions = { pacientes: ["ver"] };
 
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -110,7 +110,7 @@ describe("ProtectedRoute - Guardias de Navegación y Roles", () => {
             path="/"
             element={
               <ProtectedRoute>
-                <div>Dashboard de Sanidad</div>
+                <div>Dashboard de la clínica</div>
               </ProtectedRoute>
             }
           />
@@ -118,7 +118,7 @@ describe("ProtectedRoute - Guardias de Navegación y Roles", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Sin acceso a Sanidad")).toBeDefined();
-    expect(screen.queryByText("Dashboard de Sanidad")).toBeNull();
+    expect(screen.getByText("Sin acceso al sistema")).toBeDefined();
+    expect(screen.queryByText("Dashboard de la clínica")).toBeNull();
   });
 });

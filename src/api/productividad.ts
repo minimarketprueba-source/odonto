@@ -4,6 +4,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { avisarEsquemaFaltante } from "@/lib/esquema";
 
 export interface AtencionProductividad {
   index: number;
@@ -114,7 +115,9 @@ export async function fetchProductividad(
   }
 
   const { data: dataConsultas, error: errorConsultas } = await queryConsultas;
-  if (errorConsultas) {
+  if (errorConsultas && !avisarEsquemaFaltante(errorConsultas, "Reportes · consultas")) {
+    // Un error de verdad (red, permisos) sí se registra: el reporte sale
+    // incompleto y hay que poder saber por qué.
     console.error("Error fetching consultas for productividad:", errorConsultas);
   }
 
@@ -196,7 +199,7 @@ export async function fetchProductividad(
 
   // 2. Si la especialidad es Enfermería o "todas", incluir atenciones_enfermeria
   if (!especialidadId || especialidadId === "todas" || especialidadId === "enfermeria") {
-    let queryEnfermeria = supabase
+    const queryEnfermeria = supabase
       .from("atenciones_enfermeria")
       .select(`
         id,
@@ -223,7 +226,10 @@ export async function fetchProductividad(
       .lte("fecha", fechaHasta)
       .order("fecha", { ascending: true });
 
-    const { data: dataEnf } = await queryEnfermeria;
+    const { data: dataEnf, error: errorEnf } = await queryEnfermeria;
+    if (errorEnf && !avisarEsquemaFaltante(errorEnf, "Reportes · atenciones de enfermería")) {
+      console.error("Error fetching atenciones for productividad:", errorEnf);
+    }
     if (dataEnf) {
       for (const e of dataEnf as any[]) {
         let horaStr = null;

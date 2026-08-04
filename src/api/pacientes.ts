@@ -1,26 +1,31 @@
 // ============================================================================
-// Capa de datos: Pacientes de la Sanidad
+// Capa de datos: Pacientes de la clínica
 // ============================================================================
-// Tabla `pacientes` (compartida con control de peso vía cadetes.paciente_id).
-// No son solo cadetes: la Sanidad también atiende policías, familiares y
-// civiles. OJO: el vínculo con control de peso se apoya en que cada persona
-// tenga UNA sola ficha, así que todo script que vincule cadetes con pacientes
-// debe filtrar por `tipo = 'cadete'`.
-// Escritura protegida por RLS: solo personal de Sanidad activo.
+// Tabla `pacientes`. Cada persona tiene UNA sola ficha, que es la que reúne su
+// odontograma, sus citas y sus presupuestos: por eso el alta avisa de posibles
+// duplicados y la cédula tiene un índice único en la base.
+// Escritura protegida por RLS: solo personal activo de la clínica.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 
-// Única institución (Clínica Central); heredado del esquema multi-clínica de Laravel.
-export const CLINICA_ID = 1;
+// Única institución; heredado del esquema multi-clínica de Laravel.
+//
+// OJO: en esta base `clinica_id` es UUID, no un número. Hasta el 2026-08-04 acá
+// decía `= 1` y la base rechazaba TODO intento de guardar con
+// "invalid input syntax for type uuid: 1": no se podía registrar un paciente,
+// agendar una cita ni cargar un horario. El UUID de abajo es el de la clínica
+// que crea `supabase/migrations/esquema_completo.sql`; si se cambia allá, hay
+// que cambiarlo acá.
+export const CLINICA_ID = "00000000-0000-4000-a000-000000000001";
 
 export const TIPOS_PACIENTE = [
   { value: "cadete", label: "Cadete" },
   { value: "oficial", label: "Oficial" },
   { value: "suboficial", label: "Suboficial" },
   { value: "funcionario", label: "Funcionario / Personal Administrativo" },
-  { value: "medico", label: "Médico / Personal de Sanidad" },
+  { value: "medico", label: "Profesional / Personal de la clínica" },
   { value: "policia", label: "Policía" },
   { value: "familiar", label: "Familiar" },
   { value: "civil", label: "Civil" },
@@ -44,7 +49,7 @@ export function labelTipoPaciente(tipo: string): string {
   );
 }
 
-/** Estos tipos no pertenecen a la Academia: no se les piden curso ni sección. */
+/** Pacientes de afuera de la institución: no se les piden curso ni sección. */
 export function esPacienteExterno(tipo: string): boolean {
   return tipo === "familiar" || tipo === "civil";
 }
@@ -52,8 +57,8 @@ export function esPacienteExterno(tipo: string): boolean {
 export type TipoPaciente = (typeof TIPOS_PACIENTE)[number]["value"];
 
 export interface Paciente {
-  id: number;
-  clinica_id: number;
+  id: string;
+  clinica_id: string;
   nombres: string;
   apellidos: string;
   /** Puede ser null: un familiar menor de edad todavía no tiene cédula propia. */
@@ -119,7 +124,7 @@ export async function fetchPacientes(): Promise<Paciente[]> {
   return data || [];
 }
 
-export async function fetchPaciente(id: number): Promise<Paciente> {
+export async function fetchPaciente(id: string): Promise<Paciente> {
   const { data, error } = await supabase
     .from("pacientes")
     .select("*")
@@ -139,7 +144,7 @@ export async function createPaciente(input: CreatePacienteInput): Promise<Pacien
   return data;
 }
 
-export async function updatePaciente(id: number, cambios: Partial<CreatePacienteInput>): Promise<Paciente> {
+export async function updatePaciente(id: string, cambios: Partial<CreatePacienteInput>): Promise<Paciente> {
   const { data, error } = await supabase
     .from("pacientes")
     .update(cambios)
@@ -151,12 +156,12 @@ export async function updatePaciente(id: number, cambios: Partial<CreatePaciente
 }
 
 /** Soft-delete: el paciente queda inactivo, nunca se borra (tiene historia clínica). */
-export async function desactivarPaciente(id: number): Promise<void> {
+export async function desactivarPaciente(id: string): Promise<void> {
   const { error } = await supabase.from("pacientes").update({ activo: false }).eq("id", id);
   if (error) throw new Error(`No se pudo desactivar el paciente: ${error.message}`);
 }
 
-export async function reactivarPaciente(id: number): Promise<void> {
+export async function reactivarPaciente(id: string): Promise<void> {
   const { error } = await supabase.from("pacientes").update({ activo: true }).eq("id", id);
   if (error) throw new Error(`No se pudo reactivar el paciente: ${error.message}`);
 }
@@ -172,7 +177,7 @@ export function usePacientes() {
   });
 }
 
-export function usePaciente(id: number) {
+export function usePaciente(id: string) {
   return useQuery({
     queryKey: ["pacientes", "detail", id],
     queryFn: () => fetchPaciente(id),
@@ -194,7 +199,7 @@ export function useCreatePaciente() {
 export function useUpdatePaciente() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, cambios }: { id: number; cambios: Partial<CreatePacienteInput> }) =>
+    mutationFn: ({ id, cambios }: { id: string; cambios: Partial<CreatePacienteInput> }) =>
       updatePaciente(id, cambios),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.pacientes.all }),
   });
@@ -203,7 +208,7 @@ export function useUpdatePaciente() {
 export function useCambiarEstadoPaciente() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, activo }: { id: number; activo: boolean }) =>
+    mutationFn: ({ id, activo }: { id: string; activo: boolean }) =>
       activo ? reactivarPaciente(id) : desactivarPaciente(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.pacientes.all }),
   });

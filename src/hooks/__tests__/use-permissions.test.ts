@@ -22,7 +22,7 @@ vi.mock("@/context/auth-context", async (importOriginal) => ({
 }));
 
 import { usePermissions } from "@/hooks/use-permissions";
-import { MODULOS_SANIDAD } from "@/context/auth-context";
+import { MODULOS_CLINICA } from "@/context/auth-context";
 
 function conCuenta(role: string | null, permissions: Record<string, string[]> | null) {
   estado.auth = { role, permissions };
@@ -32,14 +32,14 @@ function conCuenta(role: string | null, permissions: Record<string, string[]> | 
 describe("acceso del administrador", () => {
   it("ve todos los módulos aunque no tenga permisos guardados", () => {
     const p = conCuenta("admin", null);
-    for (const m of MODULOS_SANIDAD) {
+    for (const m of MODULOS_CLINICA) {
       expect(p.canView(m.key), `admin no ve ${m.key}`).toBe(true);
     }
   });
 
   it("ve todos los módulos aunque sus permisos estén vacíos ({})", () => {
     const p = conCuenta("admin", {});
-    for (const m of MODULOS_SANIDAD) {
+    for (const m of MODULOS_CLINICA) {
       expect(p.canView(m.key), `admin no ve ${m.key}`).toBe(true);
     }
   });
@@ -48,7 +48,7 @@ describe("acceso del administrador", () => {
     // Si alguien guardó permisos explícitos chicos en la cuenta admin, el rol
     // manda igual: el admin nunca queda afuera de una pantalla.
     const p = conCuenta("admin", { pacientes: ["ver"] });
-    for (const m of MODULOS_SANIDAD) {
+    for (const m of MODULOS_CLINICA) {
       expect(p.canView(m.key), `admin no ve ${m.key}`).toBe(true);
       expect(p.hasPermission(m.key, "editar"), `admin no edita ${m.key}`).toBe(true);
       expect(p.hasPermission(m.key, "eliminar"), `admin no elimina ${m.key}`).toBe(true);
@@ -75,7 +75,7 @@ describe("contraste: los demás roles sí dependen de sus permisos", () => {
 
   it("sin rol no se ve nada", () => {
     const p = conCuenta(null, null);
-    for (const m of MODULOS_SANIDAD) {
+    for (const m of MODULOS_CLINICA) {
       expect(p.canView(m.key)).toBe(false);
     }
   });

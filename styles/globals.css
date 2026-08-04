@@ -108,27 +108,27 @@
     overflow-x: hidden;
   }
   :root {
-    /* Tema claro - Azul moderno */
-    --background: 252 254 255; /* Casi blanco */
-    --foreground: 0 0 0;
-    --card: 255 255 255;
-    --card-foreground: 0 0 0;
+    /* Tema claro - Clinical Precision */
+    --background: 247 249 251; /* #f7f9fb */
+    --foreground: 25 28 30; /* #191c1e */
+    --card: 255 255 255; /* #ffffff */
+    --card-foreground: 25 28 30;
     --popover: 255 255 255;
-    --popover-foreground: 0 0 0;
-    --primary: 59 130 246; /* Azul #3B82F6 */
+    --popover-foreground: 25 28 30;
+    --primary: 0 97 165; /* #0061a5 */
     --primary-foreground: 255 255 255;
-    --secondary: 59 130 246;
+    --secondary: 80 95 118; /* #505f76 */
     --secondary-foreground: 255 255 255;
-    --muted: 240 249 255; /* Azul muy claro */
-    --muted-foreground: 71 85 105;
-    --accent: 125 211 252; /* Celeste #7DD3FC */
-    --accent-foreground: 0 0 0;
-    --destructive: 239 68 68;
+    --muted: 242 244 246; /* surface-container-low */
+    --muted-foreground: 63 71 83; /* on-surface-variant */
+    --accent: 208 225 251; /* secondary-container */
+    --accent-foreground: 84 100 122; /* on-secondary-container */
+    --destructive: 186 26 26; /* #ba1a1a */
     --destructive-foreground: 255 255 255;
-    --border: 226 232 240;
-    --input: 226 232 240;
-    --ring: 59 130 246;
-    --radius: 0.625rem;
+    --border: 224 227 229; /* surface-variant #e0e3e5 */
+    --input: 224 227 229;
+    --ring: 0 97 165;
+    --radius: 0.25rem; /* rounded DEFAULT: 0.25rem */
     --chart-1: 255 255 255;
     --chart-2: 125 211 252;
     --chart-3: 96 165 250;
@@ -136,14 +136,14 @@
     --chart-5: 199 210 254;
 
     /* Sidebar */
-    --sidebar: 240 249 255;
-    --sidebar-foreground: 0 0 0;
-    --sidebar-primary: 59 130 246;
+    --sidebar: 247 249 251;
+    --sidebar-foreground: 25 28 30;
+    --sidebar-primary: 0 97 165;
     --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 240 249 255;
-    --sidebar-accent-foreground: 0 0 0;
-    --sidebar-border: 219 234 254;
-    --sidebar-ring: 59 130 246;
+    --sidebar-accent: 242 244 246;
+    --sidebar-accent-foreground: 25 28 30;
+    --sidebar-border: 224 227 229;
+    --sidebar-ring: 0 97 165;
   }
 
   .dark {

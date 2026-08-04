@@ -119,7 +119,7 @@ export default function SignUpPage() {
             Crear Cuenta de Usuario
           </CardTitle>
           <CardDescription className="text-slate-400 text-sm mt-1">
-            Sanidad ISEPOL — Clínica Odontológica
+            Clínica Odontológica
           </CardDescription>
         </CardHeader>
 

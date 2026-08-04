@@ -99,10 +99,10 @@ export function Sidebar() {
               {!isCollapsed && (
                 <div className="transition-all duration-300 overflow-hidden w-auto opacity-100">
                   <h3 className="text-base font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent whitespace-nowrap">
-                    Sección Sanidad
+                    Clínica Odontológica
                   </h3>
                   <p className="text-xs text-muted-foreground font-medium leading-tight">
-                    Academia Nacional de Policía
+                    Sistema de Gestión Dental
                   </p>
                 </div>
               )}

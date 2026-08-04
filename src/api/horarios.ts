@@ -3,7 +3,7 @@
 // ============================================================================
 // Tablas `horarios_medicos` (días/horas de atención semanales) y
 // `ausencias_medicos` (vacaciones, permisos, reuniones). Lectura y escritura
-// para personal de Sanidad activo (los enfermeros cargan los horarios de las
+// para el personal activo de la clínica (recepción carga los horarios de los
 // médicas; cada profesional puede cargar el suyo).
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

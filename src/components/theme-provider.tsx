@@ -3,9 +3,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { toast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/auth-context'
-import { supabase } from '@/lib/supabase'
 
 type Theme = 'light' | 'dark' | 'system'
+
+/**
+ * Clave del tema en el navegador. Va por usuario para que en una computadora
+ * compartida (recepción, sala de espera) el tema de una persona no le cambie
+ * la pantalla a la siguiente. Sin sesión se usa la clave suelta de siempre.
+ */
+function claveTema(userId?: string): string {
+  return userId ? `theme:${userId}` : 'theme'
+}
 
 type ThemeProviderProps = React.PropsWithChildren<{
   attribute?: string
@@ -36,35 +44,24 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
 
   const persistThemeSelection = useCallback(
     async (selectedTheme: Theme) => {
-      if (!user) return false
-
-      const timestamp = new Date().toISOString()
-
+      // El tema se guarda en el navegador, no en la base.
+      //
+      // Antes iba a la tabla `config_peso`, que no existe en esta base: cada
+      // cambio de tema tiraba un 404 a la consola y un cartel rojo de "no se
+      // pudo guardar", aunque el tema sí se aplicaba. Es una preferencia de
+      // pantalla, propia de cada computadora, así que el navegador es el lugar
+      // correcto para guardarla.
       try {
-        // Guardar preferencia en la tabla `config_peso` (fuente de la verdad solicitada)
-        const upsertPayload: Record<string, any> = {
-          user_id: user.id,
-          tema_preferido: selectedTheme,
-          updated_at: timestamp,
-        }
-
-        const { error } = await supabase.from('config_peso').upsert(upsertPayload, { onConflict: 'user_id' })
-
-        if (error) {
-          console.error('Error al guardar tema en config_peso:', error)
-          toast({ title: 'Error', description: 'No se pudo guardar la preferencia de tema.', variant: 'destructive' })
-          return false
-        }
-
-        toast({ title: 'Tema guardado', description: 'La preferencia de tema se guardó correctamente.' })
+        localStorage.setItem(claveTema(user?.id), selectedTheme)
         return true
       } catch (error) {
-        console.error('Error inesperado al guardar tema en config_peso:', error)
-        toast({ title: 'Error', description: 'Ocurrió un error al guardar la preferencia de tema.', variant: 'destructive' })
+        // Modo incógnito o almacenamiento lleno: el tema se aplica igual, solo
+        // que no se recuerda en la próxima visita. No vale un cartel de error.
+        console.warn('No se pudo recordar la preferencia de tema:', error)
         return false
       }
     },
-    [user]
+    [user?.id]
   )
 
   const applyTheme = useCallback(
@@ -98,55 +95,20 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
     initialThemeLoadedRef.current = false
   }, [user?.id])
 
-  // Cargar y sincronizar el tema del usuario autenticado (desde `config_peso.tema_preferido`)
+  // Al iniciar sesión, recuperar el tema que esa persona eligió en esta
+  // computadora. Es una lectura local, así que no hay pedido de red que pueda
+  // fallar ni estado de carga que esperar.
   useEffect(() => {
     if (!user || initialThemeLoadedRef.current) return
+    initialThemeLoadedRef.current = true
 
-    let isCancelled = false
-    const themeBeforeLoad = themeRef.current
-
-    const loadThemeFromPreferences = async () => {
-      try {
-        const { data: configData, error: configError } = await supabase
-          .from('config_peso')
-          .select('tema_preferido')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (isCancelled) return
-
-        if (configError && configError.code !== 'PGRST116') {
-          console.error('Error al cargar tema desde config_peso:', configError)
-        }
-
-        const resolvedTheme = configData?.tema_preferido as Theme | undefined
-
-        // Si el usuario cambió el tema manualmente mientras se cargaba, no lo sobreescribimos.
-        if (themeRef.current !== themeBeforeLoad) {
-          initialThemeLoadedRef.current = true
-          return
-        }
-
-        if (resolvedTheme && resolvedTheme !== themeRef.current) {
-          applyTheme(resolvedTheme, { persist: false })
-        }
-
-        initialThemeLoadedRef.current = true
-      } catch (error) {
-        if (!isCancelled) {
-          console.error('Error al sincronizar tema desde config_peso:', error)
-        }
-      } finally {
-        if (!isCancelled && !initialThemeLoadedRef.current) {
-          initialThemeLoadedRef.current = true
-        }
+    try {
+      const guardado = localStorage.getItem(claveTema(user.id)) as Theme | null
+      if (guardado && guardado !== themeRef.current) {
+        applyTheme(guardado, { persist: false })
       }
-    }
-
-    loadThemeFromPreferences()
-
-    return () => {
-      isCancelled = true
+    } catch {
+      /* sin almacenamiento: queda el tema por defecto */
     }
   }, [user, applyTheme])
 
@@ -167,6 +129,10 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
         root.classList.add(theme)
       }
 
+      // Clave suelta `theme` = último tema usado en esta computadora. Sirve para
+      // pintar la pantalla de login con el tema correcto, antes de saber quién
+      // se va a loguear. La preferencia por persona vive aparte, en
+      // `theme:<id>` (ver claveTema), y pisa a esta apenas hay sesión.
       localStorage.setItem('theme', theme ?? 'system')
     } catch { /* noop */ }
   }, [theme, mounted])

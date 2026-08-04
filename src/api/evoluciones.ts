@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export interface EvolucionClinica {
   id: number;
-  paciente_id: number;
+  paciente_id: string;
   medico_id: number | null;
   cita_id: number | null;
   pieza: string | null;
@@ -18,7 +18,7 @@ export interface EvolucionClinica {
   };
 }
 
-export async function fetchEvoluciones(pacienteId: number): Promise<EvolucionClinica[]> {
+export async function fetchEvoluciones(pacienteId: string): Promise<EvolucionClinica[]> {
   const { data, error } = await supabase
     .from("evoluciones_clinicas")
     .select("*, medico:medicos(nombres, apellidos, especialidad:especialidades(nombre))")
@@ -40,7 +40,7 @@ export async function createEvolucion(evolucion: Partial<EvolucionClinica>): Pro
   return data;
 }
 
-export function useEvoluciones(pacienteId: number) {
+export function useEvoluciones(pacienteId: string) {
   return useQuery({
     queryKey: ["evoluciones", pacienteId],
     queryFn: () => fetchEvoluciones(pacienteId),

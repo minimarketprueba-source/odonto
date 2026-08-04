@@ -56,7 +56,7 @@ import Swal from "sweetalert2";
 
 export default function FichaPaciente() {
   const { id } = useParams<{ id: string }>();
-  const pacienteId = Number(id);
+  const pacienteId = id as string;
 
   const { data: paciente, isLoading: loadingPaciente } = usePaciente(pacienteId);
   const { data: anamnesis, isLoading: loadingAnamnesis } = usePacienteAnamnesis(pacienteId);

@@ -2,7 +2,7 @@
 // Capa de datos: Agenda de citas médicas
 // ============================================================================
 // Tabla `citas` con joins a pacientes y medicos (PostgREST embedding por FK).
-// Escritura protegida por RLS: solo personal de Sanidad activo.
+// Escritura protegida por RLS: solo personal activo de la clínica.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -30,8 +30,8 @@ export function turnoDeHora(hora: string): "Mañana" | "Tarde" | "Noche" {
 
 export interface Cita {
   id: number;
-  clinica_id: number;
-  paciente_id: number;
+  clinica_id: string;
+  paciente_id: string;
   medico_id: number;
   fecha: string; // yyyy-mm-dd
   hora: string; // HH:mm:ss
@@ -81,7 +81,7 @@ export interface Medico {
 }
 
 export interface CreateCitaInput {
-  paciente_id: number;
+  paciente_id: string;
   medico_id: number;
   fecha: string;
   hora: string;

@@ -159,7 +159,7 @@ export default function Reportes() {
       return "Todos los profesionales";
     }
     const med = medicos.find((m) => String(m.id) === prodMedicoId);
-    return med ? `${med.nombres} ${med.apellidos}` : "Profesional de Sanidad";
+    return med ? `${med.nombres} ${med.apellidos}` : "Profesional";
   }, [prodMedicoId, medicos, perfilPropio, user]);
 
   const especialistaColegiatura = useMemo(() => {
@@ -185,7 +185,7 @@ export default function Reportes() {
       especialistaColegiatura: especialistaColegiatura,
       fecha: prodFechaDesde === prodFechaHasta ? formatFechaLarga(prodFechaDesde) : `${formatFechaLarga(prodFechaDesde)} al ${formatFechaLarga(prodFechaHasta)}`,
       horario: prodHorario,
-      unidad: 'Academia Nacional de Policía "Gral. E. Díaz"',
+      unidad: 'Clínica Odontológica',
       tipoPeriodo,
       periodoEtiqueta: periodoTexto,
       filas: atenciones.map((a) => ({
@@ -250,9 +250,8 @@ export default function Reportes() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1 text-xs font-semibold">
-                <Building2 className="w-3.5 h-3.5" /> Hospital Central Rigoberto Caballero
+                <Building2 className="w-3.5 h-3.5" /> Clínica Odontológica
               </Badge>
-              <Badge variant="secondary" className="text-xs">Sanidad ISEPOL</Badge>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <FileSpreadsheet className="w-7 h-7 text-primary" /> Planilla de Productividad por Especialidad y Usuario
@@ -518,7 +517,7 @@ export default function Reportes() {
                   <div>
                     <div className="flex items-center gap-2">
                       <Badge className="bg-blue-600 text-white font-bold text-xs uppercase">
-                        Modelo Oficial Rigoberto Caballero
+                        Modelo Oficial
                       </Badge>
                       <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-500/30 text-xs font-bold uppercase">
                         {tipoPeriodo === "diario" && "Informe Diario"}

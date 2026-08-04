@@ -33,7 +33,7 @@ import { showSwal } from "@/components/ui/swal";
 import { supabase } from "@/lib/supabase";
 import { recordAuditAction } from "@/lib/audit";
 import {
-  useAuth, esEstadoActivo, DEFAULT_PERMISOS_SANIDAD, MODULOS_SANIDAD, ROLES_SANIDAD_OPCIONES,
+  useAuth, esEstadoActivo, DEFAULT_PERMISOS_CLINICA, MODULOS_CLINICA, ROLES_CLINICA_OPCIONES,
 } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -82,28 +82,20 @@ interface UserRecord {
 }
 
 // Roles y módulos salen de auth-context: son los mismos que usan el menú, las
-// rutas y canView(). Antes esta pantalla tenía la lista de control de peso
-// (cadetes, ergometría, respaldo…) y roles que acá no dan acceso a nada, así
-// que guardar dejaba a la persona sin sistema.
-const ROLE_OPTIONS = ROLES_SANIDAD_OPCIONES;
-
-/** Roles de control de peso: no se asignan desde acá, pero hay que poder verlos
- *  y filtrarlos porque la tabla `user_roles` es compartida con la otra app. */
-const ROLES_OTRA_APP = [
-  { value: "analyst", label: "Registro (control de peso)" },
-  { value: "viewer", label: "Solo lectura (control de peso)" },
-];
+// rutas y canView(). Tenerlos en un solo lugar evita que esta pantalla ofrezca
+// un rol o un módulo que no existe y deje a la persona sin acceso al guardar.
+const ROLE_OPTIONS = ROLES_CLINICA_OPCIONES;
 
 type RoleValue = string;
 type RoleFilterValue = "all" | string;
 type StatusFilterValue = "all" | "active" | "inactive";
 
-const SYSTEM_MODULES = MODULOS_SANIDAD;
+const SYSTEM_MODULES = MODULOS_CLINICA;
 
 const PERMISSION_TYPES = ["ver", "editar", "eliminar", "exportar"] as const;
 type PermissionMap = Record<string, string[]>;
 
-const DEFAULT_PERMISSIONS: Record<string, PermissionMap> = DEFAULT_PERMISOS_SANIDAD;
+const DEFAULT_PERMISSIONS: Record<string, PermissionMap> = DEFAULT_PERMISOS_CLINICA;
 
 interface NewUserForm {
   email: string;
@@ -119,7 +111,6 @@ type SortOptionValue = "recent" | "name" | "role";
 const ROLE_FILTER_OPTIONS: { value: RoleFilterValue; label: string }[] = [
   { value: "all", label: "Todos" },
   ...ROLE_OPTIONS,
-  ...ROLES_OTRA_APP,
   { value: "sin_rol", label: "Sin rol asignado" },
 ];
 const STATUS_FILTER_OPTIONS = [
@@ -134,13 +125,13 @@ const SORT_OPTIONS = [
 ] as const;
 
 const ROLE_LABELS: Record<string, string> = {
-  ...Object.fromEntries([...ROLE_OPTIONS, ...ROLES_OTRA_APP].map((r) => [r.value, r.label])),
+  ...Object.fromEntries(ROLE_OPTIONS.map((r) => [r.value, r.label])),
   sin_rol: "Sin rol asignado",
 };
 
 const getRoleLabel = (role: string) => ROLE_LABELS[role.toLowerCase()] ?? role;
 
-/** Solo los roles de Sanidad se pueden asignar desde esta pantalla. */
+/** Solo estos roles se pueden asignar desde esta pantalla. */
 const esRolAsignable = (role: string) => ROLE_OPTIONS.some((r) => r.value === role);
 
 const formatDate = (value?: string | null) => {
@@ -211,7 +202,7 @@ function buildUsers(profiles: RawProfile[], roles: RawRoleRow[]): UserRecord[] {
         profile?.updated_at ??
         roleRow?.updated_at ??
         null,
-      // Sin fila en user_roles no hay acceso a Sanidad: mostrarlo como
+      // Sin fila en user_roles no hay acceso: mostrarlo como
       // "solo lectura" hacía creer que la persona podía entrar.
       role: roleRow?.role ?? profile?.role ?? "sin_rol",
       statusLabel: isActive ? "Activo" : "Inactivo",
@@ -400,7 +391,7 @@ export default function Usuarios() {
 
   const openRoleDialog = async (record: UserRecord) => {
     setRoleDialogUser(record);
-    // Si el rol guardado no es de Sanidad (o no tiene), el desplegable queda
+    // Si el rol guardado no es asignable (o no tiene), el desplegable queda
     // vacío y Guardar deshabilitado: hay que elegir uno a propósito.
     setPendingRole(esRolAsignable(record.role) ? record.role : "");
     // Cargar permisos existentes del usuario
@@ -510,10 +501,10 @@ export default function Usuarios() {
         details: `Email: ${newUserForm.email}, Rol: ${newUserForm.role}`,
       }).catch(() => { /* auditoría no crítica */ });
 
-      // El alta la resuelve una función del servidor que es de control de peso:
-      // puede no guardar el rol de Sanidad y `permissions` nace en `{}`, que no
-      // son permisos y dejaría a la persona viendo solo el Dashboard. Se
-      // reescriben acá con los del rol elegido.
+      // El alta la resuelve una función del servidor que puede no guardar el
+      // rol, y `permissions` nace en `{}`, que no son permisos y dejaría a la
+      // persona viendo solo el Dashboard. Se reescriben acá con los del rol
+      // elegido.
       if (data?.user_id) {
         const { error: errRol } = await supabase.from("user_roles").upsert(
           {
@@ -1125,7 +1116,7 @@ export default function Usuarios() {
                 {!esRolAsignable(roleDialogUser?.role ?? "") && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
                     Esta cuenta hoy figura como «{getRoleLabel(roleDialogUser?.role ?? "")}», que no da acceso
-                    a Sanidad. Al elegir un rol de acá pasa a tener acceso.
+                    al sistema. Al elegir un rol de acá pasa a tener acceso.
                   </p>
                 )}
               </div>

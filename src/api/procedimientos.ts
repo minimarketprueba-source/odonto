@@ -18,7 +18,7 @@ export const TIPOS_PROCEDIMIENTO = [
 export type TipoProcedimiento = (typeof TIPOS_PROCEDIMIENTO)[number]["value"] | string;
 export interface NuevoProcedimiento { tipo: TipoProcedimiento; cantidad: number; detalle?: string | null; }
 export interface ProcedimientoSanitario extends NuevoProcedimiento {
-  id?: number; clinica_id?: number; paciente_id?: number; consulta_id?: number | null;
+  id?: number; clinica_id?: string; paciente_id?: number; consulta_id?: number | null;
   atencion_enfermeria_id?: number | null; fecha: string; created_at?: string;
 }
 

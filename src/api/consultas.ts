@@ -25,9 +25,9 @@ export type DestinoAtencion =
 /**
  * Destinos posibles y qué reposo genera cada uno.
  *
- * "Parte sin servicio" también exime de la educación física (decisión del
- * 2026-07-27): la Sanidad lo usa para el que no está para formar ni hacer
- * ejercicio, aunque siga en la unidad. Por eso va como reposo local.
+ * "Parte sin servicio" también exime de la actividad física: se usa para quien
+ * no está en condiciones de hacer ejercicio, aunque siga en su puesto. Por eso
+ * va como reposo local.
  */
 export const DESTINOS_ATENCION: {
   value: DestinoAtencion;
@@ -65,7 +65,7 @@ export function labelDestinoAtencion(
 
 export interface Consulta {
   id: number;
-  clinica_id: number;
+  clinica_id: string;
   paciente_id: number;
   medico_id: number;
   cita_id: number | null;

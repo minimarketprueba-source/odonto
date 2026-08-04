@@ -10,7 +10,7 @@ import { Loader2, Plus, FileText, User } from "lucide-react";
 import { toast } from "sonner";
 
 interface EvolucionClinicaProps {
-  pacienteId: number;
+  pacienteId: string;
 }
 
 export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {

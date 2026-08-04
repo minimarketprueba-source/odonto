@@ -1,5 +1,5 @@
 /**
- * Utilidad de Impresión Aislada mediante Iframe para Sanidad ANP.
+ * Utilidad de impresión aislada mediante iframe.
  * Garantiza impresión 100% confiable en navegadores y Electron (sin hojas en blanco ni conflictos con modales).
  */
 
@@ -93,7 +93,7 @@ const DOCUMENTOS_REPOSO = {
     titulo: "CONSTANCIA DE INTERNACIÓN",
     ref: "INTERN",
     condicion: "INTERNACIÓN EN SALA DE OBSERVACIÓN",
-    detalle: "El/la paciente queda internado en la sala de observación de la Sanidad, eximido de toda actividad.",
+    detalle: "El/la paciente queda internado en la sala de observación de la clínica, eximido de toda actividad.",
   },
 } as const;
 
@@ -131,7 +131,7 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
       </div>
       <div>
         <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
-        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "—"}</p>
       </div>
     </div>
 
@@ -180,7 +180,7 @@ export function imprimirCertificadoReposo(datos: DatosImpresionReposo) {
           ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
           <div style="font-size:10px; color:#475569;">
             <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-            <p style="margin:1px 0;">Sanidad ANP — Documento Oficial</p>
+            <p style="margin:1px 0;">Clínica Odontológica — Documento Oficial</p>
             <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
             <p style="margin:1px 0; color:#64748b;">Escanee para verificar validez</p>
           </div>
@@ -249,7 +249,7 @@ export function imprimirConstanciaEnfermeria(datos: DatosConstanciaEnfermeria) {
       </div>
       <div>
         <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
-        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "—"}</p>
       </div>
     </div>
 
@@ -315,7 +315,7 @@ export function imprimirConstanciaEnfermeria(datos: DatosConstanciaEnfermeria) {
           ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
           <div style="font-size:10px; color:#475569;">
             <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-            <p style="margin:1px 0;">Sanidad ANP — Constancia de Enfermería</p>
+            <p style="margin:1px 0;">Clínica Odontológica — Constancia</p>
             <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
             <p style="margin:1px 0; color:#64748b;">Escanee para verificar validez</p>
           </div>
@@ -325,7 +325,7 @@ export function imprimirConstanciaEnfermeria(datos: DatosConstanciaEnfermeria) {
           <div class="linea-firma"></div>
           <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">${datos.enfermeroNombre}</p>
           ${datos.enfermeroRegistro ? `<p style="margin:0; font-size:11px; font-weight:bold;">Reg. Prof. N° ${datos.enfermeroRegistro}</p>` : ""}
-          <p style="margin:0; font-size:10px; color:#64748b;">Firma del Enfermero/a — Sección Sanidad</p>
+          <p style="margin:0; font-size:10px; color:#64748b;">Firma del Profesional — Clínica Odontológica</p>
         </div>
       </div>
     </div>
@@ -353,7 +353,7 @@ export function imprimirInformeConsulta(datos: DatosImpresionConsulta) {
       </div>
       <div>
         <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
-        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "—"}</p>
       </div>
     </div>
 
@@ -409,7 +409,7 @@ export function imprimirInformeConsulta(datos: DatosImpresionConsulta) {
           ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
           <div style="font-size:10px; color:#475569;">
             <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-            <p style="margin:1px 0;">Sanidad ANP — Documento Oficial</p>
+            <p style="margin:1px 0;">Clínica Odontológica — Documento Oficial</p>
             <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
             <p style="margin:1px 0; color:#64748b;">Escanee para verificar validez</p>
           </div>
@@ -486,8 +486,8 @@ export function imprimirSalvoconducto(datos: DatosImpresionSalvoconducto) {
         </div>` : ""}
 
       <p style="margin:0 0 4px 0; font-size:13px;">
-        Por la presente se <strong>AUTORIZA LA SALIDA</strong> del personal arriba individualizado
-        de las instalaciones de la Academia Nacional de Policía, por razones médicas, con el
+        Por la presente se <strong>AUTORIZA LA SALIDA</strong> de la persona arriba individualizada
+        de las instalaciones de la institución, por razones médicas, con el
         siguiente destino:
       </p>
 
@@ -524,7 +524,7 @@ export function imprimirSalvoconducto(datos: DatosImpresionSalvoconducto) {
           ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
           <div style="font-size:10px; color:#475569;">
             <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-            <p style="margin:1px 0;">Sanidad ANP — Documento Oficial</p>
+            <p style="margin:1px 0;">Clínica Odontológica — Documento Oficial</p>
             <p style="margin:1px 0; font-family: monospace;">ID: ${datos.numero}</p>
             ${datos.expedidoPor ? `<p style="margin:1px 0; color:#64748b;">Expedido por: ${datos.expedidoPor}</p>` : ""}
           </div>
@@ -611,7 +611,7 @@ export function imprimirHojaEnfermeria(datos: DatosImpresionHojaEnfermeria) {
     <div class="box-reposo">
       <div style="margin-bottom:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
         <p style="margin:0 0 2px 0; font-weight:bold; color:#1e293b; font-size:11px; text-transform:uppercase;">DIAGNÓSTICO Y MOTIVO DE OBSERVACIÓN / INTERNACIÓN:</p>
-        <p style="margin:0; font-size:13px; font-weight:600; color:#0f172a;">${datos.diagnosticoIngreso || "En observación de Sanidad"}</p>
+        <p style="margin:0; font-size:13px; font-weight:600; color:#0f172a;">${datos.diagnosticoIngreso || "En observación"}</p>
         ${datos.motivoObservacion ? `<p style="margin:4px 0 0 0; font-size:12px; color:#334155;">${datos.motivoObservacion}</p>` : ""}
       </div>
 
@@ -642,7 +642,7 @@ export function imprimirHojaEnfermeria(datos: DatosImpresionHojaEnfermeria) {
           ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
           <div style="font-size:10px; color:#475569;">
             <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-            <p style="margin:1px 0;">Sanidad ANP — Ficha de Enfermería</p>
+            <p style="margin:1px 0;">Clínica Odontológica — Ficha Clínica</p>
             <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
           </div>
         </div>
@@ -731,7 +731,7 @@ export function imprimirHistoriaClinicaCompleta(datos: DatosImpresionHistoriaCli
       </div>
       <div>
         <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
-        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "—"}</p>
       </div>
     </div>
 
@@ -840,16 +840,16 @@ export function imprimirHistoriaClinicaCompleta(datos: DatosImpresionHistoriaCli
         ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
         <div style="font-size:10px; color:#475569;">
           <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-          <p style="margin:1px 0;">Sanidad ANP — Legajo Clínico Oficial</p>
+          <p style="margin:1px 0;">Clínica Odontológica — Legajo Clínico</p>
           <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
-          <p style="margin:1px 0; color:#64748b;">Documento oficial expedido por la Sección Sanidad</p>
+          <p style="margin:1px 0; color:#64748b;">Documento oficial expedido por la Clínica Odontológica</p>
         </div>
       </div>
 
       <div class="firmas">
         <div class="linea-firma"></div>
-        <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">Dirección de Sanidad ANP</p>
-        <p style="margin:0; font-size:10px; color:#64748b;">Firma y Sello del Responsable de Sanidad</p>
+        <p style="margin:2px 0 0 0; font-weight:bold; font-size:12px;">Dirección de la Clínica Odontológica</p>
+        <p style="margin:0; font-size:10px; color:#64748b;">Firma y Sello del Responsable de la Clínica</p>
       </div>
     </div>
   `;
@@ -1093,7 +1093,7 @@ export function imprimirOrdenEstudios(datos: DatosImpresionOrdenEstudios) {
       <h1>SECCIÓN SANIDAD — ACADEMIA NACIONAL DE POLICÍA</h1>
       <p class="sub">Gral. José E. Díaz</p>
       <h2>${tituloDoc}</h2>
-      <p class="meta">Emisión: ${datos.fecha} — Sanidad ANP / Hospital Rigoberto Caballero</p>
+      <p class="meta">Emisión: ${datos.fecha} — Clínica Odontológica</p>
     </div>
 
     <div class="box-paciente">
@@ -1103,7 +1103,7 @@ export function imprimirOrdenEstudios(datos: DatosImpresionOrdenEstudios) {
       </div>
       <div>
         <p style="margin:2px 0;"><strong>Tipo / Grado:</strong> ${formatTipoGrado(datos.pacienteTipo, datos.pacienteGrado)}</p>
-        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "ANP"}</p>
+        <p style="margin:2px 0;"><strong>Unidad / Sección:</strong> ${datos.pacienteUnidad || "—"}</p>
       </div>
     </div>
 
@@ -1137,7 +1137,7 @@ export function imprimirOrdenEstudios(datos: DatosImpresionOrdenEstudios) {
           ${datos.qrSvgHtml ? `<div style="border: 1px solid #94a3b8; padding: 4px; background: #fff;">${datos.qrSvgHtml}</div>` : ""}
           <div style="font-size:10px; color:#475569;">
             <p style="margin:0; font-weight:bold; color:#0f172a; font-size:11px;">VERIFICACIÓN DIGITAL QR</p>
-            <p style="margin:1px 0;">Sanidad ANP — Solicitud Oficial de Estudios</p>
+            <p style="margin:1px 0;">Clínica Odontológica — Solicitud de Estudios</p>
             <p style="margin:1px 0; font-family: monospace;">ID: ${refCod}</p>
           </div>
         </div>
@@ -1489,8 +1489,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
           <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: bold; color: #2563eb;">PLANILLA DE PRODUCTIVIDAD POR ESPECIALIDAD Y PROFESIONAL</p>
         </div>
         <div style="text-align: right; font-size: 11px; color: #334155; line-height: 1.4;">
-          <p style="margin: 0; font-weight: bold; color: #0f172a;">SECCIÓN SANIDAD</p>
-          <p style="margin: 0;">Academia Nacional de Policía "Gral. E. Díaz"</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">CLÍNICA ODONTOLÓGICA</p>
           <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Emisión: ${new Date().toLocaleDateString("es-PY")}</p>
         </div>
       </div>
@@ -1540,7 +1539,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
         <div>
           <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
           <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">V° B° JEFATURA DE SANIDAD</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">Sección Sanidad — ANP</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">Clínica Odontológica</p>
           <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y Sello Autorizado</p>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/supabase'
 import type { User, Session } from '@supabase/supabase-js'
 import { logger } from '@/lib/logger'
+import { esTablaInexistente } from '@/lib/esquema'
 
 interface AuthContextType {
   user: User | null
@@ -21,11 +22,9 @@ interface AuthContextType {
   isLoading: boolean
 }
 
-// Roles que pueden entrar a este sistema. Los roles de control de peso
-// (analyst, viewer) NO tienen acceso a Sanidad; solo los admins son comunes
-// a ambos sistemas.
-// Roles que pueden entrar a este sistema.
-export const ROLES_SANIDAD = [
+// Roles que pueden entrar a este sistema. Cualquier otro rol que aparezca en
+// `user_roles` cae en la pantalla "Sin acceso".
+export const ROLES_CLINICA = [
   'admin',
   'superadmin',
   'super_admin',
@@ -64,7 +63,7 @@ export const DEMO_USERS: Record<string, { email: string; name: string; role: str
 /**
  * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
  */
-export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
+export const ROLES_CLINICA_OPCIONES: { value: string; label: string }[] = [
   { value: 'admin', label: 'Administrador Odontológico' },
   { value: 'medico', label: 'Odontólogo / Cirujano Dentista' },
   { value: 'recepcion', label: 'Recepción / Admisión Dental' },
@@ -74,7 +73,7 @@ export const ROLES_SANIDAD_OPCIONES: { value: string; label: string }[] = [
 /**
  * Módulos del sistema odontológico.
  */
-export const MODULOS_SANIDAD: { key: string; label: string }[] = [
+export const MODULOS_CLINICA: { key: string; label: string }[] = [
   { key: 'pacientes', label: 'Pacientes y Ficha Dental' },
   { key: 'citas', label: 'Citas y Horarios' },
   { key: 'consultas', label: 'Presupuestos y Facturación' },
@@ -94,10 +93,10 @@ export function esEstadoActivo(status?: string | null): boolean {
 }
 
 // Permisos por defecto cuando user_roles.permissions viene vacío.
-export const DEFAULT_PERMISOS_SANIDAD: Record<string, Record<string, string[]>> = {
-  admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
-  superadmin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
-  super_admin: Object.fromEntries(MODULOS_SANIDAD.map((m) => [m.key, TODOS_LOS_PERMISOS])),
+export const DEFAULT_PERMISOS_CLINICA: Record<string, Record<string, string[]>> = {
+  admin: Object.fromEntries(MODULOS_CLINICA.map((m) => [m.key, TODOS_LOS_PERMISOS])),
+  superadmin: Object.fromEntries(MODULOS_CLINICA.map((m) => [m.key, TODOS_LOS_PERMISOS])),
+  super_admin: Object.fromEntries(MODULOS_CLINICA.map((m) => [m.key, TODOS_LOS_PERMISOS])),
   medico: {
     pacientes: ['ver', 'editar'],
     citas: ['ver', 'editar'],
@@ -138,22 +137,12 @@ export function rolPorCorreo(email?: string | null): string {
   return 'medico'
 }
 
-/**
- * Si el error es "la tabla `user_roles` no existe" (falta la migración) y no
- * otra cosa. Solo por código: PGRST205 es tabla desconocida y 42P01 es la
- * misma falta del lado de Postgres. OJO: PGRST204 es *columna* faltante, que
- * es un problema distinto y no debe caer acá.
- */
-function esTablaRolesFaltante(error: { code?: string }): boolean {
-  return error.code === 'PGRST205' || error.code === '42P01'
-}
-
-export function resolverPermisosSanidad(
+export function resolverPermisosClinica(
   rol: string | null,
   permissions: Record<string, string[]> | null
 ): Record<string, string[]> | null {
   if (!rol) return null
-  const defaults = DEFAULT_PERMISOS_SANIDAD[rol] ?? null
+  const defaults = DEFAULT_PERMISOS_CLINICA[rol] ?? null
   if (!permissions || Object.keys(permissions).length === 0) return defaults
 
   if (!defaults) return permissions
@@ -411,7 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (roleError && esTablaRolesFaltante(roleError)) {
+        if (roleError && esTablaInexistente(roleError)) {
           // La base todavía no tiene `user_roles` (falta auth_roles_setup.sql).
           // Sin esto la persona entraba y chocaba con "Sin acceso", que no dice
           // nada de la migración que falta. El candado real es el RLS, no esta
@@ -423,7 +412,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           )
           const rolFallback = rolPorCorreo(user.email)
           setRole(rolFallback)
-          setPermissions(resolverPermisosSanidad(rolFallback, null))
+          setPermissions(resolverPermisosClinica(rolFallback, null))
         } else if (roleError) {
           logger.error('Error cargando rol del usuario:', {
             message: roleError.message,
@@ -443,13 +432,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const rol = roleData.role ? roleData.role.toLowerCase() : null
           setRole(rol)
           setPermissions(
-            resolverPermisosSanidad(rol, roleData.permissions as Record<string, string[]> | null)
+            resolverPermisosClinica(rol, roleData.permissions as Record<string, string[]> | null)
           )
         } else {
           // Si aún no tiene rol explícito en DB, asignar por defecto segun email o admin para desarrollo
           const rolFallback = rolPorCorreo(user.email)
           setRole(rolFallback)
-          setPermissions(resolverPermisosSanidad(rolFallback, null))
+          setPermissions(resolverPermisosClinica(rolFallback, null))
         }
 
         if (isActive) {

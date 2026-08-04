@@ -1,5 +1,5 @@
 // ============================================================================
-// Catálogo de Medicamentos Frecuentes — Sección Sanidad ANP
+// Catálogo de Medicamentos Frecuentes
 // ============================================================================
 // Proporciona sugerencias y valores predeterminados para la prescripción rápida
 // en recetas médicas.

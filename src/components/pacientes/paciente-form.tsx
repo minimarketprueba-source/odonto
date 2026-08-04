@@ -39,7 +39,7 @@ function etiquetaUnidad(tipo: string): string {
   if (tipo === "oficial" || tipo === "suboficial") return "Cargo o función en la Academia";
   if (tipo === "policia") return "Dependencia / Comisaría / Unidad";
   if (tipo === "cadete") return "Sección / Batallón";
-  if (tipo === "funcionario" || tipo === "medico") return "Departamento / Sección / Sanidad";
+  if (tipo === "funcionario" || tipo === "medico") return "Departamento / Área";
   return "Unidad / Sección";
 }
 
@@ -164,7 +164,7 @@ export function PacienteForm({
         <DialogHeader>
           <DialogTitle>{paciente ? "Editar paciente" : "Registrar paciente"}</DialogTitle>
           <DialogDescription>
-            Cadetes, policías, familiares y civiles atendidos por la Sanidad.
+            Datos de la persona que se atiende en la clínica.
             Los campos con * son obligatorios.
           </DialogDescription>
         </DialogHeader>

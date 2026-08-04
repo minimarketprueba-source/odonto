@@ -95,7 +95,7 @@ export default function LoginPage() {
             Clínica Odontológica
           </CardTitle>
           <CardDescription className="text-slate-400 text-sm mt-1">
-            Sanidad ISEPOL — Gestión de Odontograma y Citas
+            Gestión de Odontograma y Citas
           </CardDescription>
         </CardHeader>
 
