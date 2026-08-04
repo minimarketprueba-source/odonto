@@ -27,7 +27,7 @@ interface CitaFormProps {
 }
 
 export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { hasPermission } = usePermissions();
   const puedeCrearPaciente = hasPermission("pacientes", "editar");
   const [altaPacienteOpen, setAltaPacienteOpen] = useState(false);
@@ -271,8 +271,18 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                 />
                 {mostrarListaMedicos && (
                   <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-48 overflow-y-auto divide-y">
-                    {medicosFiltrados.length === 0 ? (
-                      <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron profesionales</p>
+                    {medicos.length === 0 ? (
+                      // Sin ninguno cargado, "no se encontraron" hacía pensar en
+                      // un problema de búsqueda. Lo que falta es darlos de alta.
+                      <p className="p-3 text-xs text-muted-foreground text-center">
+                        Todavía no hay odontólogos registrados.
+                        <br />
+                        Un administrador los carga en <strong>Mantenimiento → Médicos</strong>.
+                      </p>
+                    ) : medicosFiltrados.length === 0 ? (
+                      <p className="p-3 text-xs text-muted-foreground text-center">
+                        Ningún odontólogo coincide con «{busquedaMedico}»
+                      </p>
                     ) : (
                       medicosFiltrados.map((m) => (
                         <button
@@ -294,6 +304,16 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                       ))
                     )}
                   </div>
+                )}
+
+                {/* Un odontólogo cuya ficha no está vinculada a su cuenta no se
+                    ve a sí mismo precargado y no tiene forma de saber por qué. */}
+                {role === "medico" && !miMedico && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    Su cuenta todavía no está vinculada a una ficha profesional, por eso
+                    no aparece su nombre. Pídale a un administrador que la vincule en
+                    Mantenimiento → Médicos.
+                  </p>
                 )}
               </div>
             )}

@@ -235,7 +235,6 @@ export default function Usuarios() {
   const [showPasswordInDialog, setShowPasswordInDialog] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  // Estado para el modal de alta de usuarios
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -249,6 +248,11 @@ export default function Usuarios() {
     telefono: "",
   });
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Estado para edición de perfil
+  const [editProfileUser, setEditProfileUser] = useState<UserRecord | null>(null);
+  const [editProfileForm, setEditProfileForm] = useState({ nombre: "", apellido: "" });
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // Estado para los logs de auditoría
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -552,6 +556,31 @@ export default function Usuarios() {
       setCreateError(error?.message || "No se pudo crear el usuario.");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!editProfileUser) return;
+    setIsUpdatingProfile(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          nombre: editProfileForm.nombre,
+          apellido: editProfileForm.apellido,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editProfileUser.id);
+      
+      if (error) throw error;
+      
+      toast({ title: "Perfil actualizado exitosamente" });
+      setEditProfileUser(null);
+      await loadUsers(); // Refetch para actualizar la lista
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error al actualizar perfil", description: (err as Error).message });
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
@@ -1043,6 +1072,21 @@ export default function Usuarios() {
                                   variant="outline"
                                   size="sm"
                                   className="gap-1.5"
+                                  onClick={() => {
+                                    setEditProfileUser(record);
+                                    setEditProfileForm({
+                                      nombre: record.raw?.nombre || "",
+                                      apellido: record.raw?.apellido || "",
+                                    });
+                                  }}
+                                >
+                                  <UserCog className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Editar Perfil</span>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5"
                                   onClick={() => openRoleDialog(record)}
                                 >
                                   <UserCog className="h-4 w-4" />
@@ -1337,6 +1381,56 @@ export default function Usuarios() {
                   </>
                 ) : (
                   "Actualizar Contraseña"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal para Editar Perfil */}
+        <Dialog open={Boolean(editProfileUser)} onOpenChange={(open) => !open && setEditProfileUser(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserCog className="h-5 w-5 text-primary" />
+                Editar Perfil
+              </DialogTitle>
+              <DialogDescription>
+                Modifica los datos personales de <strong>{editProfileUser?.email}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nombre(s)</Label>
+                <Input
+                  placeholder="Ej: Juan Pérez"
+                  value={editProfileForm.nombre}
+                  onChange={(e) => setEditProfileForm((prev) => ({ ...prev, nombre: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Apellido(s)</Label>
+                <Input
+                  placeholder="Opcional"
+                  value={editProfileForm.apellido}
+                  onChange={(e) => setEditProfileForm((prev) => ({ ...prev, apellido: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setEditProfileUser(null)} disabled={isUpdatingProfile}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateProfile} disabled={isUpdatingProfile}>
+                {isUpdatingProfile ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Cambios"
                 )}
               </Button>
             </DialogFooter>
