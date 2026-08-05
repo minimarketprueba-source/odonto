@@ -23,16 +23,16 @@ Guía para Claude Code (claude.ai/code) al trabajar en este repositorio.
 
 ### Cuentas
 
-Cuatro cuentas demo, contraseña `123456` **salvo la de admin, que el usuario cambió**:
-
 | Correo | Rol |
 |---|---|
 | `medico@odonto.com` | Odontólogo |
-| `admin@odonto.com` | Administrador (contraseña propia del usuario) |
+| `admin@odonto.com` | Administrador |
 | `recepcion@odonto.com` | Recepción |
 | `asistente@odonto.com` | Asistente dental |
 
-⚠️ **Pendiente de seguridad**: las contraseñas siguen siendo de prueba y el registro público está abierto. El sitio está en internet.
+**Las contraseñas ya no son las de prueba.** El 2026-08-05 se cambiaron por API admin y se le pasaron al usuario por chat; la de admin la cambió él antes. **No van en este archivo**: es un repositorio de GitHub. Si hace falta reponer una, se resetea por API admin con la service_role key (se la pide al usuario, no se guarda en ningún archivo).
+
+**Registro público**: cerrado en la app (sin enlace, y `/auth/sign-up` redirige al login). ⚠️ **Falta cerrarlo en Supabase**: apagar "Allow new users to sign up" en Authentication → Providers → Email. Mientras siga prendido, cualquiera puede registrarse llamando a la API directamente, porque la anon key es pública. Quien se registre queda sin rol y sin acceso a nada, pero es una puerta abierta.
 
 ### Datos cargados (2026-08-05)
 
@@ -162,9 +162,8 @@ Trampas de los scripts de prueba: PostgREST exige que todos los objetos de un lo
 
 ## Pendientes
 
-1. **Seguridad, antes de usarlo con pacientes reales**: cambiar las contraseñas de prueba y cerrar el registro público (hoy cualquiera puede crearse una cuenta; queda sin acceso hasta que un admin le asigne rol, pero es una puerta abierta).
+1. **Apagar el registro en Supabase** (Authentication → Providers → Email → "Allow new users to sign up"). Es lo único de seguridad que queda y solo se hace desde el panel.
 2. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta.
 3. **Revisar las tarifas**: hay 12 de ejemplo.
 4. **Confirmación de correo**: sigue activada en Supabase, así que una cuenta nueva con dominio inventado (`@odonto.com`) queda trabada. Se destraba apagándola en el panel o creando las cuentas por API admin.
-5. **Planes viejos**: los totales se recalculan al tocar un plan; los cargados antes del arreglo muestran los valores viejos hasta que se les agregue o borre algo.
-6. Sin revisar: los impresos de odontograma y consentimiento, y cómo se ve en celular.
+5. Sin revisar: los impresos de odontograma y consentimiento, y cómo se ve en celular.
