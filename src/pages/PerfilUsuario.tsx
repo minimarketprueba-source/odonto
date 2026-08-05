@@ -4,12 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IdCard, KeyRound, Loader2, UserCircle2 } from "lucide-react";
+import { IdCard, KeyRound, Loader2, UserCircle2, Mail } from "lucide-react";
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { useMiMedico } from "@/api/citas";
-import { usePerfilProfesional, guardarPerfilPropio } from "@/api/perfil";
+import { usePerfilProfesional, guardarPerfilPropio, cambiarCorreoPropio } from "@/api/perfil";
 import { updateMedico } from "@/api/mantenimiento";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-client";
@@ -25,9 +25,15 @@ export default function PerfilUsuario() {
 
   const [telefono, setTelefono] = useState("");
 
-  // Nombre y registro profesional propios: prellenan "quién atiende" y la
-  // firma de la constancia. Los médicos los toman de su ficha; enfermería y
-  // admin los cargan acá.
+  // Teléfono de la cuenta, para quien no tiene ficha de odontólogo (admin y
+  // recepción): sin esto no había forma de cargar un contacto propio.
+  const [telefonoPerfil, setTelefonoPerfil] = useState("");
+
+  const [correoNuevo, setCorreoNuevo] = useState("");
+  const [guardandoCorreo, setGuardandoCorreo] = useState(false);
+
+  // Nombre y registro profesional propios: es con lo que queda firmado lo que
+  // registre. Los odontólogos los toman de su ficha; el resto los carga acá.
   const { data: perfilProf } = usePerfilProfesional(user);
   const nombrePerfil = perfilProf?.nombre ?? null;
   const [nombre, setNombre] = useState("");
@@ -47,7 +53,10 @@ export default function PerfilUsuario() {
       setNombre((prev) => prev || partes.slice(0, Math.ceil(partes.length / 2)).join(" "));
       setApellido((prev) => prev || partes.slice(Math.ceil(partes.length / 2)).join(" "));
     }
-    if (!miMedico) setRegistro((prev) => prev || perfilProf?.registro || "");
+    if (!miMedico) {
+      setRegistro((prev) => prev || perfilProf?.registro || "");
+      setTelefonoPerfil((prev) => prev || perfilProf?.telefono || "");
+    }
     if (miMedico) {
       setNombreMedico((prev) => prev || miMedico.nombres || "");
       setApellidoMedico((prev) => prev || miMedico.apellidos || "");
@@ -80,6 +89,22 @@ export default function PerfilUsuario() {
     }
   };
 
+  const cambiarCorreo = async () => {
+    setGuardandoCorreo(true);
+    try {
+      await cambiarCorreoPropio(correoNuevo);
+      setCorreoNuevo("");
+      await showSwalSuccess(
+        "Le enviamos un enlace de confirmación al correo nuevo. Ábralo desde ese " +
+          "correo para terminar el cambio. Mientras tanto, siga entrando con el actual."
+      );
+    } catch (e) {
+      await showSwalError((e as Error).message);
+    } finally {
+      setGuardandoCorreo(false);
+    }
+  };
+
   const guardarNombre = async () => {
     if (!user?.id) return;
     if (!nombre.trim() || !apellido.trim()) {
@@ -88,12 +113,12 @@ export default function PerfilUsuario() {
     }
     setGuardandoNombre(true);
     try {
-      await guardarPerfilPropio(user.id, nombre, apellido, registro);
+      await guardarPerfilPropio(user.id, nombre, apellido, registro, telefonoPerfil);
       queryClient.invalidateQueries({ queryKey: queryKeys.perfil.all });
       await showSwalSuccess(
         `Datos guardados: ${nombre.trim()} ${apellido.trim()}` +
           (registro.trim() ? ` — Reg. Prof. N° ${registro.trim()}` : "") +
-          ". Van a aparecer prellenados al registrar atenciones."
+          "."
       );
     } catch (e) {
       await showSwalError((e as Error).message);
@@ -160,10 +185,10 @@ export default function PerfilUsuario() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <IdCard className="w-5 h-5 text-primary" /> Mi nombre y apellido
+                <IdCard className="w-5 h-5 text-primary" /> Mis datos personales
               </CardTitle>
               <CardDescription>
-                Se usa para prellenar «quién atiende» al registrar atenciones de enfermería.
+                Es el nombre con el que queda firmado lo que registre en el sistema.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -183,13 +208,23 @@ export default function PerfilUsuario() {
                     onChange={(e) => setRegistro(e.target.value)} className="max-w-xs"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Sale junto a su firma en las constancias de enfermería.
+                    Sale junto a su firma en los documentos que emita.
                   </p>
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="p-telefono-perfil">Teléfono de contacto</Label>
+                  <Input
+                    id="p-telefono-perfil"
+                    placeholder="Ej: 0981 123456"
+                    value={telefonoPerfil}
+                    onChange={(e) => setTelefonoPerfil(e.target.value)}
+                    className="max-w-xs"
+                  />
                 </div>
               </div>
               <Button onClick={guardarNombre} disabled={guardandoNombre || !nombre.trim() || !apellido.trim()}>
                 {guardandoNombre ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Guardar nombre
+                Guardar mis datos
               </Button>
             </CardContent>
           </Card>
@@ -258,6 +293,37 @@ export default function PerfilUsuario() {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Mail className="w-5 h-5 text-primary" /> Cambiar mi correo
+            </CardTitle>
+            <CardDescription>
+              Es el correo con el que entra al sistema. Le va a llegar un enlace al correo
+              nuevo para confirmarlo; hasta que lo abra, sigue entrando con el actual.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1 max-w-sm">
+              <Label htmlFor="p-correo">Correo nuevo</Label>
+              <Input
+                id="p-correo"
+                type="email"
+                placeholder={user?.email ?? "nombre@correo.com"}
+                value={correoNuevo}
+                onChange={(e) => setCorreoNuevo(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={cambiarCorreo}
+              disabled={guardandoCorreo || !correoNuevo.trim() || correoNuevo.trim().toLowerCase() === (user?.email ?? "").toLowerCase()}
+            >
+              {guardandoCorreo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Cambiar correo
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
