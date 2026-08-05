@@ -51,9 +51,11 @@ import {
   CreditCard,
   FileText,
   ListTodo,
-  Printer
+  Printer,
+  MessageCircle
 } from "lucide-react";
-import { imprimirPresupuesto, imprimirPlanillaHistorial } from "@/lib/imprimir";
+import { imprimirPresupuesto, imprimirPlanillaHistorial, imprimirComprobantePagos } from "@/lib/imprimir";
+import { mensajeEstadoCuenta, enlaceWhatsApp, telefonoParaWhatsApp } from "@/lib/estado-cuenta";
 import { useEvoluciones } from "@/api/evoluciones";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
@@ -302,6 +304,50 @@ export default function FichaPaciente() {
       totalCobrado,
       totalAdeudado,
     });
+  };
+
+  /** Los datos de la cuenta del plan abierto, para el comprobante y el mensaje. */
+  const datosCuenta = () => ({
+    pacienteNombre: `${paciente!.apellidos}, ${paciente!.nombres}`,
+    pacienteDocumento: paciente!.documento,
+    fecha: new Date().toLocaleDateString("es-PY"),
+    planTitulo: activePresupuesto?.titulo ?? null,
+    totalCotizado,
+    totalAbonado,
+    saldoPendiente,
+    pagos: pagos.map((p) => ({
+      fecha: new Date(p.fecha).toLocaleDateString("es-PY"),
+      monto: Number(p.monto) || 0,
+      metodo: p.tipo_pago ?? "—",
+      comentario: p.comentario ?? null,
+    })),
+  });
+
+  /** Comprobante de pagos para imprimir o guardar en PDF y mandar. */
+  const handleImprimirComprobante = () => {
+    if (!paciente) return;
+    imprimirComprobantePagos(datosCuenta());
+  };
+
+  /** Abre WhatsApp con el estado de cuenta escrito, al número del paciente. */
+  const handleEnviarWhatsApp = () => {
+    if (!paciente) return;
+    const cuenta = datosCuenta();
+    const mensaje = mensajeEstadoCuenta({
+      clinica: "Clínica Odontológica",
+      pacienteNombre: cuenta.pacienteNombre,
+      fecha: cuenta.fecha,
+      planTitulo: cuenta.planTitulo,
+      totalCotizado: cuenta.totalCotizado,
+      totalAbonado: cuenta.totalAbonado,
+      saldoPendiente: cuenta.saldoPendiente,
+      pagos: cuenta.pagos,
+    });
+
+    if (!telefonoParaWhatsApp(paciente.telefono)) {
+      toast.info("El paciente no tiene teléfono cargado: elija el contacto en WhatsApp.");
+    }
+    window.open(enlaceWhatsApp(mensaje, paciente.telefono), "_blank", "noopener,noreferrer");
   };
 
   /** Abre el presupuesto como documento para imprimir o guardar en PDF. */
@@ -953,11 +999,37 @@ export default function FichaPaciente() {
                     {/* Payments */}
                     <Card className="shadow-sm">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-emerald-600" />
-                          Historial de Pagos y Abonos
-                        </CardTitle>
-                        <CardDescription>Registre las señas y pagos fraccionados entregados por el paciente.</CardDescription>
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div>
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-emerald-600" />
+                              Historial de Pagos y Abonos
+                            </CardTitle>
+                            <CardDescription>Registre las señas y pagos fraccionados entregados por el paciente.</CardDescription>
+                          </div>
+                          {/* El estado de cuenta se le manda al paciente: lleva
+                              solo la plata, nunca el detalle clínico. */}
+                          <div className="flex gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5"
+                              onClick={handleImprimirComprobante}
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              Comprobante
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-400"
+                              onClick={handleEnviarWhatsApp}
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              WhatsApp
+                            </Button>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
                         {pagos.length === 0 ? (

@@ -1931,3 +1931,104 @@ export function imprimirPeriodontograma(datos: DatosImpresionPeriodontograma) {
 
   ejecutarImpresionIframe(tituloDoc, html);
 }
+
+// ============================================================================
+// Comprobante de pagos (estado de cuenta del paciente)
+// ============================================================================
+// Es el papel que se le entrega o se le manda al paciente. A diferencia de la
+// planilla del historial, NO lleva nada clínico: solo la cuenta.
+
+export interface DatosComprobantePagos {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  fecha: string;
+  planTitulo?: string | null;
+  totalCotizado: number;
+  totalAbonado: number;
+  saldoPendiente: number;
+  pagos: { fecha: string; monto: number; metodo: string; comentario?: string | null }[];
+}
+
+export function imprimirComprobantePagos(datos: DatosComprobantePagos) {
+  const tituloDoc = "COMPROBANTE DE PAGOS";
+  const gs = (n: number) => `${n.toLocaleString("es-PY")} ₲`;
+
+  const filas = datos.pagos.length
+    ? datos.pagos
+        .map(
+          (p, i) => `
+      <tr>
+        <td style="padding:6px; border:1px solid #cbd5e1; text-align:center;">${i + 1}</td>
+        <td style="padding:6px; border:1px solid #cbd5e1; white-space:nowrap;">${p.fecha}</td>
+        <td style="padding:6px; border:1px solid #cbd5e1; text-transform:capitalize;">${p.metodo}</td>
+        <td style="padding:6px; border:1px solid #cbd5e1; font-size:11px; color:#475569;">${p.comentario || ""}</td>
+        <td style="padding:6px; border:1px solid #cbd5e1; text-align:right; font-weight:bold; color:#15803d;">${gs(p.monto)}</td>
+      </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="5" style="padding:12px; border:1px solid #cbd5e1; text-align:center; color:#64748b; font-style:italic;">Todavía no se registraron pagos.</td></tr>`;
+
+  const saldado = datos.saldoPendiente <= 0;
+  const aFavor = Math.max(0, datos.totalAbonado - datos.totalCotizado);
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding:22px; color:#0f172a; max-width:720px; margin:0 auto;">
+      <div style="text-align:center; margin-bottom:18px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
+        <h1 style="margin:0; font-size:18px; color:#1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h2 style="margin:5px 0; font-size:14px;">${tituloDoc}</h2>
+        <p style="margin:0; font-size:11px; color:#475569;">Emitido el ${datos.fecha}</p>
+      </div>
+
+      <div style="margin-bottom:16px; padding:10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc;">
+        <p style="margin:4px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin:4px 0;"><strong>Documento:</strong> ${datos.pacienteDocumento || "—"}</p>
+        ${datos.planTitulo ? `<p style="margin:4px 0;"><strong>Tratamiento:</strong> ${datos.planTitulo}</p>` : ""}
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead>
+          <tr style="background:#1e293b; color:#fff;">
+            <th style="padding:7px; border:1px solid #334155; width:34px;">Nº</th>
+            <th style="padding:7px; border:1px solid #334155; text-align:left;">Fecha</th>
+            <th style="padding:7px; border:1px solid #334155; text-align:left;">Método</th>
+            <th style="padding:7px; border:1px solid #334155; text-align:left;">Observación</th>
+            <th style="padding:7px; border:1px solid #334155; text-align:right;">Monto</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+
+      <table style="width:100%; margin-top:16px; font-size:13px;">
+        <tr>
+          <td style="padding:5px 8px; text-align:right;">Total del tratamiento:</td>
+          <td style="padding:5px 8px; text-align:right; width:150px;"><strong>${gs(datos.totalCotizado)}</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; text-align:right;">Total abonado:</td>
+          <td style="padding:5px 8px; text-align:right; color:#15803d;"><strong>${gs(datos.totalAbonado)}</strong></td>
+        </tr>
+        <tr style="background:${saldado ? "#f0fdf4" : "#fef2f2"};">
+          <td style="padding:8px; text-align:right; font-size:14px;"><strong>${
+            aFavor > 0 ? "SALDO A FAVOR:" : "SALDO PENDIENTE:"
+          }</strong></td>
+          <td style="padding:8px; text-align:right; font-size:15px; color:${saldado ? "#15803d" : "#b91c1c"};">
+            <strong>${gs(aFavor > 0 ? aFavor : datos.saldoPendiente)}</strong>
+          </td>
+        </tr>
+      </table>
+
+      ${
+        saldado && aFavor === 0
+          ? `<p style="margin-top:14px; text-align:center; color:#15803d; font-weight:bold;">Cuenta saldada. ¡Muchas gracias!</p>`
+          : ""
+      }
+
+      <div style="margin-top:45px; text-align:center;">
+        <div style="width:220px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
+        <span style="font-size:11px;">Firma y Sello de la Clínica</span>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
