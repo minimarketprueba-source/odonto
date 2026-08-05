@@ -278,14 +278,10 @@ export default function Dashboard() {
                       </Button>
                     </div>
                   ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Charts panel */}
-          <Card className="lg:col-span-2 shadow-sm">
-            <CardHeader className="pb-3 border-b flex flex-row justify-between items-center">
+        {/* Charts & Analytics Section */}
+        <div className="grid grid-cols-1 gap-6">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <Activity className="w-4 h-4 text-emerald-500" />
@@ -297,7 +293,7 @@ export default function Dashboard() {
                 <Link to="/presupuestos"><FileSpreadsheet className="w-3.5 h-3.5" /> Presupuestos</Link>
               </Button>
             </CardHeader>
-            <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Financial comparison */}
               <div className="space-y-2">
                 <h4 className="text-xs font-bold text-muted-foreground uppercase text-center mb-4">Balance de Caja</h4>
@@ -308,14 +304,42 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={financialChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => `${value.toLocaleString()} ₲`} />
-                        <Legend />
-                        <Bar dataKey="Facturado" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="Cobrado" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <BarChart data={financialChartData} margin={{ top: 10, right: 15, left: 15, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={{ stroke: "hsl(var(--border))" }}
+                        />
+                        <YAxis
+                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={{ stroke: "hsl(var(--border))" }}
+                          width={75}
+                          tickFormatter={formatMontoGrafico}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            borderColor: "hsl(var(--border))",
+                            borderRadius: "12px",
+                            color: "hsl(var(--card-foreground))",
+                            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                            fontSize: "12px",
+                          }}
+                          itemStyle={{ color: "hsl(var(--foreground))" }}
+                          formatter={(value: any, name: any) => [`${Number(value).toLocaleString("es-PY")} ₲`, name]}
+                        />
+                        <Legend
+                          wrapperStyle={{
+                            paddingTop: "10px",
+                            fontSize: "12px",
+                            color: "hsl(var(--muted-foreground))",
+                          }}
+                        />
+                        <Bar dataKey="Facturado" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="Cobrado" fill="#10b981" radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -348,7 +372,18 @@ export default function Dashboard() {
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
-                            <Tooltip formatter={(value) => `${value} planes`} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "hsl(var(--card))",
+                                borderColor: "hsl(var(--border))",
+                                borderRadius: "12px",
+                                color: "hsl(var(--card-foreground))",
+                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                                fontSize: "12px",
+                              }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
+                              formatter={(value: any) => [`${value} planes`, "Cantidad"]}
+                            />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
