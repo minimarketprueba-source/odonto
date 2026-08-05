@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,6 +88,35 @@ export default function Presupuestos() {
     return matchesSearch && matchesStatus;
   });
 
+  /**
+   * Totales de lo que se está viendo: si se filtra o se busca, las cuentas
+   * acompañan. Es la respuesta a "cuánto me deben en total".
+   *
+   * Un plan rechazado o anulado NO cuenta como plata por cobrar: el paciente
+   * dijo que no, contarlo infla la deuda de la clínica.
+   */
+  const totales = useMemo(() => {
+    let cotizado = 0;
+    let cobrado = 0;
+    let porCobrar = 0;
+    const pacientesQueDeben = new Set<string>();
+
+    for (const p of filteredPresupuestos) {
+      const total = Number(p.total) || 0;
+      const saldo = Number(p.saldo_pendiente) || 0;
+      const estado = String(p.estado ?? "").toLowerCase();
+      const cuenta = estado !== "rechazado" && estado !== "anulado";
+
+      cotizado += total;
+      cobrado += Math.max(0, total - saldo);
+      if (cuenta && saldo > 0) {
+        porCobrar += saldo;
+        pacientesQueDeben.add(p.paciente_id);
+      }
+    }
+    return { cotizado, cobrado, porCobrar, deudores: pacientesQueDeben.size };
+  }, [filteredPresupuestos]);
+
   return (
     <AppLayout>
       <div className="space-y-4">
@@ -138,6 +167,44 @@ export default function Presupuestos() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Cuánto se cotizó, cuánto entró y cuánto falta cobrar */}
+            {!loadingPres && filteredPresupuestos.length > 0 && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <Card className="p-3 bg-card">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Total cotizado</p>
+                  <p className="text-lg font-extrabold tabular-nums">{totales.cotizado.toLocaleString("es-PY")} ₲</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {filteredPresupuestos.length} plan{filteredPresupuestos.length === 1 ? "" : "es"}
+                  </p>
+                </Card>
+                <Card className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200">
+                  <p className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Cobrado</p>
+                  <p className="text-lg font-extrabold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                    {totales.cobrado.toLocaleString("es-PY")} ₲
+                  </p>
+                  <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/70">Ya entró a la clínica</p>
+                </Card>
+                <Card className="p-3 bg-amber-50/60 dark:bg-amber-950/20 border-amber-200">
+                  <p className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400">Por cobrar</p>
+                  <p className="text-lg font-extrabold text-amber-700 dark:text-amber-300 tabular-nums">
+                    {totales.porCobrar.toLocaleString("es-PY")} ₲
+                  </p>
+                  <p className="text-[11px] text-amber-700/70 dark:text-amber-400/70">
+                    {totales.deudores} paciente{totales.deudores === 1 ? "" : "s"} con saldo
+                  </p>
+                </Card>
+                <Card className="p-3 bg-card">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Cobrado del total</p>
+                  <p className="text-lg font-extrabold tabular-nums">
+                    {totales.cotizado > 0 ? Math.round((totales.cobrado / totales.cotizado) * 100) : 0}%
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {statusFilter === "todos" && !search ? "De toda la clínica" : "De lo que está filtrado"}
+                  </p>
+                </Card>
+              </div>
+            )}
 
             {loadingPres ? (
               <div className="text-center py-12 text-muted-foreground">

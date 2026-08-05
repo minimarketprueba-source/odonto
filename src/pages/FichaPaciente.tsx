@@ -100,6 +100,26 @@ export default function FichaPaciente() {
   /** Si pagó más de lo cotizado (una seña antes de cargar el plan). */
   const saldoAFavor = Math.max(0, totalAbonado - totalCotizado);
 
+  /**
+   * Lo mismo pero sumando TODOS los planes del paciente. Sale de las columnas
+   * guardadas de cada presupuesto, que `recalcularTotalesPresupuesto()`
+   * mantiene al día. Un plan rechazado no cuenta como deuda.
+   */
+  const totalGeneral = useMemo(() => {
+    let cotizado = 0;
+    let abonado = 0;
+    let saldo = 0;
+    for (const p of presupuestos) {
+      const total = Number(p.total) || 0;
+      const pendiente = Number(p.saldo_pendiente) || 0;
+      const estado = String(p.estado ?? "").toLowerCase();
+      cotizado += total;
+      abonado += Math.max(0, total - pendiente);
+      if (estado !== "rechazado" && estado !== "anulado") saldo += pendiente;
+    }
+    return { cotizado, abonado, saldo };
+  }, [presupuestos]);
+
   const addDetalle = useAddPresupuestoDetalle();
   const removeDetalle = useDeletePresupuestoDetalle();
   const addPago = useAddPagoPresupuesto();
@@ -752,6 +772,33 @@ export default function FichaPaciente() {
                     <Plus className="w-3.5 h-3.5" /> Nuevo Plan
                   </Button>
                 </div>
+
+                {/* Consolidado de TODOS los planes: los totales de la derecha son
+                    del plan abierto, y un paciente con tres tratamientos no
+                    tenía dónde ver cuánto debe en total. */}
+                {presupuestos.length > 1 && (
+                  <div className="rounded-xl border bg-muted/30 p-3 space-y-1.5">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                      Todos los tratamientos ({presupuestos.length})
+                    </p>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Cotizado</span>
+                      <span className="font-semibold tabular-nums">{totalGeneral.cotizado.toLocaleString("es-PY")} ₲</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Abonado</span>
+                      <span className="font-semibold text-emerald-600 tabular-nums">
+                        {totalGeneral.abonado.toLocaleString("es-PY")} ₲
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t pt-1.5">
+                      <span className="font-bold">Saldo total</span>
+                      <span className={`font-extrabold tabular-nums ${totalGeneral.saldo > 0 ? "text-destructive" : "text-emerald-600"}`}>
+                        {totalGeneral.saldo.toLocaleString("es-PY")} ₲
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {presupuestos.length === 0 ? (
                   <Card className="border-dashed py-8 text-center text-muted-foreground">

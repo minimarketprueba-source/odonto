@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IdCard, KeyRound, Loader2, UserCircle2, Mail } from "lucide-react";
+import { Eye, EyeOff, IdCard, KeyRound, Loader2, UserCircle2, Mail } from "lucide-react";
 import { showSwalSuccess, showSwalError } from "@/lib/swal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -21,6 +21,8 @@ export default function PerfilUsuario() {
 
   const [pass1, setPass1] = useState("");
   const [pass2, setPass2] = useState("");
+  const [mostrarPass1, setMostrarPass1] = useState(false);
+  const [mostrarPass2, setMostrarPass2] = useState(false);
   const [guardandoPass, setGuardandoPass] = useState(false);
 
   const [telefono, setTelefono] = useState("");
@@ -337,11 +339,43 @@ export default function PerfilUsuario() {
           <CardContent className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="p-pass1">Contraseña nueva</Label>
-              <Input id="p-pass1" type="password" value={pass1} onChange={(e) => setPass1(e.target.value)} className="max-w-xs" />
+              <div className="relative max-w-xs">
+                <Input
+                  id="p-pass1"
+                  type={mostrarPass1 ? "text" : "password"}
+                  value={pass1}
+                  onChange={(e) => setPass1(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarPass1((visible) => !visible)}
+                  aria-label={mostrarPass1 ? "Ocultar contraseña nueva" : "Mostrar contraseña nueva"}
+                  className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  {mostrarPass1 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-1">
               <Label htmlFor="p-pass2">Repetir contraseña nueva</Label>
-              <Input id="p-pass2" type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} className="max-w-xs" />
+              <div className="relative max-w-xs">
+                <Input
+                  id="p-pass2"
+                  type={mostrarPass2 ? "text" : "password"}
+                  value={pass2}
+                  onChange={(e) => setPass2(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarPass2((visible) => !visible)}
+                  aria-label={mostrarPass2 ? "Ocultar repetición de contraseña" : "Mostrar repetición de contraseña"}
+                  className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  {mostrarPass2 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button onClick={cambiarPassword} disabled={guardandoPass || !pass1 || !pass2}>
               {guardandoPass
