@@ -1027,31 +1027,52 @@ export default function FichaPaciente() {
                               />
                             </div>
                           </div>
-                          <div className="flex gap-1">
-                            <Input
-                              placeholder="Precio (opcional)"
-                              type="text"
-                              inputMode="numeric"
-                              className="h-8 w-28 bg-background"
-                              value={selCosto}
-                              onChange={(e) => setSelCosto(e.target.value.replace(/\D/g, ""))}
-                            />
-                            <Input
-                              placeholder="Desc. ₲"
-                              type="text"
-                              inputMode="numeric"
-                              className="h-8 w-24 bg-background"
-                              value={selDescuento}
-                              onChange={(e) => setSelDescuento(e.target.value.replace(/\D/g, ""))}
-                            />
-                            <Button type="submit" size="icon" className="h-8 w-8 flex-shrink-0" disabled={addDetalle.isPending}>
+                          <div className="space-y-1">
+                            <Label htmlFor="add_costo" className="text-[10px] uppercase font-bold text-muted-foreground">
+                              Importe y descuento (₲)
+                            </Label>
+                            <div className="flex gap-1">
+                              <Input
+                                id="add_costo"
+                                placeholder="Importe"
+                                type="text"
+                                inputMode="numeric"
+                                className="h-9 flex-1 bg-background font-semibold"
+                                value={selCosto}
+                                onChange={(e) => setSelCosto(e.target.value.replace(/\D/g, ""))}
+                              />
+                              <Input
+                                id="add_descuento"
+                                placeholder="Desc."
+                                type="text"
+                                inputMode="numeric"
+                                className="h-9 w-20 bg-background"
+                                value={selDescuento}
+                                onChange={(e) => setSelDescuento(e.target.value.replace(/\D/g, ""))}
+                              />
+                            </div>
+                          </div>
+
+                          {/* El botón va en su propia fila y a lo ancho: antes era
+                              un "+" de 32 px encajado entre dos campos, y en un
+                              celular el dedo le erraba y tocaba el input de al
+                              lado. El tratamiento parecía no agregarse. */}
+                          <div className="sm:col-span-4 space-y-1">
+                            <Button
+                              type="submit"
+                              className="w-full h-10 gap-2"
+                              disabled={addDetalle.isPending || !selTratamientoId}
+                            >
                               <Plus className="w-4 h-4" />
+                              {addDetalle.isPending ? "Agregando..." : "Agregar al presupuesto"}
                             </Button>
+                            <p className="text-[11px] text-muted-foreground">
+                              {selTratamientoId
+                                ? "El importe viene sugerido de la tarifa, pero se puede cambiar en cada caso."
+                                : "Elija primero un procedimiento de la lista de arriba."}
+                            </p>
                           </div>
                         </form>
-                        <p className="text-[11px] text-muted-foreground -mt-1">
-                          El importe viene sugerido de la tarifa, pero se puede cambiar en cada caso.
-                        </p>
                       </CardContent>
                     </Card>
 
