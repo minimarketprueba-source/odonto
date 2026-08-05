@@ -134,9 +134,9 @@ export default function ConfigurarSupabase() {
         
         <CardContent className="space-y-6">
           {configured && (
-            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <Alert className="border-sky-200 bg-sky-50 dark:bg-sky-950/60 dark:border-sky-900">
+              <AlertCircle className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+              <AlertDescription className="text-sky-900 dark:text-sky-200">
                 Ya existe una configuración guardada. Si cambias estos valores, se actualizará la conexión a Supabase.
               </AlertDescription>
             </Alert>

@@ -26,7 +26,7 @@ function StatCardComponent({
   const variantColors = {
     default: 'text-primary',
     success: 'text-green-600',
-    warning: 'text-yellow-600',
+    warning: 'text-orange-600 dark:text-orange-400',
     danger: 'text-red-600',
   }
 

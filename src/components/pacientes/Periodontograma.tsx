@@ -37,10 +37,12 @@ function dienteVacio(): DatosDiente {
 
 /** Color de fondo según la profundidad: es la lectura rápida del periodontograma. */
 function colorPS(ps?: number | null): string {
-  if (ps === null || ps === undefined) return "";
-  if (ps >= 6) return "bg-red-500 text-white";       // bolsa profunda
-  if (ps >= 4) return "bg-amber-400 text-amber-950";  // bolsa moderada
-  return "bg-emerald-100 text-emerald-900";           // dentro de lo normal
+  // Sin medir: acompaña el tema. Antes quedaba con el fondo blanco del
+  // navegador y, en modo oscuro, la arcada era un muro de cuadritos brillantes.
+  if (ps === null || ps === undefined) return "bg-background text-foreground";
+  if (ps >= 6) return "bg-red-500/90 text-white dark:bg-red-600";              // bolsa profunda
+  if (ps >= 4) return "bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-50"; // moderada
+  return "bg-emerald-100 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-50";      // normal
 }
 
 export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento }: PeriodontogramaProps) {
@@ -268,7 +270,7 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
       </div>
 
       {sinGuardar && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <div className="rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40 px-3 py-2 text-sm text-sky-900 dark:text-sky-200">
           Hay mediciones sin guardar. Se pierden si sale de la ficha sin apretar <strong>Guardar</strong>.
         </div>
       )}
@@ -276,13 +278,13 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
       {/* La referencia tiene que estar a la vista mientras se sondea */}
       <div className="flex flex-wrap items-center gap-4 text-xs bg-muted/40 rounded-lg px-3 py-2">
         <span className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded-sm border bg-emerald-100" /> 1-3 mm
+          <span className="w-4 h-4 rounded-sm border bg-emerald-100 dark:bg-emerald-800" /> 1-3 mm
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded-sm border bg-amber-400" /> 4-5 mm
+          <span className="w-4 h-4 rounded-sm border bg-amber-200 dark:bg-amber-700" /> 4-5 mm
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded-sm border bg-red-500" /> 6 mm o más
+          <span className="w-4 h-4 rounded-sm border bg-red-500/90 dark:bg-red-600" /> 6 mm o más
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-red-600" /> sangrado
@@ -308,7 +310,7 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
           { etiqueta: "Sitios medidos", valor: String(resumen.sitiosMedidos), color: "text-foreground" },
           { etiqueta: "Sangrado", valor: `${resumen.porcentajeSangrado}%`, color: "text-red-600" },
           { etiqueta: "Placa", valor: `${resumen.porcentajePlaca}%`, color: "text-blue-600" },
-          { etiqueta: "Bolsas 4-5 mm", valor: String(resumen.bolsas4a5), color: "text-amber-600" },
+          { etiqueta: "Bolsas 4-5 mm", valor: String(resumen.bolsas4a5), color: "text-amber-700 dark:text-amber-400" },
           { etiqueta: "Bolsas ≥6 mm", valor: String(resumen.bolsas6omas), color: "text-red-600" },
           { etiqueta: "PS promedio", valor: `${resumen.psPromedio} mm`, color: "text-foreground" },
         ].map((i) => (

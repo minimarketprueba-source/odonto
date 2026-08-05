@@ -1158,7 +1158,7 @@ export default function Usuarios() {
                   </SelectContent>
                 </Select>
                 {!esRolAsignable(roleDialogUser?.role ?? "") && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                  <p className="text-xs text-sky-700 dark:text-sky-400">
                     Esta cuenta hoy figura como «{getRoleLabel(roleDialogUser?.role ?? "")}», que no da acceso
                     al sistema. Al elegir un rol de acá pasa a tener acceso.
                   </p>

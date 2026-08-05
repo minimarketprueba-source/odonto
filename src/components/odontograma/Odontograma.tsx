@@ -248,7 +248,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
           title={titulo}
           onClick={() => aplicar(numero, "completo")}
           className={`rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${
-            piezaSinGuardar ? "ring-2 ring-dashed ring-amber-500" : ""
+            piezaSinGuardar ? "ring-2 ring-dashed ring-sky-500" : ""
           }`}
           disabled={guardando}
         >
@@ -369,8 +369,8 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
 
           {/* Nada se asienta en la historia clínica hasta que se confirma acá. */}
           {hayPendientes && (
-            <div className="flex flex-wrap items-center gap-2 mt-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-              <span className="text-xs font-medium text-amber-900 dark:text-amber-200 flex-1 min-w-[180px]">
+            <div className="flex flex-wrap items-center gap-2 mt-3 p-2.5 rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40">
+              <span className="text-xs font-medium text-sky-900 dark:text-sky-200 flex-1 min-w-[180px]">
                 {cantidadPendiente === 1
                   ? "1 marca sin guardar"
                   : `${cantidadPendiente} marcas sin guardar`}{" "}
