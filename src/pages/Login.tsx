@@ -173,7 +173,10 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Seccion Accesos Rapidos Demo */}
+          {/* Accesos rápidos: solo mientras se desarrolla. En el sitio publicado
+              mostrarían los correos de todas las cuentas del sistema, que es
+              justo lo que un desconocido necesita para empezar a probar. */}
+          {import.meta.env.DEV && (
           <div className="pt-2 border-t border-slate-800/80">
             <p className="text-xs text-slate-400 text-center mb-3 font-medium">
               ⚡ Accesos Rápidos de Prueba / Demo:
@@ -217,13 +220,13 @@ export default function LoginPage() {
               </Button>
             </div>
           </div>
+          )}
 
+          {/* Las cuentas las crea un administrador desde la pantalla de
+              Usuarios: no hay registro abierto al público. */}
           <div className="text-center pt-2">
             <p className="text-xs text-slate-500">
-              ¿No tienes una cuenta aún?{" "}
-              <Link to="/auth/sign-up" className="text-teal-400 hover:text-teal-300 font-semibold underline underline-offset-4">
-                Registra un usuario
-              </Link>
+              ¿No tiene cuenta? Solicítela al administrador de la clínica.
             </p>
           </div>
         </CardContent>

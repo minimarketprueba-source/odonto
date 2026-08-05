@@ -26,8 +26,6 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
 // Lazy load de páginas para mejor rendimiento
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Login = lazy(() => import('./pages/Login'))
-const SignUp = lazy(() => import('./pages/SignUp'))
-const SignUpSuccess = lazy(() => import('./pages/SignUpSuccess'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
@@ -98,8 +96,14 @@ function App() {
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/login" element={<AuthRedirect><Login /></AuthRedirect>} />
-          <Route path="/auth/sign-up" element={<AuthRedirect><SignUp /></AuthRedirect>} />
-          <Route path="/auth/sign-up-success" element={<AuthRedirect><SignUpSuccess /></AuthRedirect>} />
+          {/* Sin registro abierto: las cuentas de la clínica las crea un
+              administrador desde la pantalla de Usuarios. Entrar a estas
+              direcciones a mano lleva al login.
+              OJO: esto cierra la puerta de la app, no la de Supabase. El
+              cierre de verdad es apagar "Allow new users to sign up" en el
+              panel, porque la anon key es pública. */}
+          <Route path="/auth/sign-up" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/auth/sign-up-success" element={<Navigate to="/auth/login" replace />} />
           <Route path="/auth/forgot-password" element={<AuthRedirect><ForgotPassword /></AuthRedirect>} />
           <Route path="/auth/reset-password" element={<AuthRedirect><ResetPassword /></AuthRedirect>} />
           <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
