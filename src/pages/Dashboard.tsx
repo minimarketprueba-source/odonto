@@ -44,7 +44,7 @@ function getSaludoInfo() {
     return { texto: "Buenos días", icon: Sun, color: "text-blue-500" };
   }
   if (h < 19) {
-    return { texto: "Buenas tardes", icon: SunMedium, color: "text-orange-500" };
+    return { texto: "Buenas tardes", icon: SunMedium, color: "text-blue-500" };
   }
   return { texto: "Buenas noches", icon: Moon, color: "text-indigo-400" };
 }
@@ -174,7 +174,7 @@ export default function Dashboard() {
                 <CardDescription>
                   {misCitasHoy.length === 0
                     ? "No hay citas registradas para la fecha de hoy."
-                    : `${misAtendidas.length} de ${misCitasHoy.length} pacientes atendidos (${progressPercentage}% completado)`}
+                    : `${misAtendidas.length} de ${misCitasHoy.length} pacientes atendidos · ${misPendientes.length} por atender`}
                 </CardDescription>
               </div>
               <Badge variant="outline" className="bg-background text-xs font-semibold px-3 py-1">
@@ -196,7 +196,7 @@ export default function Dashboard() {
                     <div className="flex items-center space-x-2 truncate">
                       <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                       <span className="font-semibold text-foreground truncate">
-                        {c.hora} — {c.pacientes?.apellidos}, {c.pacientes?.nombres}
+                        {c.hora} — {c.paciente?.apellidos}, {c.paciente?.nombres}
                       </span>
                     </div>
                     <Badge

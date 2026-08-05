@@ -196,7 +196,7 @@ export function PacienteForm({
           </div>
 
           {duplicado && (
-            <div className="sm:col-span-2 flex items-start gap-2 p-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-sm text-amber-800 dark:text-amber-200">
+            <div className="sm:col-span-2 flex items-start gap-2 p-2 rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/40 text-sm text-blue-800 dark:text-blue-200">
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>
                 Esa cédula ya está registrada a nombre de{" "}

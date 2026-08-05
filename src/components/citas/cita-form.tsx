@@ -309,7 +309,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
                 {/* Un odontólogo cuya ficha no está vinculada a su cuenta no se
                     ve a sí mismo precargado y no tiene forma de saber por qué. */}
                 {role === "medico" && !miMedico && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     Su cuenta todavía no está vinculada a una ficha profesional, por eso
                     no aparece su nombre. Pídale a un administrador que la vincule en
                     Mantenimiento → Médicos.
@@ -381,7 +381,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
             </div>
           )}
           {!disponibilidad?.ausencia && disponibilidad?.fueraDeHorario && (
-            <div className="flex items-start gap-2 p-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-sm text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 p-2 rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/40 text-sm text-blue-700 dark:text-blue-300">
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>Esa fecha/hora cae fuera del horario de atención del profesional. Puede agendar igual, pero verifique.</span>
             </div>

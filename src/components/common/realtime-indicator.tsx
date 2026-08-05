@@ -11,10 +11,10 @@ export function RealtimeIndicator({ isConnected, className = "" }: RealtimeIndic
     return (
       <Badge
         variant="outline"
-        className={`gap-1.5 py-0.5 px-2 text-[11px] font-normal border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 ${className}`}
+        className={`gap-1.5 py-0.5 px-2 text-[11px] font-normal border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 ${className}`}
         title="Estableciendo conexión en tiempo real..."
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
         <span>Sincronizando...</span>
       </Badge>
     );
