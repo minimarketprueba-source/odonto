@@ -942,39 +942,42 @@ export default function FichaPaciente() {
                             </p>
                           ) : (
                             <div className="border rounded-xl overflow-hidden bg-card text-xs">
-                              <table className="w-full text-left">
-                                <thead className="bg-muted/50 border-b">
+                              <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-100/80 dark:bg-slate-800/80 border-b text-muted-foreground">
                                   <tr>
-                                    <th className="p-2 font-semibold">Diente</th>
-                                    <th className="p-2 font-semibold">Tratamiento</th>
-                                    <th className="p-2 font-semibold text-right">Costo</th>
-                                    <th className="p-2 font-semibold text-right">Desct.</th>
-                                    <th className="p-2 font-semibold text-right">Total</th>
-                                    <th className="p-2 font-semibold text-center">Acción</th>
+                                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-center">Diente</th>
+                                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px]">Tratamiento</th>
+                                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Costo</th>
+                                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Desct.</th>
+                                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Total</th>
+                                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-center">Acción</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y">
+                                <tbody className="divide-y divide-border/60">
                                   {detalles.map((d) => (
-                                    <tr key={d.id}>
-                                      <td className="p-2 font-medium">
+                                    <tr key={d.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors">
+                                      <td className="p-2.5 font-medium text-center whitespace-nowrap">
                                         {d.pieza ? `${d.pieza} (${d.cara || "Completo"})` : "Boca entera"}
                                       </td>
-                                      <td className="p-2">{d.odontologia_precios?.nombre}</td>
-                                      <td className="p-2 text-right">{d.costo.toLocaleString()} ₲</td>
-                                      <td className="p-2 text-right text-destructive">-{d.descuento.toLocaleString()} ₲</td>
-                                      <td className="p-2 text-right font-bold">
-                                        {(d.costo - d.descuento).toLocaleString()} ₲
+                                      <td className="p-2.5 font-medium text-foreground">{d.odontologia_precios?.nombre}</td>
+                                      <td className="p-2.5 text-right whitespace-nowrap tabular-nums">{d.costo.toLocaleString("es-PY")} ₲</td>
+                                      <td className="p-2.5 text-right text-destructive whitespace-nowrap tabular-nums">-{d.descuento.toLocaleString("es-PY")} ₲</td>
+                                      <td className="p-2.5 text-right font-bold whitespace-nowrap tabular-nums text-foreground">
+                                        {(d.costo - d.descuento).toLocaleString("es-PY")} ₲
                                       </td>
-                                      <td className="p-2 text-center">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 text-destructive"
-                                          onClick={() => removeDetalle.mutate({ id: d.id, presupuestoId: d.presupuesto_id })}
-                                          disabled={removeDetalle.isPending}
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
+                                      <td className="p-2.5 text-center">
+                                        <div className="flex justify-center">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                                            onClick={() => removeDetalle.mutate({ id: d.id, presupuestoId: d.presupuesto_id })}
+                                            disabled={removeDetalle.isPending}
+                                            title="Eliminar tratamiento"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </div>
                                       </td>
                                     </tr>
                                   ))}
@@ -1122,33 +1125,38 @@ export default function FichaPaciente() {
                           <p className="text-xs text-center text-muted-foreground py-4 italic">No se han registrado abonos todavía.</p>
                         ) : (
                           <div className="border rounded-xl overflow-hidden text-xs">
-                            <table className="w-full text-left">
-                              <thead className="bg-muted/50 border-b">
+                            <table className="w-full text-left border-collapse">
+                              <thead className="bg-slate-100/80 dark:bg-slate-800/80 border-b text-muted-foreground">
                                 <tr>
-                                  <th className="p-2 font-semibold">Fecha</th>
-                                  <th className="p-2 font-semibold">Método</th>
-                                  <th className="p-2 font-semibold">Comentario</th>
-                                  <th className="p-2 font-semibold text-right">Monto</th>
-                                  <th className="p-2 font-semibold text-right">Acción</th>
+                                  <th className="p-2.5 font-bold uppercase tracking-wider text-[10px]">Fecha</th>
+                                  <th className="p-2.5 font-bold uppercase tracking-wider text-[10px]">Método</th>
+                                  <th className="p-2.5 font-bold uppercase tracking-wider text-[10px]">Comentario</th>
+                                  <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Monto</th>
+                                  <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-center">Acción</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y bg-card">
+                              <tbody className="divide-y divide-border/60 bg-card">
                                 {pagos.map((pa) => (
-                                  <tr key={pa.id}>
-                                    <td className="p-2">{new Date(pa.fecha).toLocaleDateString("es-ES")}</td>
-                                    <td className="p-2 capitalize">{pa.tipo_pago}</td>
-                                    <td className="p-2 text-muted-foreground italic">{pa.comentario || "Sin observaciones"}</td>
-                                    <td className="p-2 text-right font-bold text-emerald-600">+{pa.monto.toLocaleString()} ₲</td>
-                                    <td className="p-2 text-right">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-destructive hover:bg-red-50"
-                                        onClick={() => handleDeletePayment(pa.id)}
-                                        disabled={deletePago.isPending}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </Button>
+                                  <tr key={pa.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors">
+                                    <td className="p-2.5 whitespace-nowrap">{new Date(pa.fecha).toLocaleDateString("es-PY")}</td>
+                                    <td className="p-2.5 capitalize font-medium">{pa.tipo_pago}</td>
+                                    <td className="p-2.5 text-muted-foreground italic">{pa.comentario || "Sin observaciones"}</td>
+                                    <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap tabular-nums">
+                                      +{pa.monto.toLocaleString("es-PY")} ₲
+                                    </td>
+                                    <td className="p-2.5 text-center">
+                                      <div className="flex justify-center">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                                          onClick={() => handleDeletePayment(pa.id)}
+                                          disabled={deletePago.isPending}
+                                          title="Borrar abono"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}

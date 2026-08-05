@@ -374,56 +374,73 @@ export default function Presupuestos() {
                     </CardTitle>
                     <CardDescription>Lista completa de tratamientos dentales cotizados.</CardDescription>
                   </CardHeader>
-                  <CardContent className="p-0">
+                  <CardContent className="p-0 overflow-hidden">
                     {loadingPrecios ? (
                       <div className="text-center py-12 text-muted-foreground">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
                         <p className="text-xs">Cargando tarifario...</p>
                       </div>
                     ) : precios.length === 0 ? (
                       <p className="text-xs text-center py-8 text-muted-foreground italic">No hay aranceles cargados.</p>
                     ) : (
                       <div className="overflow-x-auto text-xs">
-                        <table className="w-full text-left">
-                          <thead className="bg-muted border-b">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-slate-100/80 dark:bg-slate-800/80 border-b border-border/80 text-muted-foreground">
                             <tr>
-                              <th className="p-3 font-semibold">Código</th>
-                              <th className="p-3 font-semibold">Procedimiento</th>
-                              <th className="p-3 font-semibold text-right">Precio Base</th>
-                              <th className="p-3 font-semibold text-center">Estado</th>
-                              <th className="p-3 font-semibold text-center">Acciones</th>
+                              <th className="p-3 text-center font-bold uppercase tracking-wider text-[10px]">Código</th>
+                              <th className="p-3 text-left font-bold uppercase tracking-wider text-[10px]">Procedimiento</th>
+                              <th className="p-3 text-right font-bold uppercase tracking-wider text-[10px] whitespace-nowrap">Precio Base</th>
+                              <th className="p-3 text-center font-bold uppercase tracking-wider text-[10px]">Estado</th>
+                              <th className="p-3 text-center font-bold uppercase tracking-wider text-[10px]">Acciones</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y bg-card">
+                          <tbody className="divide-y divide-border/60 bg-card">
                             {precios.map((pr) => (
-                              <tr key={pr.id} className={!pr.activo ? "opacity-50" : ""}>
-                                <td className="p-3 font-bold">{pr.codigo}</td>
-                                <td className="p-3">{pr.nombre}</td>
-                                <td className="p-3 text-right font-bold text-slate-700 dark:text-slate-300">
-                                  {pr.costo.toLocaleString()} ₲
+                              <tr
+                                key={pr.id}
+                                className={`transition-colors hover:bg-primary/5 even:bg-slate-50/50 dark:even:bg-slate-900/30 ${
+                                  !pr.activo ? "opacity-50 bg-slate-100/50 dark:bg-slate-900/50" : ""
+                                }`}
+                              >
+                                <td className="p-3 text-center font-bold font-mono text-foreground">{pr.codigo}</td>
+                                <td className="p-3 font-medium text-foreground">{pr.nombre}</td>
+                                <td className="p-3 text-right font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap tabular-nums">
+                                  {pr.costo.toLocaleString("es-PY")} ₲
                                 </td>
                                 <td className="p-3 text-center">
-                                  <Badge className={pr.activo ? "bg-emerald-100 text-emerald-800 border-0" : "bg-red-100 text-red-800 border-0"}>
+                                  <Badge
+                                    className={
+                                      pr.activo
+                                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 shadow-none"
+                                        : "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/20 shadow-none"
+                                    }
+                                  >
                                     {pr.activo ? "Activo" : "Inactivo"}
                                   </Badge>
                                 </td>
-                                <td className="p-3 text-center flex justify-center gap-1.5">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-primary"
-                                    onClick={() => handleEditPrecioClick(pr)}
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`h-7 w-7 ${pr.activo ? "text-destructive" : "text-emerald-600"}`}
-                                    onClick={() => handleTogglePrecioActivo(pr)}
-                                  >
-                                    <Bookmark className="w-3.5 h-3.5" />
-                                  </Button>
+                                <td className="p-3 text-center">
+                                  <div className="flex justify-center items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-primary hover:bg-primary/10"
+                                      onClick={() => handleEditPrecioClick(pr)}
+                                      title="Editar precio"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={`h-7 w-7 ${
+                                        pr.activo ? "text-destructive hover:bg-destructive/10" : "text-emerald-600 hover:bg-emerald-50"
+                                      }`}
+                                      onClick={() => handleTogglePrecioActivo(pr)}
+                                      title={pr.activo ? "Desactivar arancel" : "Reactivar arancel"}
+                                    >
+                                      <Bookmark className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
