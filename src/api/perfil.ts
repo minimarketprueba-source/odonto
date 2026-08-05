@@ -104,7 +104,8 @@ export async function guardarPerfilPropio(
   // Sin la columna del teléfono se guarda el resto igual: un dato de contacto
   // no debe impedir que se guarde el nombre con el que se firman documentos.
   if (error && esColumnaFaltante(error, "telefono")) {
-    const { telefono: _descartado, ...sinTelefono } = completo;
+    const sinTelefono = { ...completo };
+    delete sinTelefono.telefono;
     ({ error } = await supabase.from("profiles").update(sinTelefono).eq("id", userId));
   }
 
