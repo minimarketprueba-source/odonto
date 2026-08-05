@@ -31,6 +31,7 @@ import {
   useOdontoPrecios,
   uploadImagenFile
 } from "@/api/odontologia";
+import { Combobox } from "@/components/ui/combobox";
 import { Odontograma } from "@/components/odontograma/Odontograma";
 import { EvolucionClinica } from "@/components/pacientes/EvolucionClinica";
 import { Periodontograma } from "@/components/pacientes/Periodontograma";
@@ -987,27 +988,32 @@ export default function FichaPaciente() {
                         <form onSubmit={handleAddProcedure} className="p-3 border rounded-xl bg-slate-50 dark:bg-slate-900/20 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                           <div className="space-y-1 sm:col-span-2">
                             <Label htmlFor="add_tratamiento" className="text-[10px] uppercase font-bold text-muted-foreground">Procedimiento</Label>
-                            <Select
+                            {/* Con más de treinta tratamientos, una lista sin
+                                buscador obliga a recorrerla entera con el dedo
+                                cada vez. Se escribe "blanq" y quedan los tres. */}
+                            <Combobox
+                              id="add_tratamiento"
+                              className="h-9 bg-background"
                               value={selTratamientoId}
-                              onValueChange={(valor) => {
+                              onChange={(valor) => {
                                 setSelTratamientoId(valor);
                                 // Se propone el precio de la tarifa; queda editable
                                 // para cobrar distinto según el caso.
                                 const tarifa = precios.find((p) => String(p.id) === String(valor));
                                 setSelCosto(tarifa ? String(tarifa.costo) : "");
                               }}
-                            >
-                              <SelectTrigger id="add_tratamiento" className="h-8 bg-background">
-                                <SelectValue placeholder="Seleccione..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {precios.map((pr) => (
-                                  <SelectItem key={pr.id} value={String(pr.id)}>
-                                    {pr.nombre} ({pr.costo.toLocaleString()} ₲)
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              placeholder="Buscar tratamiento..."
+                              buscarPlaceholder="Escriba parte del nombre o el código"
+                              vacioTexto="Ningún tratamiento coincide"
+                              opciones={precios.map((pr) => ({
+                                value: String(pr.id),
+                                label: pr.nombre,
+                                detalle: `${pr.costo.toLocaleString("es-PY")} ₲`,
+                                // El código no se muestra, pero sirve para buscar
+                                // "BLA" o "EXT" y llegar directo al grupo.
+                                buscarPor: pr.codigo,
+                              }))}
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor="add_pieza" className="text-[10px] uppercase font-bold text-muted-foreground">Diente/Cara</Label>
