@@ -25,7 +25,10 @@ interface PreconsultaDialogProps {
 }
 
 /**
- * Signos vitales que enfermería toma mientras el paciente espera al médico.
+ * Signos vitales que se toman mientras el paciente espera para ser atendido.
+ *
+ * En odontología importan sobre todo antes de anestesiar: una presión alta o
+ * una taquicardia cambian la conducta del profesional.
  * Quedan en la cita y el médico los ve al registrar la consulta.
  */
 export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialogProps) {
@@ -42,7 +45,9 @@ export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialo
   const [peso, setPeso] = useState("");
   const [talla, setTalla] = useState("");
   const [nota, setNota] = useState("");
-  const [enfermero, setEnfermero] = useState("");
+  /** Quién tomó los signos. La columna de la base se llama
+   *  `preconsulta_enfermero` por herencia del sistema anterior. */
+  const [tomadoPor, setTomadoPor] = useState("");
 
   useEffect(() => {
     if (!open || !cita) return;
@@ -56,12 +61,12 @@ export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialo
     setPeso(vacio(cita.peso_kg));
     setTalla(vacio(cita.talla_cm));
     setNota(cita.preconsulta_nota ?? "");
-    setEnfermero(cita.preconsulta_enfermero || perfilProf?.nombre || "");
+    setTomadoPor(cita.preconsulta_enfermero || perfilProf?.nombre || "");
   }, [open, cita, perfilProf?.nombre]);
 
   const handleGuardar = async () => {
     if (!cita) return;
-    if (!enfermero.trim()) {
+    if (!tomadoPor.trim()) {
       await showSwalError("Indique quién tomó los signos vitales.");
       return;
     }
@@ -86,7 +91,7 @@ export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialo
     try {
       await guardar.mutateAsync({
         cita_id: cita.id,
-        enfermero: sanitizePlainText(enfermero) || null,
+        enfermero: sanitizePlainText(tomadoPor) || null,
         nota: sanitizeMultilineText(nota) || null,
         pa_sistolica: enteroSignoONull(paSistolica),
         pa_diastolica: enteroSignoONull(paDiastolica),
@@ -117,8 +122,8 @@ export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialo
             Signos vitales antes de la consulta
           </DialogTitle>
           <DialogDescription>
-            {paciente} — {cita?.hora?.slice(0, 5)} hs. Los toma enfermería mientras espera;
-            el médico los ve al registrar la consulta.
+            {paciente} — {cita?.hora?.slice(0, 5)} hs. Se toman mientras el paciente espera;
+            el odontólogo los ve al atenderlo.
           </DialogDescription>
         </DialogHeader>
 
@@ -174,9 +179,9 @@ export function PreconsultaDialog({ open, onOpenChange, cita }: PreconsultaDialo
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="pc-enfermero" className="font-semibold text-sm">Tomados por *</Label>
-            <Input id="pc-enfermero" className="h-10" placeholder="Nombre y apellido"
-              value={enfermero} onChange={(e) => setEnfermero(e.target.value)} />
+            <Label htmlFor="pc-tomado-por" className="font-semibold text-sm">Tomados por *</Label>
+            <Input id="pc-tomado-por" className="h-10" placeholder="Nombre y apellido"
+              value={tomadoPor} onChange={(e) => setTomadoPor(e.target.value)} />
           </div>
         </div>
 

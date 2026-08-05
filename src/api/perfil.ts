@@ -1,7 +1,7 @@
 // ============================================================================
 // Capa de datos: nombre real de la cuenta logueada
 // ============================================================================
-// Para prellenar "quién atiende" en los formularios de enfermería con el
+// Para prellenar "quién atiende" en los formularios con el
 // nombre y apellido de la persona (tabla `profiles`), en vez del usuario de
 // la cuenta ("llopez"). Es solo un prellenado: el campo queda editable porque
 // en una computadora compartida puede atender alguien con otra sesión abierta.
@@ -44,7 +44,7 @@ export async function fetchPerfilProfesional(userId: string): Promise<PerfilProf
     };
   }
 
-  // 2) El perfil de la cuenta (enfermería y admin lo cargan desde Mi perfil).
+  // 2) El perfil de la cuenta (recepción, asistentes y admin lo cargan desde Mi perfil).
   //    registro_profesional llega con SQL_Registro_Profesional.txt: si esa
   //    migración falta, se reintenta sin la columna para no perder el nombre.
   const { data, error } = await supabase

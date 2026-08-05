@@ -153,7 +153,7 @@ export default function PerfilUsuario() {
   const esAdmin = role === "admin" || role === "superadmin" || role === "super_admin";
 
   const rolLabel =
-    role === "admin" ? "Administrador" : role === "medico" ? "Profesional de salud" : role === "recepcion" ? "Recepción / Enfermería" : role ?? "—";
+    role === "admin" ? "Administrador" : role === "medico" ? "Odontólogo" : role === "recepcion" ? "Recepción" : role === "enfermeria" ? "Asistente dental" : role ?? "—";
 
   return (
     <AppLayout>

@@ -148,7 +148,6 @@ export default function Reportes() {
   // Nombre de especialidad seleccionada
   const especialidadSeleccionadaNombre = useMemo(() => {
     if (prodEspecialidadId === "todas") return "Todas las Especialidades";
-    if (prodEspecialidadId === "enfermeria") return "Enfermería";
     const esp = especialidades.find((e) => String(e.id) === prodEspecialidadId);
     return esp?.nombre || "Especialidad Externa";
   }, [prodEspecialidadId, especialidades]);

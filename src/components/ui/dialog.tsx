@@ -49,7 +49,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 /**
  * Los avisos de SweetAlert2 se dibujan en el `body`, FUERA del árbol del
  * diálogo. Sin esto, Radix tomaba el clic en «Aceptar» del aviso como un clic
- * afuera y cerraba el modal entero: la enfermera leía "revise los signos
+ * afuera y cerraba el modal entero: se leía "revise los signos
  * vitales" y el formulario desaparecía con todo lo que había cargado.
  * Ninguna interacción nacida dentro de un aviso debe cerrar lo que está debajo.
  */

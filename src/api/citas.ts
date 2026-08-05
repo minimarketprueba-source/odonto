@@ -44,7 +44,7 @@ export interface Cita {
   agendado_por: string | null; // email de quien agendó (registro estilo PY HIS)
   admitida_at: string | null; // cuándo llegó el paciente (check-in)
   orden_llegada: number | null; // nº de orden del día para el médico
-  // Preconsulta: signos vitales que toma enfermería mientras el paciente
+  // Preconsulta: signos vitales que se toman mientras el paciente
   // espera al médico. Todos opcionales (migración SQL_Preconsulta.txt).
   pa_sistolica?: number | null;
   pa_diastolica?: number | null;
@@ -201,7 +201,7 @@ export function faltaMigracionPreconsulta(error?: { code?: string; message?: str
 }
 
 /**
- * Guarda los signos vitales que enfermería tomó antes de la consulta.
+ * Guarda los signos vitales tomados antes de la atención.
  * Quedan en la propia cita: el médico los ve al atender, sin volver a
  * preguntarlos ni abrir una ficha de urgencias.
  */
@@ -232,7 +232,7 @@ export async function guardarPreconsulta(input: PreconsultaInput): Promise<void>
   }
 }
 
-/** True si la cita ya tiene signos vitales cargados por enfermería. */
+/** True si la cita ya tiene los signos vitales cargados. */
 export function tienePreconsulta(c: Cita): boolean {
   return !!(c.preconsulta_at || c.pa_sistolica || c.fc || c.temp || c.spo2 || c.fr);
 }
