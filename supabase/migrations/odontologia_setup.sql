@@ -146,17 +146,22 @@ CREATE POLICY consentimientos_paciente_all ON public.consentimientos_paciente FO
 INSERT INTO public.odontologia_precios (codigo, nombre, costo) VALUES
 ('CONS-01', 'Consulta Diagnóstica y Presupuesto', 50000.00),
 ('LIM-02', 'Limpieza Dental (Profilaxis)', 150000.00),
-('EMP-03', 'Empaste Simple (Resina)', 180000.00),
-('EMP-04', 'Empaste Complejo', 250000.00),
-('ENDO-05', 'Endodoncia Unirradicular', 450000.00),
-('ENDO-06', 'Endodoncia Multirradicular', 700000.00),
+('EMP-03', 'Empaste Simple (Resina)', 250000.00),
+('EMP-04', 'Empaste Complejo', 400000.00),
+('ENDO-05', 'Endodoncia Unirradicular', 900000.00),
+('ENDO-06', 'Endodoncia Multirradicular', 1500000.00),
 ('EXT-07', 'Extracción Simple', 120000.00),
 ('EXT-08', 'Extracción de Tercer Molar (Cirugía)', 350000.00),
-('COR-09', 'Corona de Metal-Porcelana', 1200000.00),
-('COR-10', 'Corona de Zirconio', 1800000.00),
+('COR-09', 'Corona de Metal-Porcelana', 1850000.00),
+('COR-10', 'Corona de Zirconio', 2500000.00),
 ('IMP-11', 'Implante Dental (Fase Quirúrgica)', 3500000.00),
-('IMP-12', 'Perno sobre Implante y Corona', 2000000.00)
-ON CONFLICT (codigo) DO UPDATE SET costo = EXCLUDED.costo;
+('IMP-12', 'Perno sobre Implante y Corona', 2000000.00),
+('RAD-13', 'Radiografía Periapical', 80000.00),
+('CIR-14', 'Cirugía Compleja', 350000.00),
+('ORT-15', 'Ortodoncia Mantenimiento', 250000.00),
+('ORT-16', 'Cementado de Brackets', 150000.00),
+('EXT-17', 'Extracción Simple Temporario', 180000.00)
+ON CONFLICT (codigo) DO UPDATE SET costo = EXCLUDED.costo, nombre = EXCLUDED.nombre;
 
 -- Trigger y Función para actualizar el saldo pendiente del presupuesto cuando hay pagos
 CREATE OR REPLACE FUNCTION public.fn_actualizar_saldo_presupuesto()
