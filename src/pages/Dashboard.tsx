@@ -41,7 +41,7 @@ import { usePresupuestos } from "@/api/odontologia";
 function getSaludoInfo() {
   const h = new Date().getHours();
   if (h < 12) {
-    return { texto: "Buenos días", icon: Sun, color: "text-amber-500" };
+    return { texto: "Buenos días", icon: Sun, color: "text-blue-500" };
   }
   if (h < 19) {
     return { texto: "Buenas tardes", icon: SunMedium, color: "text-orange-500" };
@@ -205,7 +205,7 @@ export default function Dashboard() {
                           ? "bg-emerald-100 text-emerald-800 border-0 flex-shrink-0 text-[10px]"
                           : c.estado === "cancelada"
                             ? "bg-red-100 text-red-800 border-0 flex-shrink-0 text-[10px]"
-                            : "bg-amber-100 text-amber-800 border-0 flex-shrink-0 text-[10px]"
+                            : "bg-blue-100 text-blue-800 border-0 flex-shrink-0 text-[10px]"
                       }
                     >
                       {c.estado}
@@ -315,7 +315,7 @@ export default function Dashboard() {
                               c.estado === "atendida"
                                 ? "bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/20"
                                 : c.estado === "admitida"
-                                  ? "bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/20"
+                                  ? "bg-blue-50 border border-blue-200 text-blue-800 dark:bg-blue-950/20"
                                   : "bg-slate-50 border border-slate-200 text-slate-800"
                             }
                           >

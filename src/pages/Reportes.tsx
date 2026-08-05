@@ -496,18 +496,18 @@ export default function Reportes() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-2xl border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 shadow-sm">
+              <Card className="rounded-2xl border-indigo-200 dark:border-indigo-800/50 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Por cobrar</p>
-                    <h3 className="text-2xl font-extrabold text-amber-700 dark:text-amber-300 mt-1 tabular-nums">
+                    <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Por cobrar</p>
+                    <h3 className="text-2xl font-extrabold text-indigo-700 dark:text-indigo-300 mt-1 tabular-nums">
                       {facturacion.pendiente.toLocaleString("es-PY")} ₲
                     </h3>
-                    <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 font-semibold mt-0.5">
+                    <p className="text-[11px] text-indigo-700/80 dark:text-indigo-400/80 font-semibold mt-0.5">
                       Saldo de {facturacion.planes} plan{facturacion.planes === 1 ? "" : "es"} del período
                     </p>
                   </div>
-                  <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-600">
+                  <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-600">
                     <Coins className="w-6 h-6" />
                   </div>
                 </CardContent>

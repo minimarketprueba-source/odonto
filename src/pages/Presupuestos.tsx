@@ -185,12 +185,12 @@ export default function Presupuestos() {
                   </p>
                   <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/70">Ya entró a la clínica</p>
                 </Card>
-                <Card className="p-3 bg-amber-50/60 dark:bg-amber-950/20 border-amber-200">
-                  <p className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400">Por cobrar</p>
-                  <p className="text-lg font-extrabold text-amber-700 dark:text-amber-300 tabular-nums">
+                <Card className="p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/50">
+                  <p className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-400">Por cobrar</p>
+                  <p className="text-lg font-extrabold text-indigo-700 dark:text-indigo-300 tabular-nums">
                     {totales.porCobrar.toLocaleString("es-PY")} ₲
                   </p>
-                  <p className="text-[11px] text-amber-700/70 dark:text-amber-400/70">
+                  <p className="text-[11px] text-indigo-700/70 dark:text-indigo-400/70">
                     {totales.deudores} paciente{totales.deudores === 1 ? "" : "s"} con saldo
                   </p>
                 </Card>
