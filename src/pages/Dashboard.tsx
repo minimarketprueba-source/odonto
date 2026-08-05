@@ -60,17 +60,9 @@ function getFechaFormateada(): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function formatMontoGrafico(val: number): string {
+function formatMontoCompleto(val: number): string {
   if (!val || val === 0) return "0 ₲";
-  if (val >= 1_000_000) {
-    const m = val / 1_000_000;
-    return `${Number.isInteger(m) ? m : m.toFixed(1)}M ₲`;
-  }
-  if (val >= 1_000) {
-    const k = val / 1_000;
-    return `${Number.isInteger(k) ? k : Math.round(k)}k ₲`;
-  }
-  return `${val} ₲`;
+  return `${val.toLocaleString("es-PY")} ₲`;
 }
 
 export default function Dashboard() {
@@ -379,11 +371,11 @@ export default function Dashboard() {
                           axisLine={{ stroke: "hsl(var(--border))" }}
                         />
                         <YAxis
-                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11, fontWeight: 500 }}
                           tickLine={false}
                           axisLine={{ stroke: "hsl(var(--border))" }}
-                          width={75}
-                          tickFormatter={formatMontoGrafico}
+                          width={110}
+                          tickFormatter={formatMontoCompleto}
                         />
                         <Tooltip
                           contentStyle={{
@@ -393,6 +385,7 @@ export default function Dashboard() {
                             color: "hsl(var(--card-foreground))",
                             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
                             fontSize: "12px",
+                            fontWeight: 600,
                           }}
                           itemStyle={{ color: "hsl(var(--foreground))" }}
                           formatter={(value: any, name: any) => [`${Number(value).toLocaleString("es-PY")} ₲`, name]}
@@ -404,8 +397,8 @@ export default function Dashboard() {
                             color: "hsl(var(--muted-foreground))",
                           }}
                         />
-                        <Bar dataKey="Facturado" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-                        <Bar dataKey="Cobrado" fill="#10b981" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="Facturado" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={65} />
+                        <Bar dataKey="Cobrado" fill="#059669" radius={[6, 6, 0, 0]} maxBarSize={65} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
