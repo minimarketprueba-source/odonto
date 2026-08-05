@@ -23,6 +23,7 @@ import {
   usePagosPresupuesto,
   usePagosPaciente,
   useAddPagoPresupuesto,
+  useDeletePagoPresupuesto,
   usePacienteImagenes,
   useCreatePacienteImagen,
   useConsentimientos,
@@ -102,6 +103,7 @@ export default function FichaPaciente() {
   const addDetalle = useAddPresupuestoDetalle();
   const removeDetalle = useDeletePresupuestoDetalle();
   const addPago = useAddPagoPresupuesto();
+  const deletePago = useDeletePagoPresupuesto();
 
   // Images state
   const { data: imagenes = [] } = usePacienteImagenes(pacienteId);
@@ -253,6 +255,26 @@ export default function FichaPaciente() {
           setActivePresupuestoId(null);
         }
         toast.success("Presupuesto eliminado.");
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+    }
+  };
+
+  const handleDeletePayment = async (idPago: number) => {
+    const confirm = await Swal.fire({
+      title: "¿Borrar pago?",
+      text: "El saldo pendiente volverá a subir.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, borrar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (confirm.isConfirmed) {
+      try {
+        await deletePago.mutateAsync(idPago);
+        toast.success("Pago eliminado.");
       } catch (err) {
         toast.error((err as Error).message);
       }
@@ -958,35 +980,25 @@ export default function FichaPaciente() {
                               />
                             </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="add_costo" className="text-[10px] uppercase font-bold text-muted-foreground">
-                              Importe (₲)
-                            </Label>
+                          <div className="flex gap-1">
                             <Input
-                              id="add_costo"
-                              placeholder="0"
-                              className="h-8 bg-background font-semibold"
-                              type="number"
-                              min="0"
+                              placeholder="Precio (opcional)"
+                              type="text"
+                              inputMode="numeric"
+                              className="h-8 w-28 bg-background"
                               value={selCosto}
-                              onChange={(e) => setSelCosto(e.target.value)}
+                              onChange={(e) => setSelCosto(e.target.value.replace(/\D/g, ""))}
                             />
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="add_descuento" className="text-[10px] uppercase font-bold text-muted-foreground">Descuento (₲)</Label>
-                            <div className="flex gap-1">
-                              <Input
-                                id="add_descuento"
-                                placeholder="0"
-                                className="h-8 bg-background flex-1"
-                                type="number"
-                                min="0"
-                                value={selDescuento}
-                                onChange={(e) => setSelDescuento(e.target.value)}
-                              />
-                              <Button type="submit" size="icon" className="h-8 w-8 flex-shrink-0" disabled={addDetalle.isPending}>
+                            <Input
+                              placeholder="Desc. ₲"
+                              type="text"
+                              inputMode="numeric"
+                              className="h-8 w-24 bg-background"
+                              value={selDescuento}
+                              onChange={(e) => setSelDescuento(e.target.value.replace(/\D/g, ""))}
+                            />
+                            <Button type="submit" size="icon" className="h-8 w-8 flex-shrink-0" disabled={addDetalle.isPending}>
                                 <Plus className="w-4 h-4" />
-                              </Button>
                             </div>
                           </div>
                         </form>
@@ -1043,6 +1055,7 @@ export default function FichaPaciente() {
                                   <th className="p-2 font-semibold">Método</th>
                                   <th className="p-2 font-semibold">Comentario</th>
                                   <th className="p-2 font-semibold text-right">Monto</th>
+                                  <th className="p-2 font-semibold text-right">Acción</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y bg-card">
@@ -1052,6 +1065,17 @@ export default function FichaPaciente() {
                                     <td className="p-2 capitalize">{pa.tipo_pago}</td>
                                     <td className="p-2 text-muted-foreground italic">{pa.comentario || "Sin observaciones"}</td>
                                     <td className="p-2 text-right font-bold text-emerald-600">+{pa.monto.toLocaleString()} ₲</td>
+                                    <td className="p-2 text-right">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-destructive hover:bg-red-50"
+                                        onClick={() => handleDeletePayment(pa.id)}
+                                        disabled={deletePago.isPending}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1067,10 +1091,11 @@ export default function FichaPaciente() {
                               id="pago_monto"
                               placeholder="Monto"
                               className="h-8 bg-background"
-                              type="number"
+                              type="text"
+                              inputMode="numeric"
                               required
                               value={pagoMonto}
-                              onChange={(e) => setPagoMonto(e.target.value)}
+                              onChange={(e) => setPagoMonto(e.target.value.replace(/\D/g, ""))}
                             />
                           </div>
                           <div className="space-y-1">

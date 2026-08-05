@@ -539,6 +539,19 @@ export function useAddPagoPresupuesto() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: odontoKeys.pagos(data.presupuesto_id) });
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos() });
+      queryClient.invalidateQueries({ queryKey: ["odontologia", "pagos-paciente"] });
+    },
+  });
+}
+
+export function useDeletePagoPresupuesto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deletePagoPresupuesto,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos() });
+      queryClient.invalidateQueries({ queryKey: ["odontologia", "pagos"] });
+      queryClient.invalidateQueries({ queryKey: ["odontologia", "pagos-paciente"] });
     },
   });
 }

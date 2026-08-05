@@ -265,10 +265,11 @@ export default function Presupuestos() {
                         <Input
                           id="pre_costo"
                           placeholder="0"
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           required
                           value={precioCosto}
-                          onChange={(e) => setPrecioCosto(e.target.value)}
+                          onChange={(e) => setPrecioCosto(e.target.value.replace(/\D/g, ""))}
                         />
                       </div>
 
