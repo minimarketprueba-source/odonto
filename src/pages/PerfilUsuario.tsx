@@ -133,13 +133,37 @@ export default function PerfilUsuario() {
     if (miMedico) setTelefono((miMedico as { telefono?: string | null }).telefono ?? "");
   }, [miMedico]);
 
+  /** Los rechazos de Supabase al cambiar la contraseña, en castellano. */
+  const traducirErrorPassword = (mensaje: string): string => {
+    const m = mensaje.toLowerCase();
+    if (m.includes("should be different") || m.includes("same as the old")) {
+      return "La contraseña nueva es igual a la actual. Elija una distinta.";
+    }
+    if (m.includes("at least") || m.includes("too short") || m.includes("length")) {
+      return "La contraseña es demasiado corta. Use al menos 6 caracteres.";
+    }
+    if (m.includes("weak") || m.includes("pwned") || m.includes("compromised")) {
+      return "Esa contraseña es muy común y fácil de adivinar. Elija otra.";
+    }
+    if (m.includes("session") || m.includes("jwt") || m.includes("expired")) {
+      return "Su sesión venció. Vuelva a entrar y pruebe de nuevo.";
+    }
+    if (m.includes("rate") || m.includes("too many")) {
+      return "Demasiados intentos seguidos. Espere un minuto.";
+    }
+    return mensaje;
+  };
+
   const cambiarPassword = async () => {
     if (pass1.length < 6) { await showSwalError("La contraseña nueva debe tener al menos 6 caracteres."); return; }
     if (pass1 !== pass2) { await showSwalError("Las contraseñas no coinciden."); return; }
     setGuardandoPass(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: pass1 });
-      if (error) throw new Error(error.message);
+      // Supabase contesta en inglés, y el rechazo más común —poner la misma
+      // contraseña que ya se tenía— dejaba a la persona sin entender por qué
+      // "no funcionó" el cambio.
+      if (error) throw new Error(traducirErrorPassword(error.message));
       setPass1("");
       setPass2("");
       await showSwalSuccess("Contraseña cambiada correctamente. Úsela desde su próximo ingreso.");
