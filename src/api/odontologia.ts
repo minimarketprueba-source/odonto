@@ -348,6 +348,42 @@ export async function fetchPresupuestoDetalles(presupuestoId: number): Promise<P
   return data || [];
 }
 
+/**
+ * Vuelve a calcular el total y el saldo del plan a partir de sus procedimientos
+ * y sus pagos, y los guarda.
+ *
+ * Hace falta porque `presupuestos.total` y `presupuestos.saldo_pendiente` son
+ * columnas guardadas: si nadie las actualiza, quedan en 0. Eso es lo que hacía
+ * que un pago de 250.000 ₲ apareciera en el historial y "Total Abonado"
+ * siguiera mostrando 0 ₲.
+ *
+ * Se recalcula desde cero (no se suma ni resta sobre lo anterior) para que un
+ * borrado, una edición o un guardado a medias no dejen el saldo desfasado para
+ * siempre.
+ */
+export async function recalcularTotalesPresupuesto(presupuestoId: string | number): Promise<void> {
+  const [{ data: detalles }, { data: pagos }] = await Promise.all([
+    supabase.from("presupuesto_detalles").select("costo, descuento").eq("presupuesto_id", presupuestoId),
+    supabase.from("pagos_presupuesto").select("monto").eq("presupuesto_id", presupuestoId),
+  ]);
+
+  const total = (detalles ?? []).reduce(
+    (suma, d: any) => suma + (Number(d.costo) || 0) - (Number(d.descuento) || 0),
+    0
+  );
+  const abonado = (pagos ?? []).reduce((suma, p: any) => suma + (Number(p.monto) || 0), 0);
+
+  // Si el paciente pagó de más (una seña mayor al plan todavía sin cargar), el
+  // saldo es 0 y no un número negativo, que se leería como deuda al revés.
+  const saldoPendiente = Math.max(0, total - abonado);
+
+  const { error } = await supabase
+    .from("presupuestos")
+    .update({ total, saldo_pendiente: saldoPendiente })
+    .eq("id", presupuestoId);
+  if (error) handleDbError(error, "presupuestos");
+}
+
 export async function addPresupuestoDetalle(detalle: Partial<PresupuestoDetalle>): Promise<PresupuestoDetalle> {
   const { data, error } = await supabase
     .from("presupuesto_detalles")
@@ -355,6 +391,7 @@ export async function addPresupuestoDetalle(detalle: Partial<PresupuestoDetalle>
     .select()
     .single();
   if (error) handleDbError(error, "presupuesto_detalles");
+  if (data?.presupuesto_id) await recalcularTotalesPresupuesto(data.presupuesto_id);
   return data;
 }
 
@@ -366,12 +403,22 @@ export async function updatePresupuestoDetalle(id: number, cambios: Partial<Pres
     .select()
     .single();
   if (error) handleDbError(error, "presupuesto_detalles");
+  if (data?.presupuesto_id) await recalcularTotalesPresupuesto(data.presupuesto_id);
   return data;
 }
 
 export async function deletePresupuestoDetalle(id: number): Promise<void> {
+  // Se lee a qué plan pertenece ANTES de borrarlo: después ya no hay forma de
+  // saber qué totales hay que recalcular.
+  const { data: previo } = await supabase
+    .from("presupuesto_detalles")
+    .select("presupuesto_id")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase.from("presupuesto_detalles").delete().eq("id", id);
   if (error) handleDbError(error, "presupuesto_detalles");
+  if (previo?.presupuesto_id) await recalcularTotalesPresupuesto(previo.presupuesto_id);
 }
 
 export function usePresupuestoDetalles(presupuestoId: number) {
@@ -435,7 +482,21 @@ export async function addPagoPresupuesto(pago: Partial<PagoPresupuesto>): Promis
     .select()
     .single();
   if (error) handleDbError(error, "pagos_presupuesto");
+  // Sin esto el pago quedaba registrado pero el saldo no bajaba.
+  if (data?.presupuesto_id) await recalcularTotalesPresupuesto(data.presupuesto_id);
   return data;
+}
+
+export async function deletePagoPresupuesto(id: string | number): Promise<void> {
+  const { data: previo } = await supabase
+    .from("pagos_presupuesto")
+    .select("presupuesto_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { error } = await supabase.from("pagos_presupuesto").delete().eq("id", id);
+  if (error) handleDbError(error, "pagos_presupuesto");
+  if (previo?.presupuesto_id) await recalcularTotalesPresupuesto(previo.presupuesto_id);
 }
 
 export function usePagosPresupuesto(presupuestoId: number) {

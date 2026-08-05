@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,8 +49,10 @@ import {
   Calendar,
   CreditCard,
   FileText,
-  ListTodo
+  ListTodo,
+  Printer
 } from "lucide-react";
+import { imprimirPresupuesto } from "@/lib/imprimir";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 
@@ -73,6 +75,21 @@ export default function FichaPaciente() {
   const [activePresupuestoId, setActivePresupuestoId] = useState<number | null>(null);
   const { data: detalles = [] } = usePresupuestoDetalles(activePresupuestoId || 0);
   const { data: pagos = [] } = usePagosPresupuesto(activePresupuestoId || 0);
+
+  // Cuentas del plan, sacadas de lo que hay cargado. Antes se leían de las
+  // columnas `total` y `saldo_pendiente` del presupuesto, que nadie actualizaba:
+  // un pago aparecía en el historial y "Total Abonado" seguía en 0 ₲.
+  const totalCotizado = useMemo(
+    () => detalles.reduce((suma, d) => suma + (Number(d.costo) || 0) - (Number(d.descuento) || 0), 0),
+    [detalles]
+  );
+  const totalAbonado = useMemo(
+    () => pagos.reduce((suma, p) => suma + (Number(p.monto) || 0), 0),
+    [pagos]
+  );
+  const saldoPendiente = Math.max(0, totalCotizado - totalAbonado);
+  /** Si pagó más de lo cotizado (una seña antes de cargar el plan). */
+  const saldoAFavor = Math.max(0, totalAbonado - totalCotizado);
 
   const addDetalle = useAddPresupuestoDetalle();
   const removeDetalle = useDeletePresupuestoDetalle();
@@ -111,6 +128,9 @@ export default function FichaPaciente() {
   const [selPieza, setSelPieza] = useState("");
   const [selCara, setSelCara] = useState("");
   const [selDescuento, setSelDescuento] = useState("");
+  // El precio de la tarifa es solo una sugerencia: una misma extracción puede
+  // cobrarse distinto según el paciente, así que el importe queda editable.
+  const [selCosto, setSelCosto] = useState("");
 
   // Payment add form state
   const [pagoMonto, setPagoMonto] = useState("");
@@ -232,20 +252,56 @@ export default function FichaPaciente() {
   };
 
   // Add Treatment item to Budget
+  /** Abre el presupuesto como documento para imprimir o guardar en PDF. */
+  const handleImprimirPresupuesto = () => {
+    if (!activePresupuesto || !paciente) return;
+    imprimirPresupuesto({
+      pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
+      pacienteDocumento: paciente.documento,
+      titulo: activePresupuesto.titulo,
+      fecha: new Date(activePresupuesto.created_at).toLocaleDateString("es-PY"),
+      estado: activePresupuesto.estado,
+      // Se mandan las cuentas que están a la vista, no las columnas guardadas:
+      // el papel que se lleva el paciente tiene que decir lo mismo que la
+      // pantalla donde se le explicó.
+      total: totalCotizado,
+      saldoPendiente,
+      detalles: detalles.map((d) => ({
+        pieza: d.pieza,
+        cara: d.cara,
+        tratamiento: (d as any).odontologia_precios?.nombre ?? "Procedimiento",
+        costo: Number(d.costo) || 0,
+        descuento: Number(d.descuento) || 0,
+      })),
+      pagos: pagos.map((p) => ({
+        fecha: new Date(p.fecha).toLocaleDateString("es-PY"),
+        monto: Number(p.monto) || 0,
+        metodo: p.tipo_pago ?? "—",
+      })),
+    });
+  };
+
   const handleAddProcedure = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePresupuestoId || !selTratamientoId) return;
 
-    const selectedPre = precios.find((p) => p.id === Number(selTratamientoId));
+    const selectedPre = precios.find((p) => String(p.id) === String(selTratamientoId));
     if (!selectedPre) return;
+
+    // Manda el importe escrito; si se dejó vacío, el de la tarifa.
+    const costoFinal = selCosto.trim() !== "" ? Number(selCosto) : selectedPre.costo;
+    if (!Number.isFinite(costoFinal) || costoFinal < 0) {
+      toast.error("El importe no es válido.");
+      return;
+    }
 
     try {
       await addDetalle.mutateAsync({
         presupuesto_id: activePresupuestoId,
-        tratamiento_id: Number(selTratamientoId),
+        tratamiento_id: selectedPre.id,
         pieza: selPieza ? Number(selPieza) : null,
         cara: selCara || null,
-        costo: selectedPre.costo,
+        costo: costoFinal,
         descuento: selDescuento ? Number(selDescuento) : 0,
         estado: "pendiente",
       });
@@ -254,6 +310,7 @@ export default function FichaPaciente() {
       setSelPieza("");
       setSelCara("");
       setSelDescuento("");
+      setSelCosto("");
       toast.success("Tratamiento agregado al presupuesto.");
     } catch (err) {
       toast.error((err as Error).message);
@@ -648,6 +705,15 @@ export default function FichaPaciente() {
                             </SelectContent>
                           </Select>
                           <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={handleImprimirPresupuesto}
+                          >
+                            <Printer className="w-4 h-4" />
+                            Imprimir
+                          </Button>
+                          <Button
                             variant="destructive"
                             size="icon"
                             className="h-8 w-8"
@@ -660,22 +726,31 @@ export default function FichaPaciente() {
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
                         {/* Financial Totals */}
+                        {/* Los totales se calculan de los procedimientos y los
+                            pagos que están a la vista, no de las columnas
+                            guardadas del plan: así lo que se muestra siempre
+                            coincide con las dos listas de abajo. */}
                         <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-border/50 text-center">
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Cotizado</p>
-                            <p className="text-base font-bold text-foreground">{activePresupuesto.total.toLocaleString()} ₲</p>
+                            <p className="text-base font-bold text-foreground">{totalCotizado.toLocaleString()} ₲</p>
                           </div>
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Abonado</p>
                             <p className="text-base font-bold text-emerald-600">
-                              {(activePresupuesto.total - activePresupuesto.saldo_pendiente).toLocaleString()} ₲
+                              {totalAbonado.toLocaleString()} ₲
                             </p>
                           </div>
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Saldo Pendiente</p>
-                            <p className="text-base font-bold text-destructive">{activePresupuesto.saldo_pendiente.toLocaleString()} ₲</p>
+                            <p className="text-base font-bold text-destructive">{saldoPendiente.toLocaleString()} ₲</p>
                           </div>
                         </div>
+                        {saldoAFavor > 0 && (
+                          <p className="text-xs text-center text-emerald-600 font-semibold -mt-2">
+                            El paciente tiene {saldoAFavor.toLocaleString()} ₲ a favor.
+                          </p>
+                        )}
 
                         {/* List of details/procedures */}
                         <div className="space-y-2">
@@ -732,7 +807,16 @@ export default function FichaPaciente() {
                         <form onSubmit={handleAddProcedure} className="p-3 border rounded-xl bg-slate-50 dark:bg-slate-900/20 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                           <div className="space-y-1 sm:col-span-2">
                             <Label htmlFor="add_tratamiento" className="text-[10px] uppercase font-bold text-muted-foreground">Procedimiento</Label>
-                            <Select value={selTratamientoId} onValueChange={setSelTratamientoId}>
+                            <Select
+                              value={selTratamientoId}
+                              onValueChange={(valor) => {
+                                setSelTratamientoId(valor);
+                                // Se propone el precio de la tarifa; queda editable
+                                // para cobrar distinto según el caso.
+                                const tarifa = precios.find((p) => String(p.id) === String(valor));
+                                setSelCosto(tarifa ? String(tarifa.costo) : "");
+                              }}
+                            >
                               <SelectTrigger id="add_tratamiento" className="h-8 bg-background">
                                 <SelectValue placeholder="Seleccione..." />
                               </SelectTrigger>
@@ -764,6 +848,20 @@ export default function FichaPaciente() {
                             </div>
                           </div>
                           <div className="space-y-1">
+                            <Label htmlFor="add_costo" className="text-[10px] uppercase font-bold text-muted-foreground">
+                              Importe (₲)
+                            </Label>
+                            <Input
+                              id="add_costo"
+                              placeholder="0"
+                              className="h-8 bg-background font-semibold"
+                              type="number"
+                              min="0"
+                              value={selCosto}
+                              onChange={(e) => setSelCosto(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
                             <Label htmlFor="add_descuento" className="text-[10px] uppercase font-bold text-muted-foreground">Descuento (₲)</Label>
                             <div className="flex gap-1">
                               <Input
@@ -771,6 +869,7 @@ export default function FichaPaciente() {
                                 placeholder="0"
                                 className="h-8 bg-background flex-1"
                                 type="number"
+                                min="0"
                                 value={selDescuento}
                                 onChange={(e) => setSelDescuento(e.target.value)}
                               />
@@ -780,6 +879,9 @@ export default function FichaPaciente() {
                             </div>
                           </div>
                         </form>
+                        <p className="text-[11px] text-muted-foreground -mt-1">
+                          El importe viene sugerido de la tarifa, pero se puede cambiar en cada caso.
+                        </p>
                       </CardContent>
                     </Card>
 
