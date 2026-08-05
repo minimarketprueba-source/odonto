@@ -998,8 +998,8 @@ export default function FichaPaciente() {
                               onChange={(e) => setSelDescuento(e.target.value.replace(/\D/g, ""))}
                             />
                             <Button type="submit" size="icon" className="h-8 w-8 flex-shrink-0" disabled={addDetalle.isPending}>
-                                <Plus className="w-4 h-4" />
-                            </div>
+                              <Plus className="w-4 h-4" />
+                            </Button>
                           </div>
                         </form>
                         <p className="text-[11px] text-muted-foreground -mt-1">
