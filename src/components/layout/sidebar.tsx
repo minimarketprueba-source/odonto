@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { usePerfilProfesional } from '@/api/perfil'
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
 import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
@@ -20,6 +21,10 @@ export function Sidebar() {
   const location = useLocation()
   const pathname = location.pathname
   const { user, logout } = useAuth()
+  // Nombre real de la persona, si lo cargó en Mi perfil o tiene ficha de
+  // odontólogo. Si no hay ninguno, se cae al correo.
+  const { data: perfil } = usePerfilProfesional(user)
+  const nombreMostrado = perfil?.nombre?.trim() || null
   const { isOpen, setIsOpen, isCollapsed, setIsCollapsed } = useSidebar()
   const { canView } = usePermissions()
 
@@ -190,7 +195,7 @@ export function Sidebar() {
             )}>
               <div className="relative w-10 h-10 bg-gradient-to-br from-accent to-primary rounded-full flex items-center justify-center shadow-md ring-2 ring-white/20 flex-shrink-0">
                 <span className="text-sm font-bold text-primary-foreground">
-                  {user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                  {(nombreMostrado?.charAt(0) || user?.email?.charAt(0) || 'U').toUpperCase()}
                 </span>
                 {/* Online status indicator */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full animate-pulse" />
@@ -199,8 +204,12 @@ export function Sidebar() {
                 "flex-1 min-w-0 transition-all duration-300 overflow-hidden",
                 isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100"
               )}>
-                <p className="text-sm font-semibold text-foreground dark:text-white whitespace-nowrap">
-                  {user?.email?.split('@')[0] || 'Usuario'}
+                {/* El nombre que la persona cargó en Mi perfil. Antes acá salía
+                    siempre la parte del correo antes de la arroba ("admin"), asi
+                    que guardar el nombre no se veía reflejado en ningún lado y
+                    parecía que no se había guardado. */}
+                <p className="text-sm font-semibold text-foreground dark:text-white truncate">
+                  {nombreMostrado || user?.email?.split('@')[0] || 'Usuario'}
                 </p>
                 <p className="text-xs text-muted-foreground dark:text-white truncate">
                   {user?.email || ''}

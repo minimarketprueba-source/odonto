@@ -168,6 +168,11 @@ export default function PerfilUsuario() {
             <CardDescription>Sus datos de acceso y su ficha profesional.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm break-words">
+            {/* El nombre guardado, arriba de todo: es la confirmación de que
+                quedó registrado, sin tener que buscarlo en los campos. */}
+            {nombrePerfil && (
+              <p><span className="text-muted-foreground">Nombre:</span> <span className="font-medium">{nombrePerfil}</span></p>
+            )}
             <p><span className="text-muted-foreground">Usuario:</span> <span className="font-medium">{user?.email ?? "—"}</span></p>
             <p><span className="text-muted-foreground">Rol:</span> <span className="font-medium">{rolLabel}</span></p>
             {miMedico && (
