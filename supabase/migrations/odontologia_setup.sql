@@ -145,7 +145,7 @@ CREATE POLICY consentimientos_paciente_all ON public.consentimientos_paciente FO
 -- Insertar procedimientos dentales iniciales por defecto si no existen
 INSERT INTO public.odontologia_precios (codigo, nombre, costo) VALUES
 ('CONS-01', 'Consulta Diagnóstica y Presupuesto', 50000.00),
-('LIM-02', 'Limpieza Dental (Profilaxis)', 150000.00),
+('LIM-02', 'Limpieza Dental (Profilaxis)', 300000.00),
 ('EMP-03', 'Empaste Simple (Resina)', 250000.00),
 ('EMP-04', 'Empaste Complejo', 400000.00),
 ('ENDO-05', 'Endodoncia Unirradicular', 900000.00),
@@ -154,13 +154,20 @@ INSERT INTO public.odontologia_precios (codigo, nombre, costo) VALUES
 ('EXT-08', 'Extracción de Tercer Molar (Cirugía)', 350000.00),
 ('COR-09', 'Corona de Metal-Porcelana', 1850000.00),
 ('COR-10', 'Corona de Zirconio', 2500000.00),
-('IMP-11', 'Implante Dental (Fase Quirúrgica)', 3500000.00),
+('IMP-11', 'Implante Dental (Fase Quirúrgica)', 4000000.00),
 ('IMP-12', 'Perno sobre Implante y Corona', 2000000.00),
 ('RAD-13', 'Radiografía Periapical', 80000.00),
 ('CIR-14', 'Cirugía Compleja', 350000.00),
 ('ORT-15', 'Ortodoncia Mantenimiento', 250000.00),
 ('ORT-16', 'Cementado de Brackets', 150000.00),
-('EXT-17', 'Extracción Simple Temporario', 180000.00)
+('EXT-17', 'Extracción Simple Temporario', 180000.00),
+('PER-18', 'Perno Dental', 350000.00),
+('EXT-19', 'Exodoncia Temporario Unirradicular', 150000.00),
+('EXT-20', 'Exodoncia Temporario Multirradicular', 180000.00),
+('RES-21', 'Resina Temporario', 150000.00),
+('RES-22', 'Resina Compuesta Temporario', 250000.00),
+('RES-23', 'Resina Clase 2', 400000.00),
+('LEV-24', 'Levantamiento de Margen', 200000.00)
 ON CONFLICT (codigo) DO UPDATE SET costo = EXCLUDED.costo, nombre = EXCLUDED.nombre;
 
 -- Trigger y Función para actualizar el saldo pendiente del presupuesto cuando hay pagos
