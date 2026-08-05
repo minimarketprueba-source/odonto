@@ -36,7 +36,7 @@ Guía para Claude Code (claude.ai/code) al trabajar en este repositorio.
 
 ### Datos cargados (2026-08-05)
 
-3 pacientes reales, 8 especialidades odontológicas, 1 clínica, 12 tarifas, 3 sillones. **0 odontólogos**: el usuario todavía no cargó su ficha, y de eso dependen la firma de la agenda y de los registros.
+3 pacientes reales, 8 especialidades odontológicas, 1 clínica, **32 tarifas propias de la clínica** (cargadas por la usuaria el 2026-08-05), 3 sillones. **0 odontólogos**: el usuario todavía no cargó su ficha, y de eso dependen la firma de la agenda y de los registros.
 
 ### Migraciones (`supabase/migrations/`)
 
@@ -152,7 +152,25 @@ Publicar: `git push vercel main && git push origin main`. Vercel despliega solo 
 El usuario no puede revisar el código: la verificación es responsabilidad de Claude. Lo que funcionó bien esta sesión:
 
 1. **Probar en el navegador con Playwright** usando el Chrome del sistema (`channel: 'chrome'`; los binarios de Playwright no están descargados). Los scripts van al scratchpad.
-2. **Preparar datos por API** con la service_role key y **borrarlos al terminar**. Nunca dejar datos de prueba en la base del usuario, y menos en la ficha de un paciente real.
+2. **Preparar datos por API** con la service_role key y **borrar SOLO lo que se creó**, guardando los ids devueltos por el insert:
+
+   ```js
+   const creados = [];
+   const [p] = await (await fetch(SB + '/rest/v1/presupuestos', {método POST...})).json();
+   creados.push(p.id);
+   // al terminar:
+   for (const id of creados) await fetch(SB + '/rest/v1/presupuestos?id=eq.' + id, { method: 'DELETE', ... });
+   ```
+
+   ⛔ **NUNCA** un DELETE con filtro amplio (`?id=not.is.null`, `?id=neq.<algo>`, `?id=gt.0`). Eso borra la tabla entera.
+
+   **Pasó de verdad el 2026-08-05**: los scripts de prueba limpiaban con
+   `presupuestos?id=not.is.null` y **borraron el plan de tratamiento que la
+   usuaria estaba cargando**, con su pago incluido. Lo notó porque el
+   Dashboard le quedó en cero. Esta es una base en uso, no un entorno de
+   pruebas: cada fila puede ser el trabajo de alguien.
+
+   Si de verdad hace falta partir de cero, preguntarle antes.
 3. **Verificar contra la base**, no solo contra la pantalla: que el registro quede escrito es lo que importa.
 4. Cuando un control falla, **confirmar si es la app o la prueba** antes de anunciar un error. Varias veces fue el selector o una expresión de búsqueda.
 
