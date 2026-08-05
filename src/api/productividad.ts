@@ -1,6 +1,15 @@
 // ============================================================================
-// Capa de datos: Planilla de Productividad (Informe Diario, Semanal y Mensual)
+// Capa de datos: producción clínica de la clínica odontológica
 // ============================================================================
+// De dónde sale la producción: de `evoluciones_clinicas`, que es donde queda
+// asentado cada procedimiento hecho sobre una pieza (la historia clínica
+// dental). Se complementa con `presupuestos` y `pagos_presupuesto` para la
+// parte de dinero.
+//
+// OJO: hasta el 2026-08-04 esto consultaba `consultas` y `atenciones_enfermeria`,
+// tablas del sistema médico del que salió esta app y que en esta base NO
+// existen. La pantalla de Reportes daba 404 y salía vacía siempre, por más
+// tratamientos que se cargaran.
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -12,284 +21,222 @@ export interface AtencionProductividad {
   fecha: string; // YYYY-MM-DD
   hora: string | null; // HH:mm
   pacienteNombre: string;
-  pacienteJerarquia: string; // Jerarquía / Tipo y Grado
+  /** Documento del paciente; en el impreso ocupa la columna identificatoria. */
+  pacienteJerarquia: string;
   pacienteSexo: "M" | "F" | string;
-  diagnostico: string;
-  tratamiento: string;
-  especialidadId?: number | null;
+  /** Pieza dental tratada (notación FDI). Vacío si la nota no es de una pieza. */
+  pieza: string;
+  /** Procedimiento realizado: es la producción propiamente dicha. */
+  procedimiento: string;
+  /** Nota clínica del profesional. */
+  nota: string;
+  especialidadId?: string | null;
   especialidadNombre: string;
-  medicoId?: number | null;
+  medicoId?: string | null;
   medicoNombre: string;
   medicoColegiatura?: string | null;
-  origen: "consulta" | "enfermeria";
+}
+
+export interface ResumenFacturacion {
+  /** Cobrado en el período (pagos recibidos). */
+  cobrado: number;
+  /** Suma de los presupuestos creados en el período. */
+  presupuestado: number;
+  /** Saldo pendiente de los presupuestos aprobados. */
+  pendiente: number;
+  /** Cantidad de planes de tratamiento creados en el período. */
+  planes: number;
+}
+
+export interface ProduccionDental {
+  atenciones: AtencionProductividad[];
+  facturacion: ResumenFacturacion;
+  /** Citas del período agrupadas por estado. */
+  citasPorEstado: Record<string, number>;
 }
 
 export interface FiltrosProductividad {
   fechaDesde: string;
   fechaHasta: string;
-  especialidadId?: string; // "todas" | "enfermeria" | id numérico en string
-  medicoId?: string;       // "todos" | "mi_usuario" | id numérico en string
-  usuarioActualId?: string | null;
-  usuarioActualEmail?: string | null;
-  usuarioActualNombre?: string | null;
-  rolUsuario?: string | null;
+  /** "todas" o el id (UUID) de una especialidad. */
+  especialidadId?: string;
+  /** "todos", "mi_usuario" o el id (UUID) de un odontólogo. */
+  medicoId?: string;
+  usuarioActualId?: string;
+  usuarioActualEmail?: string;
+  usuarioActualNombre?: string;
+  rolUsuario?: string;
 }
 
 export function formatSexo(sexo?: string | null): string {
-  if (!sexo) return "M";
-  const s = sexo.trim().toUpperCase();
-  if (s.startsWith("F") || s.includes("FEM")) return "F";
-  return "M";
+  if (!sexo) return "—";
+  const s = sexo.toUpperCase();
+  if (s === "M") return "M";
+  if (s === "F") return "F";
+  return s;
 }
 
+/** Identificación del paciente en la planilla: su documento, o el tipo si no tiene. */
 export function formatJerarquia(tipo?: string | null, grado?: string | null): string {
-  const t = tipo?.trim() || "";
-  const g = grado?.trim() || "";
-  if (g && t) {
-    if (g.toLowerCase().includes(t.toLowerCase())) return g;
-    return `${t} — ${g}`;
-  }
-  return g || t || "Paciente";
+  const partes = [grado, tipo].filter((x) => x && String(x).trim().length > 0);
+  return partes.length ? partes.join(" ") : "—";
 }
 
-export async function fetchProductividad(
+/** Hora legible (HH:mm) a partir de un timestamp. */
+function horaDe(valor?: string | null): string | null {
+  if (!valor) return null;
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function soloFecha(valor?: string | null): string {
+  if (!valor) return "";
+  return String(valor).slice(0, 10);
+}
+
+export async function fetchProduccionDental(
   filtros: FiltrosProductividad
-): Promise<AtencionProductividad[]> {
-  const {
-    fechaDesde,
-    fechaHasta,
-    especialidadId,
-    medicoId = "mi_usuario",
-    usuarioActualId,
-    usuarioActualEmail,
-    usuarioActualNombre,
-    rolUsuario,
-  } = filtros;
+): Promise<ProduccionDental> {
+  const { fechaDesde, fechaHasta, especialidadId, medicoId } = filtros;
 
-  const esGinecologoOAdmin =
-    rolUsuario &&
-    ["admin", "superadmin", "super_admin", "ginecologo"].includes(rolUsuario.toLowerCase());
+  // El día "hasta" se incluye entero: las marcas de tiempo de ese día llegan
+  // hasta las 23:59, así que se compara contra el día siguiente.
+  const hastaExclusivo = new Date(`${fechaHasta}T00:00:00`);
+  hastaExclusivo.setDate(hastaExclusivo.getDate() + 1);
+  const hastaISO = hastaExclusivo.toISOString().slice(0, 10);
 
-  // 1. Obtener consultas médicas
-  let queryConsultas = supabase
-    .from("consultas")
+  // --- 1. Producción clínica: los procedimientos asentados ---
+  let consultaEvoluciones = supabase
+    .from("evoluciones_clinicas")
     .select(`
       id,
-      fecha,
-      motivo_consulta,
-      diagnostico,
-      tratamiento,
-      destino,
-      anulada_at,
-      created_at,
-      cita:citas(id, hora),
-      cie10:cie10(codigo, descripcion),
+      fecha_registro,
+      pieza,
+      procedimiento,
+      nota_clinica,
       medico:medicos(
-        id,
-        nombres,
-        apellidos,
-        numero_colegiatura,
-        especialidad_id,
-        user_id,
-        email,
+        id, nombres, apellidos, numero_colegiatura, especialidad_id,
         especialidad:especialidades(id, nombre)
       ),
-      paciente:pacientes(
-        id,
-        nombres,
-        apellidos,
-        documento,
-        tipo,
-        grado,
-        sexo
-      )
+      paciente:pacientes(id, nombres, apellidos, documento, tipo, grado, sexo)
     `)
-    .is("anulada_at", null)
-    .gte("fecha", fechaDesde)
-    .lte("fecha", fechaHasta)
-    .order("fecha", { ascending: true })
-    .order("id", { ascending: true });
+    .gte("fecha_registro", fechaDesde)
+    .lt("fecha_registro", hastaISO)
+    .order("fecha_registro", { ascending: true })
+    .limit(5000);
 
   if (medicoId && medicoId !== "todos" && medicoId !== "mi_usuario") {
-    queryConsultas = queryConsultas.eq("medico_id", parseInt(medicoId, 10));
+    consultaEvoluciones = consultaEvoluciones.eq("medico_id", medicoId);
   }
 
-  const { data: dataConsultas, error: errorConsultas } = await queryConsultas;
-  if (errorConsultas && !avisarEsquemaFaltante(errorConsultas, "Reportes · consultas")) {
-    // Un error de verdad (red, permisos) sí se registra: el reporte sale
-    // incompleto y hay que poder saber por qué.
-    console.error("Error fetching consultas for productividad:", errorConsultas);
+  const { data: datosEvoluciones, error: errorEvoluciones } = await consultaEvoluciones;
+  if (errorEvoluciones && !avisarEsquemaFaltante(errorEvoluciones, "Reportes · evoluciones clínicas")) {
+    console.error("Error al cargar la producción clínica:", errorEvoluciones);
   }
 
-  const lista: AtencionProductividad[] = [];
+  const atenciones: AtencionProductividad[] = [];
+  for (const e of (datosEvoluciones ?? []) as any[]) {
+    const medico = e.medico;
+    const especialidad = medico?.especialidad;
 
-  if (dataConsultas) {
-    for (const c of dataConsultas as any[]) {
-      const espNombre = c.medico?.especialidad?.nombre || "Consulta General";
-      const espId = c.medico?.especialidad?.id;
+    // El filtro por especialidad se aplica acá porque cuelga del odontólogo,
+    // no de la evolución: PostgREST no puede filtrar por una tabla anidada
+    // dos niveles sin descartar filas sin médico asignado.
+    if (especialidadId && especialidadId !== "todas" && especialidad?.id !== especialidadId) {
+      continue;
+    }
 
-      // Filtrar por especialidad en memoria si se especificó
-      if (especialidadId && especialidadId !== "todas" && espId !== parseInt(especialidadId, 10)) {
-        continue;
-      }
+    const paciente = e.paciente;
+    atenciones.push({
+      index: atenciones.length + 1,
+      id: e.id,
+      fecha: soloFecha(e.fecha_registro),
+      hora: horaDe(e.fecha_registro),
+      pacienteNombre: paciente
+        ? `${paciente.apellidos ?? ""}, ${paciente.nombres ?? ""}`.replace(/^, |, $/, "")
+        : "—",
+      pacienteJerarquia: paciente?.documento || formatJerarquia(paciente?.tipo, paciente?.grado),
+      pacienteSexo: formatSexo(paciente?.sexo),
+      pieza: e.pieza ? String(e.pieza) : "",
+      procedimiento: e.procedimiento || "—",
+      nota: e.nota_clinica || "",
+      especialidadId: especialidad?.id ?? null,
+      especialidadNombre: especialidad?.nombre || "Odontología General",
+      medicoId: medico?.id ?? null,
+      medicoNombre: medico ? `${medico.apellidos ?? ""}, ${medico.nombres ?? ""}` : "—",
+      medicoColegiatura: medico?.numero_colegiatura ?? null,
+    });
+  }
 
-      // Filtrar por "mi_usuario" si corresponde
-      if (medicoId === "mi_usuario") {
-        const esSuMedico =
-          (usuarioActualId && c.medico?.user_id === usuarioActualId) ||
-          (usuarioActualEmail && c.medico?.email?.toLowerCase() === usuarioActualEmail.toLowerCase());
+  // --- 2. Dinero: lo cobrado y lo que queda por cobrar ---
+  const facturacion: ResumenFacturacion = { cobrado: 0, presupuestado: 0, pendiente: 0, planes: 0 };
 
-        const medNom = c.medico ? `${c.medico.nombres} ${c.medico.apellidos}`.toLowerCase() : "";
-        const coincidaNombre = usuarioActualNombre && medNom.includes(usuarioActualNombre.toLowerCase());
+  const { data: pagos, error: errorPagos } = await supabase
+    .from("pagos_presupuesto")
+    .select("monto, fecha")
+    .gte("fecha", fechaDesde)
+    .lt("fecha", hastaISO)
+    .limit(5000);
+  if (errorPagos && !avisarEsquemaFaltante(errorPagos, "Reportes · pagos")) {
+    console.error("Error al cargar los pagos:", errorPagos);
+  }
+  for (const p of (pagos ?? []) as any[]) facturacion.cobrado += Number(p.monto) || 0;
 
-        if (!esSuMedico && !coincidaNombre && usuarioActualId) {
-          // Si el usuario no es ese médico específico, no incluir esta consulta
-          continue;
-        }
-      }
-
-      // Regla de Confidencialidad Gineco-Obstétrica
-      const esGinecologia = espNombre.toLowerCase().includes("ginecolog") || espNombre.toLowerCase().includes("obstetr");
-      let diagTexto = "";
-      if (esGinecologia && !esGinecologoOAdmin) {
-        diagTexto = "🔒 Diagnóstico e información médica reservada (Ginecología y Obstetricia)";
-      } else {
-        const parteDetalle = c.diagnostico?.trim();
-        const parteCie = c.cie10 ? `[${c.cie10.codigo} - ${c.cie10.descripcion}]` : "";
-        diagTexto = [parteDetalle, parteCie].filter(Boolean).join(" ") || c.motivo_consulta || "Consulta Médica";
-      }
-
-      // Hora
-      let horaStr = null;
-      if (c.cita?.hora) {
-        horaStr = c.cita.hora.slice(0, 5);
-      } else if (c.created_at) {
-        const d = new Date(c.created_at);
-        if (!isNaN(d.getTime())) {
-          horaStr = d.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" });
-        }
-      }
-
-      const pacienteNombre = c.paciente
-        ? `${c.paciente.nombres || ""} ${c.paciente.apellidos || ""}`.trim()
-        : "Paciente sin nombre";
-      const medicoNombre = c.medico
-        ? `${c.medico.nombres || ""} ${c.medico.apellidos || ""}`.trim()
-        : "Profesional";
-
-      lista.push({
-        index: 0,
-        id: c.id,
-        fecha: c.fecha,
-        hora: horaStr,
-        pacienteNombre,
-        pacienteJerarquia: formatJerarquia(c.paciente?.tipo, c.paciente?.grado),
-        pacienteSexo: formatSexo(c.paciente?.sexo),
-        diagnostico: diagTexto,
-        tratamiento: c.tratamiento || c.destino || "Atención realizada",
-        especialidadId: espId,
-        especialidadNombre: espNombre,
-        medicoId: c.medico?.id,
-        medicoNombre,
-        medicoColegiatura: c.medico?.numero_colegiatura,
-        origen: "consulta",
-      });
+  const { data: presupuestos, error: errorPresupuestos } = await supabase
+    .from("presupuestos")
+    .select("total, saldo_pendiente, estado, created_at")
+    .gte("created_at", fechaDesde)
+    .lt("created_at", hastaISO)
+    .limit(5000);
+  if (errorPresupuestos && !avisarEsquemaFaltante(errorPresupuestos, "Reportes · presupuestos")) {
+    console.error("Error al cargar los presupuestos:", errorPresupuestos);
+  }
+  for (const p of (presupuestos ?? []) as any[]) {
+    facturacion.planes += 1;
+    facturacion.presupuestado += Number(p.total) || 0;
+    // Un plan rechazado o anulado no es plata por cobrar.
+    const estado = String(p.estado ?? "").toLowerCase();
+    if (estado !== "rechazado" && estado !== "anulado") {
+      facturacion.pendiente += Number(p.saldo_pendiente) || 0;
     }
   }
 
-  // 2. Si la especialidad es Enfermería o "todas", incluir atenciones_enfermeria
-  if (!especialidadId || especialidadId === "todas" || especialidadId === "enfermeria") {
-    const queryEnfermeria = supabase
-      .from("atenciones_enfermeria")
-      .select(`
-        id,
-        fecha,
-        created_at,
-        tipo,
-        motivo,
-        procedimiento,
-        destino,
-        enfermero_nombre,
-        anulada_at,
-        paciente:pacientes(
-          id,
-          nombres,
-          apellidos,
-          documento,
-          tipo,
-          grado,
-          sexo
-        )
-      `)
-      .is("anulada_at", null)
-      .gte("fecha", fechaDesde)
-      .lte("fecha", fechaHasta)
-      .order("fecha", { ascending: true });
-
-    const { data: dataEnf, error: errorEnf } = await queryEnfermeria;
-    if (errorEnf && !avisarEsquemaFaltante(errorEnf, "Reportes · atenciones de enfermería")) {
-      console.error("Error fetching atenciones for productividad:", errorEnf);
-    }
-    if (dataEnf) {
-      for (const e of dataEnf as any[]) {
-        let horaStr = null;
-        if (e.created_at) {
-          const d = new Date(e.created_at);
-          if (!isNaN(d.getTime())) {
-            horaStr = d.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" });
-          }
-        }
-
-        // Si se filtró por "mi_usuario", verificar si la atención la realizó el usuario conectado
-        if (medicoId === "mi_usuario" && usuarioActualNombre) {
-          const nomEnf = (e.enfermero_nombre || "").toLowerCase();
-          const nomUsuario = usuarioActualNombre.toLowerCase();
-          // Comparar si incluye al menos una palabra significativa del nombre
-          const partesNom = nomUsuario.split(/\s+/).filter((p) => p.length > 2);
-          const coincide = partesNom.some((p) => nomEnf.includes(p));
-          if (!coincide && partesNom.length > 0) {
-            continue;
-          }
-        } else if (medicoId && medicoId !== "todos" && medicoId !== "mi_usuario") {
-          // Si especificó un id médico numérico y estamos en enfermería, omitir si no aplica
-          continue;
-        }
-
-        const pacienteNombre = e.paciente
-          ? `${e.paciente.nombres || ""} ${e.paciente.apellidos || ""}`.trim()
-          : "Paciente sin nombre";
-
-        lista.push({
-          index: 0,
-          id: `enf-${e.id}`,
-          fecha: e.fecha,
-          hora: horaStr,
-          pacienteNombre,
-          pacienteJerarquia: formatJerarquia(e.paciente?.tipo, e.paciente?.grado),
-          pacienteSexo: formatSexo(e.paciente?.sexo),
-          diagnostico: e.motivo || `Atención de Enfermería (${e.tipo})`,
-          tratamiento: e.procedimiento || e.destino || "Atención realizada",
-          especialidadNombre: "Enfermería",
-          medicoNombre: e.enfermero_nombre || "Personal de Enfermería",
-          origen: "enfermeria",
-        });
-      }
-    }
+  // --- 3. Citas del período, por estado ---
+  let consultaCitas = supabase
+    .from("citas")
+    .select("estado, medico_id")
+    .gte("fecha", fechaDesde)
+    .lte("fecha", fechaHasta)
+    .limit(5000);
+  if (medicoId && medicoId !== "todos" && medicoId !== "mi_usuario") {
+    consultaCitas = consultaCitas.eq("medico_id", medicoId);
+  }
+  const { data: citas, error: errorCitas } = await consultaCitas;
+  if (errorCitas && !avisarEsquemaFaltante(errorCitas, "Reportes · citas")) {
+    console.error("Error al cargar las citas:", errorCitas);
   }
 
-  // Ordenar cronológicamente y asignar índice 1, 2, 3...
-  lista.sort((a, b) => a.fecha.localeCompare(b.fecha));
-  lista.forEach((item, idx) => {
-    item.index = idx + 1;
-  });
+  const citasPorEstado: Record<string, number> = {};
+  for (const c of (citas ?? []) as any[]) {
+    const estado = c.estado || "sin estado";
+    citasPorEstado[estado] = (citasPorEstado[estado] ?? 0) + 1;
+  }
 
-  return lista;
+  return { atenciones, facturacion, citasPorEstado };
 }
 
 export function useProductividadReporte(filtros: FiltrosProductividad) {
   return useQuery({
-    queryKey: ["productividad", filtros],
-    queryFn: () => fetchProductividad(filtros),
-    enabled: !!filtros.fechaDesde && !!filtros.fechaHasta,
+    queryKey: [
+      "produccion-dental",
+      filtros.fechaDesde,
+      filtros.fechaHasta,
+      filtros.especialidadId ?? "todas",
+      filtros.medicoId ?? "todos",
+      filtros.usuarioActualId ?? "",
+    ],
+    queryFn: () => fetchProduccionDental(filtros),
+    enabled: Boolean(filtros.fechaDesde && filtros.fechaHasta),
   });
 }

@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  BarChart2, FileSpreadsheet, Printer, Users, User, Stethoscope, Filter, Calendar, Clock, Shield, Building2, CalendarDays, CalendarRange, UserCheck
+  BarChart2, FileSpreadsheet, Printer, Users, Stethoscope, Filter, Calendar, Clock, Building2, CalendarDays, CalendarRange, UserCheck, Wallet, Coins
 } from "lucide-react";
 import { useCitasRango, fechaHoyISO, ESTADOS_CITA } from "@/api/citas";
 import { useEspecialidades, useMedicosAdmin } from "@/api/mantenimiento";
@@ -125,17 +125,20 @@ export default function Reportes() {
   const { data: especialidades = [] } = useEspecialidades();
   const { data: medicos = [] } = useMedicosAdmin();
 
-  // Consulta de productividad con soporte para el usuario logueado
-  const { data: atenciones = [], isLoading: cargandoProd } = useProductividadReporte({
+  // Producción clínica del período (procedimientos, dinero y citas)
+  const { data: produccion, isLoading: cargandoProd } = useProductividadReporte({
     fechaDesde: prodFechaDesde,
     fechaHasta: prodFechaHasta,
     especialidadId: prodEspecialidadId,
     medicoId: prodMedicoId,
     usuarioActualId: user?.id,
-    usuarioActualEmail: user?.email,
-    usuarioActualNombre: perfilPropio?.nombre,
-    rolUsuario: role,
+    usuarioActualEmail: user?.email ?? undefined,
+    usuarioActualNombre: perfilPropio?.nombre ?? undefined,
+    rolUsuario: role ?? undefined,
   });
+
+  const atenciones = produccion?.atenciones ?? [];
+  const facturacion = produccion?.facturacion ?? { cobrado: 0, presupuestado: 0, pendiente: 0, planes: 0 };
 
   // Cálculos de estadísticas para la planilla
   const totalAtendidos = atenciones.length;
@@ -193,8 +196,10 @@ export default function Reportes() {
         pacienteNombre: a.pacienteNombre,
         pacienteJerarquia: a.pacienteJerarquia,
         pacienteSexo: a.pacienteSexo,
-        diagnostico: a.diagnostico,
-        tratamiento: a.tratamiento,
+        // El impreso mantiene dos columnas: la pieza va junto al procedimiento
+        // para que se lea "16 · Obturación" de un vistazo.
+        diagnostico: a.pieza ? `${a.pieza} · ${a.procedimiento}` : a.procedimiento,
+        tratamiento: a.nota,
       })),
       totalAtendidos,
       totalMasculino: totalM,
@@ -202,7 +207,7 @@ export default function Reportes() {
     });
   };
 
-  // --- Filtros & Estadísticas de Citas (Pestaña 2) ---
+  // --- Filtros & Estadísticas de citas (Pestaña 2) ---
   const [estDesde, setEstDesde] = useState(inicioDeMes());
   const [estHasta, setEstHasta] = useState(fechaHoyISO());
   const { data: citas = [], isLoading: cargandoCitas } = useCitasRango(estDesde, estHasta);
@@ -254,10 +259,10 @@ export default function Reportes() {
               </Badge>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <FileSpreadsheet className="w-7 h-7 text-primary" /> Planilla de Productividad por Especialidad y Usuario
+              <FileSpreadsheet className="w-7 h-7 text-primary" /> Producción Odontológica por Profesional
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Generador de informes de productividad semanal, mensual o diaria de los pacientes atendidos por cada usuario profesional.
+              Informe de los tratamientos realizados y lo facturado en el período, por odontólogo.
             </p>
           </div>
 
@@ -279,7 +284,7 @@ export default function Reportes() {
               <FileSpreadsheet className="w-4 h-4" /> Planilla de Productividad
             </TabsTrigger>
             <TabsTrigger value="estadisticas" className="rounded-lg gap-2 text-sm font-semibold">
-              <BarChart2 className="w-4 h-4" /> Estadísticas de Citas
+              <BarChart2 className="w-4 h-4" /> Estadísticas de citas
             </TabsTrigger>
           </TabsList>
 
@@ -291,10 +296,10 @@ export default function Reportes() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base font-bold flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-primary" /> Configuración de Productividad (Semanal / Mensual / Diario)
+                      <Filter className="w-4 h-4 text-primary" /> Período del informe (semanal, mensual o diario)
                     </CardTitle>
                     <CardDescription>
-                      Consulte y descargue su informe de pacientes atendidos en la semana, en el mes o por rango de fechas.
+                      Consulte y descargue la producción de la clínica en la semana, en el mes o por rango de fechas.
                     </CardDescription>
                   </div>
 
@@ -333,7 +338,7 @@ export default function Reportes() {
                   {/* Selector de Usuario / Profesional */}
                   <div className="space-y-1.5 lg:col-span-2">
                     <Label className="text-xs font-semibold flex items-center gap-1">
-                      <UserCheck className="w-3.5 h-3.5 text-primary" /> Atenciones del Profesional / Usuario
+                      <UserCheck className="w-3.5 h-3.5 text-primary" /> Producción del odontólogo
                     </Label>
                     <Select value={prodMedicoId} onValueChange={setProdMedicoId}>
                       <SelectTrigger className="rounded-xl font-bold bg-primary/5 border-primary/30">
@@ -463,9 +468,11 @@ export default function Reportes() {
               <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Atendidos</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Procedimientos</p>
                     <h3 className="text-2xl font-extrabold text-primary mt-1">{totalAtendidos}</h3>
-                    <p className="text-[11px] text-primary/80 font-semibold mt-0.5">{periodoTexto}</p>
+                    <p className="text-[11px] text-primary/80 font-semibold mt-0.5">
+                      {periodoTexto} · {totalM} M / {totalF} F
+                    </p>
                   </div>
                   <div className="p-3 bg-primary/10 rounded-2xl text-primary">
                     <Users className="w-6 h-6" />
@@ -473,26 +480,36 @@ export default function Reportes() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-2xl border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 shadow-sm">
+              <Card className="rounded-2xl border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-sm">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Masculinos (M)</p>
-                    <h3 className="text-2xl font-extrabold text-blue-700 dark:text-blue-300 mt-1">{totalM}</h3>
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Cobrado</p>
+                    <h3 className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-1 tabular-nums">
+                      {facturacion.cobrado.toLocaleString("es-PY")} ₲
+                    </h3>
+                    <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-semibold mt-0.5">
+                      Pagos recibidos en el período
+                    </p>
                   </div>
-                  <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-600">
-                    <User className="w-6 h-6" />
+                  <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600">
+                    <Wallet className="w-6 h-6" />
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-2xl border-pink-200 bg-pink-50/50 dark:bg-pink-950/20 shadow-sm">
+              <Card className="rounded-2xl border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 shadow-sm">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-pink-600 dark:text-pink-400 uppercase tracking-wider">Femeninos (F)</p>
-                    <h3 className="text-2xl font-extrabold text-pink-700 dark:text-pink-300 mt-1">{totalF}</h3>
+                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Por cobrar</p>
+                    <h3 className="text-2xl font-extrabold text-amber-700 dark:text-amber-300 mt-1 tabular-nums">
+                      {facturacion.pendiente.toLocaleString("es-PY")} ₲
+                    </h3>
+                    <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 font-semibold mt-0.5">
+                      Saldo de {facturacion.planes} plan{facturacion.planes === 1 ? "" : "es"} del período
+                    </p>
                   </div>
-                  <div className="p-3 bg-pink-500/10 rounded-2xl text-pink-600">
-                    <User className="w-6 h-6" />
+                  <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-600">
+                    <Coins className="w-6 h-6" />
                   </div>
                 </CardContent>
               </Card>
@@ -527,10 +544,10 @@ export default function Reportes() {
                       </Badge>
                     </div>
                     <CardTitle className="text-lg font-extrabold text-foreground mt-1">
-                      {tipoPeriodo === "semanal" && "INFORME SEMANAL DE CONSULTORIO EXTERNO — PLANILLA DE PRODUCTIVIDAD"}
-                      {tipoPeriodo === "mensual" && "INFORME MENSUAL DE CONSULTORIO EXTERNO — PLANILLA DE PRODUCTIVIDAD"}
-                      {tipoPeriodo === "diario" && "INFORME DIARIO DE CONSULTORIO EXTERNO — PLANILLA DE PRODUCTIVIDAD"}
-                      {tipoPeriodo === "personalizado" && "INFORME DE CONSULTORIO EXTERNO — PLANILLA DE PRODUCTIVIDAD"}
+                      {tipoPeriodo === "semanal" && "INFORME SEMANAL DE PRODUCCIÓN ODONTOLÓGICA"}
+                      {tipoPeriodo === "mensual" && "INFORME MENSUAL DE PRODUCCIÓN ODONTOLÓGICA"}
+                      {tipoPeriodo === "diario" && "INFORME DIARIO DE PRODUCCIÓN ODONTOLÓGICA"}
+                      {tipoPeriodo === "personalizado" && "INFORME DE PRODUCCIÓN ODONTOLÓGICA"}
                     </CardTitle>
                     <CardDescription className="text-xs font-medium text-muted-foreground">
                       Período: <strong className="text-sky-700 dark:text-sky-400 font-bold">{periodoTexto}</strong> &nbsp;·&nbsp;
@@ -567,10 +584,11 @@ export default function Reportes() {
                         <tr className="bg-slate-900 text-white dark:bg-slate-950 font-semibold text-xs border-b border-border">
                           <th className="py-3 px-4 text-center w-12 border-r border-slate-800">Nº</th>
                           <th className="py-3 px-4 min-w-[200px] border-r border-slate-800">Nombre y Apellido</th>
-                          <th className="py-3 px-4 text-center w-36 border-r border-slate-800">Jerarquía</th>
+                          <th className="py-3 px-4 text-center w-36 border-r border-slate-800">Documento</th>
                           <th className="py-3 px-4 text-center w-16 border-r border-slate-800">Sexo</th>
-                          <th className="py-3 px-4 min-w-[220px] border-r border-slate-800">Diagnóstico</th>
-                          <th className="py-3 px-4 min-w-[220px]">Tratamiento / Observación</th>
+                          <th className="py-3 px-4 text-center w-20 border-r border-slate-800">Pieza</th>
+                          <th className="py-3 px-4 min-w-[220px] border-r border-slate-800">Procedimiento</th>
+                          <th className="py-3 px-4 min-w-[220px]">Nota clínica</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -595,17 +613,14 @@ export default function Reportes() {
                                 {row.pacienteSexo}
                               </span>
                             </td>
+                            <td className="py-3 px-4 text-center border-r border-border/50 text-xs font-bold tabular-nums">
+                              {row.pieza || "—"}
+                            </td>
                             <td className="py-3 px-4 border-r border-border/50 text-xs text-foreground/90">
-                              {row.diagnostico.includes("🔒") ? (
-                                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 gap-1 text-[11px] font-medium">
-                                  <Shield className="w-3 h-3" /> {row.diagnostico}
-                                </Badge>
-                              ) : (
-                                row.diagnostico
-                              )}
+                              {row.procedimiento}
                             </td>
                             <td className="py-3 px-4 text-xs text-foreground/90">
-                              {row.tratamiento}
+                              {row.nota}
                             </td>
                           </tr>
                         ))}

@@ -1456,16 +1456,16 @@ export interface DatosImpresionProductividad {
 }
 
 export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad) {
-  let tituloPrincipal = "INFORME DIARIO DE CONSULTORIO EXTERNO";
+  let tituloPrincipal = "INFORME DIARIO DE PRODUCCIÓN ODONTOLÓGICA";
   if (datos.tipoPeriodo === "semanal") {
-    tituloPrincipal = "INFORME SEMANAL DE CONSULTORIO EXTERNO";
+    tituloPrincipal = "INFORME SEMANAL DE PRODUCCIÓN ODONTOLÓGICA";
   } else if (datos.tipoPeriodo === "mensual") {
-    tituloPrincipal = "INFORME MENSUAL DE CONSULTORIO EXTERNO";
+    tituloPrincipal = "INFORME MENSUAL DE PRODUCCIÓN ODONTOLÓGICA";
   } else if (datos.tipoPeriodo === "personalizado") {
-    tituloPrincipal = "INFORME DE CONSULTORIO EXTERNO — PRODUCTIVIDAD";
+    tituloPrincipal = "INFORME DE PRODUCCIÓN ODONTOLÓGICA";
   }
 
-  const tituloDoc = `${tituloPrincipal} - PLANILLA DE PRODUCTIVIDAD`;
+  const tituloDoc = tituloPrincipal;
 
   const trs = datos.filas.map((f) => `
     <tr>
@@ -1508,10 +1508,10 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
           <tr style="background-color: #1e293b; color: #ffffff;">
             <th style="padding: 8px 4px; width: 35px; text-align: center;">Nº</th>
             <th style="padding: 8px; text-align: left;">Nombre y Apellido</th>
-            <th style="padding: 8px; width: 110px; text-align: center;">Jerarquía</th>
+            <th style="padding: 8px; width: 110px; text-align: center;">Documento</th>
             <th style="padding: 8px; width: 45px; text-align: center;">Sexo</th>
-            <th style="padding: 8px; text-align: left;">Diagnóstico</th>
-            <th style="padding: 8px; text-align: left;">Tratamiento / Observación</th>
+            <th style="padding: 8px; text-align: left;">Pieza y procedimiento</th>
+            <th style="padding: 8px; text-align: left;">Nota clínica</th>
           </tr>
         </thead>
         <tbody>
