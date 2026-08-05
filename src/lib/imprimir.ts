@@ -1783,3 +1783,151 @@ export function imprimirPlanillaHistorial(datos: DatosPlanillaHistorial) {
 
   ejecutarImpresionIframe(tituloDoc, html);
 }
+
+// ============================================================================
+// Periodontograma
+// ============================================================================
+
+export interface DatosImpresionPeriodontograma {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  fecha: string;
+  profesional?: string | null;
+  arcadas: {
+    titulo: string;
+    dientes: {
+      numero: number;
+      datos: {
+        sitios: Record<string, { ps?: number | null; sangra?: boolean; placa?: boolean } | undefined>;
+        movilidad?: number | null;
+        furca?: number | null;
+        ausente?: boolean;
+      };
+    }[];
+  }[];
+  resumen: {
+    sitiosMedidos: number;
+    porcentajeSangrado: number;
+    porcentajePlaca: number;
+    bolsas4a5: number;
+    bolsas6omas: number;
+    psPromedio: number;
+    dientesConMovilidad: number;
+    dientesAusentes: number;
+  };
+  observaciones?: string | null;
+}
+
+export function imprimirPeriodontograma(datos: DatosImpresionPeriodontograma) {
+  const tituloDoc = "PERIODONTOGRAMA";
+  const ORDEN_SITIOS = ["mv", "v", "dv", "mp", "p", "dp"];
+
+  // En papel el color no siempre está disponible, así que la profundidad se
+  // marca además con un símbolo: * para 4-5 mm y ** para 6 mm o más.
+  const celdaPS = (ps?: number | null) => {
+    if (ps === null || ps === undefined) return `<td style="border:1px solid #cbd5e1; text-align:center; padding:2px;">—</td>`;
+    const fondo = ps >= 6 ? "#fecaca" : ps >= 4 ? "#fde68a" : "#ffffff";
+    const marca = ps >= 6 ? "**" : ps >= 4 ? "*" : "";
+    return `<td style="border:1px solid #cbd5e1; text-align:center; padding:2px; background:${fondo}; font-weight:${ps >= 4 ? "bold" : "normal"};">${ps}${marca}</td>`;
+  };
+
+  const tablaArcada = (arcada: DatosImpresionPeriodontograma["arcadas"][number]) => {
+    const encabezado = arcada.dientes
+      .map((d) => `<th style="border:1px solid #334155; padding:2px; font-size:9px; background:#1e293b; color:#fff;">${d.numero}</th>`)
+      .join("");
+
+    const filaSitio = (sitio: string, etiqueta: string) => `
+      <tr>
+        <td style="border:1px solid #cbd5e1; padding:2px; font-size:9px; background:#f1f5f9; white-space:nowrap;">${etiqueta}</td>
+        ${arcada.dientes.map((d) => (d.datos.ausente ? `<td style="border:1px solid #cbd5e1; text-align:center; background:#e2e8f0;">·</td>` : celdaPS(d.datos.sitios?.[sitio]?.ps))).join("")}
+      </tr>`;
+
+    const filaMarcas = (clave: "sangra" | "placa", etiqueta: string, simbolo: string) => `
+      <tr>
+        <td style="border:1px solid #cbd5e1; padding:2px; font-size:9px; background:#f1f5f9; white-space:nowrap;">${etiqueta}</td>
+        ${arcada.dientes
+          .map((d) => {
+            const marcados = ORDEN_SITIOS.filter((s) => d.datos.sitios?.[s]?.[clave]).length;
+            return `<td style="border:1px solid #cbd5e1; text-align:center; padding:2px; font-size:9px;">${marcados ? simbolo.repeat(Math.min(marcados, 3)) : ""}</td>`;
+          })
+          .join("")}
+      </tr>`;
+
+    const filaDiente = (clave: "movilidad" | "furca", etiqueta: string) => `
+      <tr>
+        <td style="border:1px solid #cbd5e1; padding:2px; font-size:9px; background:#f1f5f9; white-space:nowrap;">${etiqueta}</td>
+        ${arcada.dientes.map((d) => `<td style="border:1px solid #cbd5e1; text-align:center; padding:2px; font-size:9px;">${d.datos[clave] ?? ""}</td>`).join("")}
+      </tr>`;
+
+    return `
+      <h3 style="font-size:11px; margin:12px 0 4px; color:#1e3a8a;">${arcada.titulo}</h3>
+      <table style="width:100%; border-collapse:collapse; font-size:10px;">
+        <thead><tr><th style="border:1px solid #334155; padding:2px; background:#1e293b; color:#fff; font-size:9px;">Pieza</th>${encabezado}</tr></thead>
+        <tbody>
+          ${filaSitio("mv", "PS mesio-vest.")}
+          ${filaSitio("v", "PS vestibular")}
+          ${filaSitio("dv", "PS disto-vest.")}
+          ${filaSitio("mp", "PS mesio-pal.")}
+          ${filaSitio("p", "PS palatino")}
+          ${filaSitio("dp", "PS disto-pal.")}
+          ${filaMarcas("sangra", "Sangrado", "•")}
+          ${filaMarcas("placa", "Placa", "▪")}
+          ${filaDiente("movilidad", "Movilidad")}
+          ${filaDiente("furca", "Furca")}
+        </tbody>
+      </table>`;
+  };
+
+  const tarjeta = (etiqueta: string, valor: string, color = "#0f172a") => `
+    <div style="border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:80px;">
+      <div style="font-size:9px; color:#475569; text-transform:uppercase;">${etiqueta}</div>
+      <div style="font-size:14px; font-weight:bold; color:${color};">${valor}</div>
+    </div>`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding:16px; color:#0f172a; max-width:1000px; margin:0 auto;">
+      <div style="text-align:center; margin-bottom:12px; border-bottom:2px solid #0f172a; padding-bottom:8px;">
+        <h1 style="margin:0; font-size:16px; color:#1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h2 style="margin:4px 0; font-size:13px;">${tituloDoc}</h2>
+      </div>
+
+      <div style="margin-bottom:10px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-size:11px;">
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre} &nbsp;·&nbsp; <strong>Documento:</strong> ${datos.pacienteDocumento || "—"}</p>
+        <p style="margin:2px 0;"><strong>Fecha del sondaje:</strong> ${datos.fecha}${datos.profesional ? ` &nbsp;·&nbsp; <strong>Profesional:</strong> ${datos.profesional}` : ""}</p>
+      </div>
+
+      ${datos.arcadas.map(tablaArcada).join("")}
+
+      <p style="font-size:9px; color:#475569; margin:6px 0;">
+        PS = profundidad de sondaje en mm. <strong>*</strong> 4-5 mm · <strong>**</strong> 6 mm o más ·
+        <strong>•</strong> sangrado · <strong>▪</strong> placa (uno por sitio afectado) · <strong>·</strong> pieza ausente.
+      </p>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; justify-content:center;">
+        ${tarjeta("Sitios medidos", String(datos.resumen.sitiosMedidos))}
+        ${tarjeta("Sangrado", `${datos.resumen.porcentajeSangrado}%`, "#b91c1c")}
+        ${tarjeta("Placa", `${datos.resumen.porcentajePlaca}%`, "#1d4ed8")}
+        ${tarjeta("Bolsas 4-5 mm", String(datos.resumen.bolsas4a5), "#b45309")}
+        ${tarjeta("Bolsas ≥6 mm", String(datos.resumen.bolsas6omas), "#b91c1c")}
+        ${tarjeta("PS promedio", `${datos.resumen.psPromedio} mm`)}
+        ${tarjeta("Piezas ausentes", String(datos.resumen.dientesAusentes))}
+      </div>
+
+      ${
+        datos.observaciones
+          ? `<div style="margin-top:12px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;">
+               <strong style="font-size:11px;">Observaciones:</strong>
+               <p style="margin:4px 0 0; font-size:11px; white-space:pre-wrap;">${datos.observaciones}</p>
+             </div>`
+          : ""
+      }
+
+      <div style="margin-top:40px; text-align:center;">
+        <div style="width:220px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
+        <span style="font-size:10px;">Firma y Sello del Odontólogo</span>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}

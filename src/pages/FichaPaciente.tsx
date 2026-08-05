@@ -535,7 +535,11 @@ export default function FichaPaciente() {
           <TabsContent value="periodontograma" className="pt-3">
             <Card className="shadow-sm">
               <CardContent className="pt-6">
-                <Periodontograma pacienteId={pacienteId} />
+                <Periodontograma
+                  pacienteId={pacienteId}
+                  pacienteNombre={`${paciente.apellidos}, ${paciente.nombres}`}
+                  pacienteDocumento={paciente.documento}
+                />
               </CardContent>
             </Card>
           </TabsContent>
