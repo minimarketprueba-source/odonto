@@ -21,6 +21,7 @@ import {
   useAddPresupuestoDetalle,
   useDeletePresupuestoDetalle,
   usePagosPresupuesto,
+  usePagosPaciente,
   useAddPagoPresupuesto,
   usePacienteImagenes,
   useCreatePacienteImagen,
@@ -52,7 +53,8 @@ import {
   ListTodo,
   Printer
 } from "lucide-react";
-import { imprimirPresupuesto } from "@/lib/imprimir";
+import { imprimirPresupuesto, imprimirPlanillaHistorial } from "@/lib/imprimir";
+import { useEvoluciones } from "@/api/evoluciones";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 
@@ -65,6 +67,10 @@ export default function FichaPaciente() {
   const saveAnamnesis = useSavePacienteAnamnesis();
 
   const { data: presupuestos = [] } = usePresupuestos(pacienteId);
+  // Para la planilla del historial hacen falta los tratamientos y todos los
+  // pagos del paciente, no solo los del plan que esté abierto.
+  const { data: evoluciones = [] } = useEvoluciones(pacienteId);
+  const { data: pagosPaciente = [] } = usePagosPaciente(pacienteId);
   const createPresupuesto = useCreatePresupuesto();
   const updatePresupuesto = useUpdatePresupuesto();
   const deletePresupuesto = useDeletePresupuesto();
@@ -252,6 +258,52 @@ export default function FichaPaciente() {
   };
 
   // Add Treatment item to Budget
+  /**
+   * Planilla con todo lo que se le hizo al paciente: tratamientos, planes y
+   * pagos. Es el papel que se archiva en su carpeta o se le entrega.
+   */
+  const handleImprimirHistorial = () => {
+    if (!paciente) return;
+
+    const planes = presupuestos.map((p) => {
+      const total = Number(p.total) || 0;
+      const saldo = Number(p.saldo_pendiente) || 0;
+      return {
+        titulo: p.titulo,
+        fecha: new Date(p.created_at).toLocaleDateString("es-PY"),
+        estado: p.estado,
+        total,
+        abonado: Math.max(0, total - saldo),
+        saldo,
+      };
+    });
+
+    const totalCobrado = pagosPaciente.reduce((suma, p) => suma + (Number(p.monto) || 0), 0);
+    const totalAdeudado = planes.reduce((suma, p) => suma + p.saldo, 0);
+
+    imprimirPlanillaHistorial({
+      pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
+      pacienteDocumento: paciente.documento,
+      pacienteTelefono: paciente.telefono,
+      tratamientos: evoluciones.map((e) => ({
+        fecha: new Date(e.fecha_registro).toLocaleDateString("es-PY"),
+        pieza: e.pieza,
+        procedimiento: e.procedimiento || "—",
+        nota: e.nota_clinica,
+        profesional: e.medico ? `${e.medico.apellidos}, ${e.medico.nombres}` : null,
+      })),
+      planes,
+      pagos: pagosPaciente.map((p) => ({
+        fecha: new Date(p.fecha).toLocaleDateString("es-PY"),
+        monto: Number(p.monto) || 0,
+        metodo: p.tipo_pago ?? "—",
+        plan: (p as any).plan ?? null,
+      })),
+      totalCobrado,
+      totalAdeudado,
+    });
+  };
+
   /** Abre el presupuesto como documento para imprimir o guardar en PDF. */
   const handleImprimirPresupuesto = () => {
     if (!activePresupuesto || !paciente) return;
@@ -417,7 +469,16 @@ export default function FichaPaciente() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap relative z-10">
+          <div className="flex gap-2 flex-wrap items-center relative z-10">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 bg-background"
+              onClick={handleImprimirHistorial}
+            >
+              <Printer className="w-4 h-4" />
+              Planilla del historial
+            </Button>
             {paciente.activo ? (
               <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-0 text-xs">Paciente Activo</Badge>
             ) : (

@@ -116,6 +116,7 @@ export const odontoKeys = {
   pagos: (presupuestoId: number) => [...odontoKeys.all, "pagos", presupuestoId] as const,
   imagenes: (pacienteId: string) => [...odontoKeys.all, "imagenes", pacienteId] as const,
   consentimientos: (pacienteId: string) => [...odontoKeys.all, "consentimientos", pacienteId] as const,
+  pagosPaciente: (pacienteId: string) => [...odontoKeys.all, "pagos-paciente", pacienteId] as const,
 };
 
 // Helper para atrapar errores de tabla inexistente y dar una guía clara al usuario
@@ -497,6 +498,30 @@ export async function deletePagoPresupuesto(id: string | number): Promise<void> 
   const { error } = await supabase.from("pagos_presupuesto").delete().eq("id", id);
   if (error) handleDbError(error, "pagos_presupuesto");
   if (previo?.presupuesto_id) await recalcularTotalesPresupuesto(previo.presupuesto_id);
+}
+
+/**
+ * Todos los pagos del paciente, de cualquiera de sus planes.
+ *
+ * `usePagosPresupuesto` trae los de UN plan; para la planilla del historial
+ * hacen falta todos juntos, con el nombre del plan al que corresponden.
+ */
+export async function fetchPagosPaciente(pacienteId: string): Promise<(PagoPresupuesto & { plan?: string | null })[]> {
+  const { data, error } = await supabase
+    .from("pagos_presupuesto")
+    .select("*, presupuesto:presupuestos!inner(titulo, paciente_id)")
+    .eq("presupuesto.paciente_id", pacienteId)
+    .order("fecha", { ascending: true });
+  if (error) handleDbError(error, "pagos_presupuesto");
+  return (data ?? []).map((p: any) => ({ ...p, plan: p.presupuesto?.titulo ?? null }));
+}
+
+export function usePagosPaciente(pacienteId: string) {
+  return useQuery({
+    queryKey: odontoKeys.pagosPaciente(pacienteId),
+    queryFn: () => fetchPagosPaciente(pacienteId),
+    enabled: !!pacienteId,
+  });
 }
 
 export function usePagosPresupuesto(presupuestoId: number) {

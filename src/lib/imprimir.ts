@@ -1646,3 +1646,140 @@ export function imprimirPresupuesto(datos: DatosImpresionPresupuesto) {
 
   ejecutarImpresionIframe(tituloDoc, html);
 }
+
+// ============================================================================
+// Planilla del historial completo de un paciente
+// ============================================================================
+// Es el papel que se archiva en la carpeta del paciente o se le entrega: todo
+// lo que se le hizo a lo largo del tiempo, con lo cobrado y lo que debe.
+
+export interface DatosPlanillaHistorial {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteEdad?: string | null;
+  pacienteTelefono?: string | null;
+  /** Cada procedimiento asentado, del más viejo al más nuevo. */
+  tratamientos: {
+    fecha: string;
+    pieza?: string | null;
+    procedimiento: string;
+    nota?: string | null;
+    profesional?: string | null;
+  }[];
+  /** Los planes de tratamiento con sus importes. */
+  planes: {
+    titulo: string;
+    fecha: string;
+    estado: string;
+    total: number;
+    abonado: number;
+    saldo: number;
+  }[];
+  pagos: { fecha: string; monto: number; metodo: string; plan?: string | null }[];
+  totalCobrado: number;
+  totalAdeudado: number;
+}
+
+export function imprimirPlanillaHistorial(datos: DatosPlanillaHistorial) {
+  const tituloDoc = "HISTORIAL CLÍNICO ODONTOLÓGICO";
+
+  const sinDatos = (columnas: number, texto: string) =>
+    `<tr><td colspan="${columnas}" style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; color: #64748b; font-style: italic;">${texto}</td></tr>`;
+
+  const filasTratamientos = datos.tratamientos.length
+    ? datos.tratamientos.map((t, i) => `
+        <tr>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-align: center;">${i + 1}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; white-space: nowrap;">${t.fecha}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${t.pieza || "—"}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1;">${t.procedimiento}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; font-size: 10px;">${t.nota || ""}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; font-size: 10px;">${t.profesional || "—"}</td>
+        </tr>
+      `).join("")
+    : sinDatos(6, "Todavía no se registraron tratamientos.");
+
+  const filasPlanes = datos.planes.length
+    ? datos.planes.map((p) => `
+        <tr>
+          <td style="padding: 5px; border: 1px solid #cbd5e1;">${p.titulo}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; white-space: nowrap;">${p.fecha}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-transform: uppercase; font-size: 10px;">${p.estado}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-align: right;">${p.total.toLocaleString()} ₲</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-align: right; color: #15803d;">${p.abonado.toLocaleString()} ₲</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-align: right; font-weight: bold; color: ${p.saldo > 0 ? "#b91c1c" : "#15803d"};">${p.saldo.toLocaleString()} ₲</td>
+        </tr>
+      `).join("")
+    : sinDatos(6, "Todavía no se cargaron planes de tratamiento.");
+
+  const filasPagos = datos.pagos.length
+    ? datos.pagos.map((p) => `
+        <tr>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; white-space: nowrap;">${p.fecha}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1;">${p.metodo}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; font-size: 10px;">${p.plan || "—"}</td>
+          <td style="padding: 5px; border: 1px solid #cbd5e1; text-align: right; font-weight: bold; color: #15803d;">${p.monto.toLocaleString()} ₲</td>
+        </tr>
+      `).join("")
+    : sinDatos(4, "Todavía no se registraron pagos.");
+
+  const encabezadoTabla = (columnas: string[]) =>
+    `<tr style="background-color: #1e293b; color: #ffffff;">${columnas
+      .map((c) => `<th style="padding: 6px; border: 1px solid #334155; text-align: left; font-size: 11px;">${c}</th>`)
+      .join("")}</tr>`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 18px; color: #0f172a; max-width: 900px; margin: 0 auto; font-size: 12px;">
+      <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 8px;">
+        <h1 style="margin: 0; font-size: 17px; color: #1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h2 style="margin: 4px 0; font-size: 13px;">${tituloDoc}</h2>
+        <p style="margin: 0; font-size: 10px; color: #475569;">Emitido el ${new Date().toLocaleDateString("es-PY")}</p>
+      </div>
+
+      <div style="margin-bottom: 14px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
+        <p style="margin: 3px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
+        <p style="margin: 3px 0;"><strong>Documento:</strong> ${datos.pacienteDocumento || "—"}${
+          datos.pacienteEdad ? ` &nbsp;·&nbsp; <strong>Edad:</strong> ${datos.pacienteEdad}` : ""
+        }${datos.pacienteTelefono ? ` &nbsp;·&nbsp; <strong>Teléfono:</strong> ${datos.pacienteTelefono}` : ""}</p>
+      </div>
+
+      <h3 style="font-size: 12px; margin: 14px 0 6px; color: #1e3a8a;">TRATAMIENTOS REALIZADOS</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>${encabezadoTabla(["Nº", "Fecha", "Pieza", "Procedimiento", "Nota clínica", "Profesional"])}</thead>
+        <tbody>${filasTratamientos}</tbody>
+      </table>
+
+      <h3 style="font-size: 12px; margin: 14px 0 6px; color: #1e3a8a;">PLANES DE TRATAMIENTO</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>${encabezadoTabla(["Plan", "Fecha", "Estado", "Cotizado", "Abonado", "Saldo"])}</thead>
+        <tbody>${filasPlanes}</tbody>
+      </table>
+
+      <h3 style="font-size: 12px; margin: 14px 0 6px; color: #1e3a8a;">PAGOS RECIBIDOS</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>${encabezadoTabla(["Fecha", "Método", "Plan", "Monto"])}</thead>
+        <tbody>${filasPagos}</tbody>
+      </table>
+
+      <div style="margin-top: 16px; display: flex; gap: 10px; justify-content: flex-end;">
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 14px; background-color: #f0fdf4; text-align: right;">
+          <div style="font-size: 10px; color: #475569; text-transform: uppercase;">Total cobrado</div>
+          <div style="font-size: 15px; font-weight: bold; color: #15803d;">${datos.totalCobrado.toLocaleString()} ₲</div>
+        </div>
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 14px; background-color: ${
+          datos.totalAdeudado > 0 ? "#fef2f2" : "#f8fafc"
+        }; text-align: right;">
+          <div style="font-size: 10px; color: #475569; text-transform: uppercase;">Saldo adeudado</div>
+          <div style="font-size: 15px; font-weight: bold; color: ${datos.totalAdeudado > 0 ? "#b91c1c" : "#15803d"};">${datos.totalAdeudado.toLocaleString()} ₲</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 45px; text-align: center;">
+        <div style="width: 220px; border-bottom: 1px solid #000; margin: 0 auto 5px;"></div>
+        <span style="font-size: 10px;">Firma y Sello del Odontólogo</span>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
