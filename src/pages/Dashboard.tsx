@@ -60,6 +60,19 @@ function getFechaFormateada(): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+function formatMontoGrafico(val: number): string {
+  if (!val || val === 0) return "0 ₲";
+  if (val >= 1_000_000) {
+    const m = val / 1_000_000;
+    return `${Number.isInteger(m) ? m : m.toFixed(1)}M ₲`;
+  }
+  if (val >= 1_000) {
+    const k = val / 1_000;
+    return `${Number.isInteger(k) ? k : Math.round(k)}k ₲`;
+  }
+  return `${val} ₲`;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const hoy = fechaHoyISO();
@@ -148,60 +161,109 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex gap-2 mt-4 md:mt-0 relative z-10">
-            <Button size="sm" className="gap-1.5" asChild>
-              <Link to="/citas">
-                <CalendarPlus className="w-4 h-4" /> Agendar Cita
-              </Link>
+            <Button size="sm" className="gap-1.5 shadow-sm" asChild>
+              <Link to="/pacientes"><UserPlus className="w-4 h-4" /> Nuevo Paciente</Link>
             </Button>
-            <Button size="sm" variant="outline" className="gap-1.5" asChild>
-              <Link to="/pacientes">
-                <UserPlus className="w-4 h-4" /> Registrar Paciente
-              </Link>
+            <Button size="sm" variant="outline" className="gap-1.5 shadow-sm bg-background" asChild>
+              <Link to="/citas"><CalendarPlus className="w-4 h-4" /> Agendar Cita</Link>
             </Button>
           </div>
         </div>
 
-        {/* General Stats Metrics */}
+        {/* Citas del Día Progress Card */}
+        <Card className="border-primary/20 bg-gradient-to-r from-card via-card to-primary/5 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                  Citas Agendadas para Hoy
+                </CardTitle>
+                <CardDescription>
+                  {misCitasHoy.length === 0
+                    ? "No hay citas registradas para la fecha de hoy."
+                    : `${misAtendidas.length} de ${misCitasHoy.length} pacientes atendidos (${progressPercentage}% completado)`}
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="bg-background text-xs font-semibold px-3 py-1">
+                {hoy}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Progress value={progressPercentage} className="h-2.5 bg-slate-100 dark:bg-slate-800" />
+
+            {/* Citas Quick List */}
+            {misCitasHoy.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2">
+                {misCitasHoy.slice(0, 6).map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-3 border rounded-xl bg-card/80 flex items-center justify-between text-xs space-x-2 shadow-2xs hover:border-primary/40 transition-colors"
+                  >
+                    <div className="flex items-center space-x-2 truncate">
+                      <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="font-semibold text-foreground truncate">
+                        {c.hora} — {c.pacientes?.apellidos}, {c.pacientes?.nombres}
+                      </span>
+                    </div>
+                    <Badge
+                      className={
+                        c.estado === "atendida"
+                          ? "bg-emerald-100 text-emerald-800 border-0 flex-shrink-0 text-[10px]"
+                          : c.estado === "cancelada"
+                            ? "bg-red-100 text-red-800 border-0 flex-shrink-0 text-[10px]"
+                            : "bg-amber-100 text-amber-800 border-0 flex-shrink-0 text-[10px]"
+                      }
+                    >
+                      {c.estado}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Key Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="shadow-sm">
+          <Card className="shadow-sm hover:border-primary/30 transition-colors">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Pacientes Activos</CardTitle>
-              <Users className="w-5 h-5 text-blue-500" />
+              <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Pacientes Registrados</CardTitle>
+              <Users className="w-4 h-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-black">{pacientes.filter((p) => p.activo).length}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">Registrados en el padrón clínico</p>
+              <div className="text-2xl font-black text-foreground">{pacientes.length}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Pacientes en la base clínica</p>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="shadow-sm hover:border-primary/30 transition-colors">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Citas para Hoy</CardTitle>
-              <CalendarDays className="w-5 h-5 text-indigo-500" />
+              <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Total Cotizado</CardTitle>
+              <DollarSign className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-black">{misCitasHoy.length}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {misAtendidas.length} atendidas · {misPendientes.length} pendientes
-              </p>
+              <div className="text-2xl font-black text-foreground">{totalCotizado.toLocaleString()} ₲</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Monto de presupuestos creados</p>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="shadow-sm hover:border-primary/30 transition-colors">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Ingresos (Cobrado)</CardTitle>
-              <Coins className="w-5 h-5 text-emerald-500" />
+              <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Total Cobrado</CardTitle>
+              <Coins className="w-4 h-4 text-emerald-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-black text-emerald-600">{totalCobrado.toLocaleString()} ₲</div>
-              <p className="text-[10px] text-muted-foreground mt-1">Abonos realizados por pacientes</p>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{totalCobrado.toLocaleString()} ₲</div>
+              <p className="text-[10px] text-muted-foreground mt-1">Ingresos totales percibidos</p>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="shadow-sm hover:border-primary/30 transition-colors">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Saldo Pendiente</CardTitle>
-              <DollarSign className="w-5 h-5 text-destructive" />
+              <Activity className="w-4 h-4 text-destructive" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-black text-destructive">{totalPendiente.toLocaleString()} ₲</div>
@@ -278,10 +340,14 @@ export default function Dashboard() {
                       </Button>
                     </div>
                   ))}
-        {/* Charts & Analytics Section */}
-        <div className="grid grid-cols-1 gap-6">
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Charts panel */}
+          <Card className="lg:col-span-2 shadow-sm">
+            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <Activity className="w-4 h-4 text-emerald-500" />
