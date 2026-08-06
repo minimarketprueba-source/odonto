@@ -262,13 +262,29 @@ export async function fetchMedicosActivos(): Promise<Medico[]> {
 
 /** Ficha de médico vinculada a la cuenta logueada (medicos.user_id), si existe. */
 export async function fetchMiMedico(userId: string): Promise<Medico | null> {
+  // Se piden hasta 2 filas en vez de `.maybeSingle()`. Antes, si dos fichas
+  // quedaban vinculadas a la misma cuenta, `.maybeSingle()` tiraba un error y
+  // el profesional se quedaba sin recetas, sin firma en la agenda y sin «Mi
+  // perfil», con un mensaje que no explicaba nada. El candado de verdad es el
+  // índice `medicos_user_id_unico` (medicos_vinculo_unico.sql); esto es para
+  // que un dato viejo no deje a nadie sin trabajar.
   const { data, error } = await supabase
     .from("medicos")
     .select("id, nombres, apellidos, activo, user_id, especialidad:especialidades(id, nombre, color)")
     .eq("user_id", userId)
-    .maybeSingle();
+    .order("activo", { ascending: false })
+    .limit(2);
   if (error) throw new Error(`Error al buscar la ficha del médico: ${error.message}`);
-  return (data as unknown as Medico) || null;
+
+  const fichas = (data as unknown as Medico[]) || [];
+  if (fichas.length > 1) {
+    console.warn(
+      `[medicos] La cuenta ${userId} tiene ${fichas.length} fichas vinculadas. ` +
+        "Se usa la activa. Corregirlo en Mantenimiento → Médicos y aplicar " +
+        "supabase/migrations/medicos_vinculo_unico.sql."
+    );
+  }
+  return fichas[0] ?? null;
 }
 
 // ---------------------------------------------------------------------------
