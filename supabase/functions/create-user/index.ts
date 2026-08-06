@@ -1,3 +1,8 @@
+// @ts-nocheck — Este archivo NO es parte de la app: corre en Deno, dentro de
+// Supabase. Usa `Deno.serve` e importa con `npm:`, cosas que el TypeScript de
+// este proyecto no conoce y marcaría en rojo sin que haya nada mal. Tampoco
+// entra en el `tsconfig.json` ni en el build. Quien lo revisa de verdad es
+// Supabase al publicarlo.
 // ============================================================================
 // Alta de cuentas de usuario
 // ============================================================================
@@ -22,13 +27,22 @@
 //   1. Entrar a https://supabase.com/dashboard/project/othuhgapvnpdjhartrut/functions
 //   2. "Deploy a new function" → "Via Editor"
 //   3. Nombre EXACTO: create-user   (así la busca la app)
-//   4. Pegar TODO este archivo y Deploy.
+//   4. BORRAR TODO el ejemplo que trae el editor (el del "Hello name") y pegar
+//      este archivo entero en su lugar. No se mezclan: son dos formas distintas
+//      de escribir lo mismo y quedarían dos respuestas peleando.
+//   5. Deploy.
 //
-// SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen cargadas solas en las
-// Edge Functions: no hay que configurar ninguna variable a mano.
+// Si el editor ofrece un interruptor "Verify JWT", dejarlo COMO VIENE
+// (activado). La app manda la sesión del administrador en la cabecera, así que
+// pasa esa verificación sin problema.
+//
+// Las claves ya vienen cargadas solas en las Edge Functions: no hay que
+// configurar ninguna variable a mano.
 // ============================================================================
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// `npm:` y no una URL de esm.sh: es lo que entienden todas las versiones del
+// entorno de Supabase, viejas y nuevas.
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -50,10 +64,21 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return responder({ error: "Método no permitido" }, 405);
 
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // Supabase renombró las claves: las cuentas viejas tienen
+  // SUPABASE_SERVICE_ROLE_KEY y las nuevas SB_SECRET_KEY. Se prueban las dos
+  // para que la función sirva igual sin tener que tocarla.
+  const url = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("SB_URL");
+  const serviceKey =
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SB_SECRET_KEY");
   if (!url || !serviceKey) {
-    return responder({ error: "La función no está configurada en el servidor." }, 500);
+    return responder(
+      {
+        error:
+          "La función no encuentra la clave del servidor. En el panel: " +
+          "Edge Functions → create-user → Secrets, agregar SUPABASE_SERVICE_ROLE_KEY.",
+      },
+      500
+    );
   }
 
   // Cliente con permisos totales. Solo se usa después de comprobar quién llama.
