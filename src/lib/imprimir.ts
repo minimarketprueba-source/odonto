@@ -868,23 +868,26 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
   const empresa = getEmpresa();
   const colorClaro = aclararColor(empresa.color_primario);
   const logoBanda = empresa.logo_url || LOGO_BANDA_PREDETERMINADO;
-  // Marca de agua: primero el ícono cuadrado, si no el logo, y recién si el
-  // consultorio no cargó ninguno de los dos, la muela de Mova Dent.
+  // Marca de agua: primero el LOGO, si no el ícono, y recién si el consultorio
+  // no cargó ninguno de los dos, la muela de Mova Dent.
   //
-  // El orden importa por dos motivos. Uno: la muela de Mova Dent en la receta
-  // de OTRO consultorio sería la marca de otra empresa impresa en un documento
-  // ajeno, así que solo sale si no se personalizó nada. Dos: el ícono es
-  // cuadrado y llena mejor el alto de una A5 que un logo ancho, por eso va
-  // primero cuando están los dos.
-  const propia = empresa.icono_url || empresa.logo_url;
+  // El logo va primero a propósito, aunque el ícono llene mejor una hoja A5:
+  // el ícono está pensado para el recuadro del menú y la pestaña del
+  // navegador, así que suele tener fondo sólido. De marca de agua eso no es un
+  // dibujo suave, es un CUADRADO GRIS en el medio de la receta. El logo, en
+  // cambio, se hace transparente porque va sobre documentos.
+  //
+  // La de Mova Dent solo sale si no se personalizó nada: en la receta de otro
+  // consultorio sería la marca de otra empresa impresa en un documento ajeno.
+  const propia = empresa.logo_url || empresa.icono_url;
   const marcaAgua = propia || MARCA_AGUA_DIENTE;
-  // La de Mova Dent ya viene aclarada de fábrica. La que sube el consultorio
-  // puede ser de cualquier color y hasta tener fondo, así que a esa se la baja
-  // mucho más para que no compita con el texto de la receta.
+  // La de fábrica ya viene aclarada. La que sube el consultorio puede ser de
+  // cualquier color, así que a esa se la baja mucho más para que no compita
+  // con el texto de la receta.
   const opacidadAgua = propia ? 0.08 : 0.5;
   // Un logo ancho estirado al alto de la muela quedaría enorme: se le da el
-  // ancho según la forma.
-  const anchoAgua = empresa.icono_url || !propia ? "76mm" : "100mm";
+  // ancho según la forma que tenga.
+  const anchoAgua = empresa.logo_url ? "100mm" : "76mm";
 
   const filas = datos.medicamentos
     .map((m, i) => {

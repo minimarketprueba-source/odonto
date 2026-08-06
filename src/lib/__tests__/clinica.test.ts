@@ -253,10 +253,20 @@ describe("la receta se adapta a otro consultorio", () => {
     expect(html).not.toContain(MARCA_AGUA_DIENTE.slice(0, 60));
   });
 
-  it("si sube su propio ícono, ese sí se usa de marca de agua", async () => {
+  it("de marca de agua usa el LOGO, no el ícono, aunque estén los dos", async () => {
+    // El ícono está hecho para el recuadro del menú y la pestaña, así que suele
+    // tener fondo sólido: de marca de agua sería un cuadrado gris en el medio
+    // de la receta. El logo se hace transparente porque va sobre documentos.
     setEmpresa({ ...OTRO, icono_url: "data:image/png;base64,OTROICONO" });
     const html = await htmlDeLaReceta();
-    expect(html).toContain("data:image/png;base64,OTROICONO");
+    expect(html).toContain("data:image/png;base64,OTROLOGO");
+  });
+
+  it("con ícono y sin logo, usa el ícono antes que filtrar la marca ajena", async () => {
+    setEmpresa({ ...OTRO, logo_url: null, icono_url: "data:image/png;base64,SOLOICONO" });
+    const html = await htmlDeLaReceta();
+    expect(html).toContain("data:image/png;base64,SOLOICONO");
+    expect(html).not.toContain(MARCA_AGUA_DIENTE.slice(0, 60));
   });
 
   it("sin nada personalizado sigue saliendo la marca de Mova Dent", async () => {
