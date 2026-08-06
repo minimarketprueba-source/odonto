@@ -1,4 +1,5 @@
 import { getEmpresa, lineaContacto } from "@/lib/clinica";
+import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
 
 /**
  * El encabezado que comparten todos los impresos: logo, nombre del
@@ -18,14 +19,14 @@ function encabezadoDocumento(
   const { sub = null, tamNombre = 18, margen = 16 } = opciones;
   const empresa = getEmpresa();
   const contacto = lineaContacto(empresa);
+  // Mientras el administrador no suba el suyo, va el de Mova Dent. Así los
+  // documentos salen con logo desde el primer día en lugar de esperar a que
+  // alguien entre a cargarlo.
+  const logo = empresa.logo_url || LOGO_IMPRESION_PREDETERMINADO;
 
   return `
       <div style="text-align:center; margin-bottom:${margen}px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
-        ${
-          empresa.logo_url
-            ? `<img src="${empresa.logo_url}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">`
-            : ""
-        }
+        <img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">
         <h1 style="margin:0; font-size:${tamNombre}px; color:#1e3a8a;">${esc(empresa.nombre)}</h1>
         ${contacto ? `<p style="margin:3px 0 0; font-size:10px; color:#64748b;">${esc(contacto)}</p>` : ""}
         <h2 style="margin:5px 0 0; font-size:14px;">${esc(tituloDoc)}</h2>

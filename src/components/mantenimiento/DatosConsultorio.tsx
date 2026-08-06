@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useEmpresa, useActualizarEmpresa, achicarLogo } from "@/api/empresa";
 import { usePermissions } from "@/hooks/use-permissions";
 import { lineaContacto } from "@/lib/clinica";
+import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
 
 /**
  * Los datos que salen impresos en todo lo que se le entrega al paciente:
@@ -152,11 +153,11 @@ export function DatosConsultorio() {
         <Label>Logo</Label>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex h-20 w-40 items-center justify-center overflow-hidden rounded-lg border bg-slate-900 p-2">
-            {logo ? (
-              <img src={logo} alt="Logo del consultorio" className="max-h-full max-w-full object-contain" />
-            ) : (
-              <span className="text-xs text-slate-400">Sin logo</span>
-            )}
+            <img
+              src={logo || LOGO_IMPRESION_PREDETERMINADO}
+              alt="Logo del consultorio"
+              className="max-h-full max-w-full object-contain"
+            />
           </div>
           <div className="flex flex-col gap-2">
             <input
@@ -187,8 +188,11 @@ export function DatosConsultorio() {
               </Button>
             )}
             <p className="max-w-xs text-xs text-muted-foreground">
-              Se achica solo a 600 px de ancho. Conviene un PNG con fondo transparente:
-              se imprime sobre papel blanco.
+              {logo
+                ? "Se achica solo a 600 px de ancho."
+                : "Mientras no subas uno, se usa el de Mova Dent."}{" "}
+              Conviene un PNG con fondo transparente y trazos oscuros: se imprime sobre
+              papel blanco.
             </p>
           </div>
         </div>
@@ -200,7 +204,13 @@ export function DatosConsultorio() {
           Así va a salir el encabezado
         </p>
         <div className="rounded-lg border bg-white p-4 text-center">
-          {logo && <img src={logo} alt="" className="mx-auto mb-1.5 max-h-12 max-w-[200px] object-contain" />}
+          {/* El mismo respaldo que usa el impreso: sin logo propio va el de
+              Mova Dent, así la vista previa no miente. */}
+          <img
+            src={logo || LOGO_IMPRESION_PREDETERMINADO}
+            alt=""
+            className="mx-auto mb-1.5 max-h-12 max-w-[200px] object-contain"
+          />
           <p className="text-base font-bold text-[#1e3a8a]">{nombre || "—"}</p>
           {vistaPrevia && <p className="mt-0.5 text-[11px] text-slate-500">{vistaPrevia}</p>}
           <p className="mt-1 text-sm font-semibold text-slate-800">RECETA ODONTOLÓGICA</p>

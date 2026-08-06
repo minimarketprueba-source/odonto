@@ -3,6 +3,7 @@ import {
   EMPRESA_PREDETERMINADA, getEmpresa, setEmpresa, lineaContacto,
 } from "@/lib/clinica";
 import { imprimirReceta } from "@/lib/imprimir";
+import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
 
 const COMPLETA = {
   nombre: "CONSULTORIO ODONTOLÓGICO MOVA DENT",
@@ -96,6 +97,18 @@ describe("encabezado de los impresos", () => {
     expect(html).toContain(EMPRESA_PREDETERMINADA.nombre);
     // Sin logo no tiene que quedar una etiqueta de imagen vacía.
     expect(html).not.toContain('<img src="" ');
+  });
+
+  it("sin logo cargado usa el de Mova Dent, para que el papel no salga pelado", async () => {
+    const html = await htmlDeLaReceta();
+    expect(html).toContain(LOGO_IMPRESION_PREDETERMINADO.slice(0, 80));
+  });
+
+  it("el logo que subió el administrador le gana al predeterminado", async () => {
+    setEmpresa(COMPLETA);
+    const html = await htmlDeLaReceta();
+    expect(html).toContain(COMPLETA.logo_url);
+    expect(html).not.toContain(LOGO_IMPRESION_PREDETERMINADO.slice(0, 80));
   });
 
   it("escapa lo que escribió el usuario en el nombre del consultorio", async () => {
