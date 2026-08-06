@@ -56,8 +56,15 @@ export function Recetas({
   const [indicaciones, setIndicaciones] = useState("");
   const [items, setItems] = useState<RecetaItem[]>([{ ...FILA_VACIA }]);
 
-  // Solo el odontólogo emite; su ficha es la que firma el documento.
-  const puedeRecetar = isMedico && !!miMedico;
+  // El odontólogo y el administrador emiten. En este consultorio el dueño es
+  // las dos cosas con una sola cuenta, así que exigir el rol `medico` lo
+  // dejaba sin poder recetar desde la cuenta que usa todos los días.
+  //
+  // El permiso es de la cuenta; la FIRMA es de la ficha de odontólogo
+  // vinculada a ella. Sin ficha no se emite, aunque sobre el permiso: el
+  // documento saldría sin nombre ni registro profesional.
+  const tienePermiso = isMedico || isAdmin;
+  const puedeRecetar = tienePermiso && !!miMedico;
 
   const opcionesVademecum = MEDICAMENTOS_FRECUENTES.map((m) => ({
     value: m.id,
@@ -269,16 +276,26 @@ export function Recetas({
         </div>
       )}
 
-      {!isMedico && (
+      {!tienePermiso && (
         <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
           Las recetas las emite el odontólogo. Desde esta cuenta se pueden ver e imprimir las ya emitidas.
         </p>
       )}
-      {isMedico && !miMedico && (
-        <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-          Para emitir recetas hace falta que su ficha de odontólogo esté cargada y vinculada a esta
-          cuenta (Mantenimiento → Médicos). La receta se firma con ese nombre y su registro profesional.
-        </p>
+      {tienePermiso && !miMedico && (
+        <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1 text-amber-900 dark:text-amber-200">
+            <p className="font-semibold">Falta vincular su ficha de odontólogo</p>
+            <p>
+              La receta se firma con el nombre y el registro profesional de la ficha vinculada a
+              esta cuenta, y esta cuenta todavía no tiene ninguna.
+            </p>
+            <p>
+              Andá a <strong>Mantenimiento → Médicos</strong>, abrí su ficha (o creála) y en
+              «Cuenta de acceso» elegí <strong>la cuenta con la que está entrando ahora</strong>.
+            </p>
+          </div>
+        </div>
       )}
 
       {abierto && (
