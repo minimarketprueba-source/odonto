@@ -105,17 +105,18 @@ export function Sidebar() {
               tabIndex={isCollapsed ? 0 : undefined}
               title={isCollapsed ? "Expandir menú" : undefined}
             >
-              {/* Con logo cargado: fondo oscuro propio y `object-contain`, porque
-                  un logo ancho recortado a un cuadrado quedaría partido al medio.
-                  Sin logo cargado: el ícono de Mova Dent, que ya viene cuadrado. */}
-              <div className={cn(
-                "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden",
-                empresa.logo_url && "bg-slate-900 p-1"
-              )}>
+              {/* Acá va SIEMPRE el ícono cuadrado, nunca el logo que sube el
+                  administrador en Mantenimiento → Consultorio.
+                  El recuadro mide 40x40 y los logos de consultorio son anchos
+                  (el de Mova Dent es 457x124, casi 4:1): metido entero se ve
+                  diminuto entre dos franjas vacías, y recortado se parte al
+                  medio. El logo cargado sí se usa donde entra bien: la pantalla
+                  de acceso y los impresos. */}
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
                 <img
-                  src={empresa.logo_url || getLogoPath()}
+                  src={getLogoPath()}
                   alt={empresa.nombre}
-                  className={cn("w-full h-full", empresa.logo_url ? "object-contain" : "object-cover")}
+                  className="w-full h-full object-cover"
                 />
               </div>
               {!isCollapsed && (
