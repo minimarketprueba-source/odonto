@@ -37,5 +37,21 @@ AS $$
     );
 $$;
 
--- Verificación: con la sesión del administrador tiene que devolver true.
-SELECT public.es_odonto_prescriptor() AS puedo_emitir_recetas;
+-- Verificación ------------------------------------------------------------------
+-- ⚠ NO sirve hacer `SELECT public.es_odonto_prescriptor()` acá: el SQL Editor
+-- corre como dueño de la base, no como un usuario de la app, así que
+-- `auth.uid()` está vacío y la función devuelve FALSE siempre. Eso no significa
+-- que esté mal instalada.
+--
+-- Lo que sí se puede comprobar es qué cuentas cumplen la condición. La del
+-- administrador tiene que aparecer con `puede_emitir = true`.
+SELECT p.email,
+       r.role,
+       r.status,
+       (
+           lower(r.role) IN ('medico', 'admin', 'superadmin', 'super_admin')
+           AND (r.status IS NULL OR lower(r.status) IN ('activo', 'active', 'habilitado', 'enabled'))
+       ) AS puede_emitir
+FROM public.user_roles r
+LEFT JOIN public.profiles p ON p.id = r.user_id
+ORDER BY puede_emitir DESC, p.email;
