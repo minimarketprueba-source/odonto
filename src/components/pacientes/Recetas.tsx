@@ -43,7 +43,7 @@ const FILA_VACIA: RecetaItem = {
 export function Recetas({
   pacienteId, pacienteNombre, pacienteDocumento, pacienteEdad,
 }: RecetasProps) {
-  const { user } = useAuth();
+  const { user, role: rol } = useAuth();
   const { isMedico, isAdmin } = usePermissions();
   const { data: miMedico } = useMiMedico(user?.id);
   const { data: anamnesis } = usePacienteAnamnesis(pacienteId);
@@ -276,24 +276,45 @@ export function Recetas({
         </div>
       )}
 
-      {!tienePermiso && (
-        <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-          Las recetas las emite el odontólogo. Desde esta cuenta se pueden ver e imprimir las ya emitidas.
-        </p>
-      )}
-      {tienePermiso && !miMedico && (
+      {/* Cuando no se puede emitir, la pantalla dice QUÉ falta y con qué cuenta
+          se está entrando. Antes solo desaparecía el botón, y desde afuera los
+          dos motivos (sin permiso / sin ficha) se ven igual: nada. */}
+      {!puedeRecetar && (
         <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div className="space-y-1 text-amber-900 dark:text-amber-200">
-            <p className="font-semibold">Falta vincular su ficha de odontólogo</p>
-            <p>
-              La receta se firma con el nombre y el registro profesional de la ficha vinculada a
-              esta cuenta, y esta cuenta todavía no tiene ninguna.
+          <div className="space-y-2 text-amber-900 dark:text-amber-200">
+            <p className="font-semibold">
+              {tienePermiso ? "Falta vincular su ficha de odontólogo" : "Esta cuenta no emite recetas"}
             </p>
-            <p>
-              Andá a <strong>Mantenimiento → Médicos</strong>, abrí su ficha (o creála) y en
-              «Cuenta de acceso» elegí <strong>la cuenta con la que está entrando ahora</strong>.
-            </p>
+
+            <ul className="space-y-0.5">
+              <li>
+                Entrando como <strong>{user?.email ?? "—"}</strong>
+                {rol ? <> · rol <strong>{rol}</strong></> : null}
+              </li>
+              <li>
+                Permiso para emitir: <strong>{tienePermiso ? "sí" : "no"}</strong>
+              </li>
+              <li>
+                Ficha de odontólogo vinculada:{" "}
+                <strong>
+                  {miMedico ? `${miMedico.apellidos}, ${miMedico.nombres}` : "ninguna"}
+                </strong>
+              </li>
+            </ul>
+
+            {tienePermiso ? (
+              <p>
+                La receta se firma con el nombre y el registro profesional de la ficha vinculada a
+                la cuenta. Andá a <strong>Mantenimiento → Médicos</strong>, abrí su ficha (o creála)
+                y en «Cuenta de acceso» elegí <strong>{user?.email ?? "esta cuenta"}</strong>.
+              </p>
+            ) : (
+              <p>
+                Las recetas las emite el odontólogo o el administrador. Desde esta cuenta se pueden
+                ver e imprimir las ya emitidas.
+              </p>
+            )}
           </div>
         </div>
       )}
