@@ -10,12 +10,16 @@ import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 
 // Helper para obtener la ruta correcta del logo
 const getLogoPath = () => {
+  // El ícono cuadrado (la muela sobre fondo oscuro), no el logo ancho: acá
+  // entra en un recuadro de 40x40 y el logo con el texto quedaría ilegible.
+  // Trae su propio fondo oscuro, así que se ve igual en modo claro y oscuro.
+  const archivo = 'mova-dent-icono.png';
   // En Electron, usar ruta relativa al index.html
   if (typeof window !== 'undefined' && (window as any).electron) {
-    return './favicon.png';
+    return `./${archivo}`;
   }
   // En web, usar ruta absoluta
-  return '/favicon.png';
+  return `/${archivo}`;
 };
 
 export function Sidebar() {

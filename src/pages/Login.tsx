@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Activity, Shield, Stethoscope, UserCheck, Sparkles, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff, Shield, Stethoscope, UserCheck, Sparkles, CheckCircle2 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { useAuth, DEMO_USERS } from "@/context/auth-context"
-import { NOMBRE_CLINICA, NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
+import { NOMBRE_CLINICA } from "@/lib/clinica";
 
 /**
  * Traduce los errores de Supabase Auth a algo que se entienda y que diga qué
@@ -79,22 +79,21 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-lg relative z-10 bg-slate-900/80 backdrop-blur-xl border border-teal-500/20 shadow-2xl shadow-teal-950/50">
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-3">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 shadow-lg shadow-teal-500/30">
-              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-                <Activity className="w-8 h-8 text-teal-400" />
-              </div>
-            </div>
-          </div>
-          
+          {/* El logo va acá y no el nombre escrito: el fondo es oscuro, que es
+              para lo que está hecho, y ya trae "MOVA DENT" en su tipografía. */}
+          <CardTitle className="mb-1">
+            <img
+              src="/mova-dent-logo-transparente.png"
+              alt={NOMBRE_CLINICA}
+              className="mx-auto h-14 w-auto sm:h-16"
+            />
+          </CardTitle>
+
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold mb-2 mx-auto">
             <Sparkles className="w-3.5 h-3.5" />
             Sistema Odontológico Integral
           </div>
 
-          <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-teal-200 via-cyan-200 to-white bg-clip-text text-transparent">
-            {NOMBRE_CLINICA_CORTO}
-          </CardTitle>
           <CardDescription className="text-slate-400 text-sm mt-1">
             {NOMBRE_CLINICA}
           </CardDescription>
