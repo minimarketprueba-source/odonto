@@ -19,6 +19,7 @@ import { PacienteForm } from "@/components/pacientes/paciente-form";
 import {
   TIPOS_PACIENTE, labelTipoPaciente, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
+import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 
 const POR_PAGINA = 24;
 
@@ -116,7 +117,7 @@ export default function Pacientes() {
               </span>
             </h2>
             <p className="text-sm text-muted-foreground">
-              Padrón de la Clínica Odontológica — cadetes, policías, familiares y civiles.
+              Padrón de {NOMBRE_CLINICA_CORTO} — cadetes, policías, familiares y civiles.
             </p>
           </div>
           {canEdit && (

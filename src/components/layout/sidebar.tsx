@@ -6,6 +6,7 @@ import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
 import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
+import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 
 // Helper para obtener la ruta correcta del logo
 const getLogoPath = () => {
@@ -104,10 +105,10 @@ export function Sidebar() {
               {!isCollapsed && (
                 <div className="transition-all duration-300 overflow-hidden w-auto opacity-100">
                   <h3 className="text-base font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent whitespace-nowrap">
-                    Clínica Odontológica
+                    {NOMBRE_CLINICA_CORTO}
                   </h3>
                   <p className="text-xs text-muted-foreground font-medium leading-tight">
-                    Sistema de Gestión Dental
+                    Consultorio Odontológico
                   </p>
                 </div>
               )}

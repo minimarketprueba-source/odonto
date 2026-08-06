@@ -18,6 +18,7 @@ import { useProductividadReporte } from "@/api/productividad";
 import { useAuth } from "@/context/auth-context";
 import { usePerfilProfesional } from "@/api/perfil";
 import { imprimirPlanillaProductividad } from "@/lib/imprimir";
+import { NOMBRE_CLINICA, NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 
 type TipoPeriodo = "diario" | "semanal" | "mensual" | "personalizado";
 
@@ -187,7 +188,7 @@ export default function Reportes() {
       especialistaColegiatura: especialistaColegiatura,
       fecha: prodFechaDesde === prodFechaHasta ? formatFechaLarga(prodFechaDesde) : `${formatFechaLarga(prodFechaDesde)} al ${formatFechaLarga(prodFechaHasta)}`,
       horario: prodHorario,
-      unidad: 'Clínica Odontológica',
+      unidad: NOMBRE_CLINICA,
       tipoPeriodo,
       periodoEtiqueta: periodoTexto,
       filas: atenciones.map((a) => ({
@@ -254,7 +255,7 @@ export default function Reportes() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1 text-xs font-semibold">
-                <Building2 className="w-3.5 h-3.5" /> Clínica Odontológica
+                <Building2 className="w-3.5 h-3.5" /> {NOMBRE_CLINICA_CORTO}
               </Badge>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">

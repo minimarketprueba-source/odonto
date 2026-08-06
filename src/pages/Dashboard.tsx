@@ -37,6 +37,7 @@ import { useAuth } from "@/context/auth-context";
 import { usePacientes } from "@/api/pacientes";
 import { useCitasDelDia, useMiMedico, fechaHoyISO } from "@/api/citas";
 import { usePresupuestos } from "@/api/odontologia";
+import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 
 function getSaludoInfo() {
   const h = new Date().getHours();
@@ -149,7 +150,7 @@ export default function Dashboard() {
             </h1>
             <p className="text-xs text-muted-foreground">{getFechaFormateada()}</p>
             <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-              {miMedico ? `Agenda Dental: Dr. ${miMedico.nombres} ${miMedico.apellidos}` : "Panel de Gestión de la Clínica Odontológica"}
+              {miMedico ? `Agenda Dental: Dr. ${miMedico.nombres} ${miMedico.apellidos}` : `Panel de Gestión — ${NOMBRE_CLINICA_CORTO}`}
             </p>
           </div>
           <div className="flex gap-2 mt-4 md:mt-0 relative z-10">

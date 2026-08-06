@@ -36,6 +36,7 @@ import { Odontograma } from "@/components/odontograma/Odontograma";
 import { EvolucionClinica } from "@/components/pacientes/EvolucionClinica";
 import { Periodontograma } from "@/components/pacientes/Periodontograma";
 import { FirmaCanvas } from "@/components/pacientes/FirmaCanvas";
+import { Recetas } from "@/components/pacientes/Recetas";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowLeft,
@@ -54,13 +55,15 @@ import {
   FileText,
   ListTodo,
   Printer,
-  MessageCircle
+  MessageCircle,
+  Pill
 } from "lucide-react";
 import { imprimirPresupuesto, imprimirPlanillaHistorial, imprimirComprobantePagos } from "@/lib/imprimir";
 import { mensajeEstadoCuenta, enlaceWhatsApp, telefonoParaWhatsApp } from "@/lib/estado-cuenta";
 import { useEvoluciones } from "@/api/evoluciones";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
+import { NOMBRE_CLINICA } from "@/lib/clinica";
 
 export default function FichaPaciente() {
   const { id } = useParams<{ id: string }>();
@@ -207,6 +210,19 @@ export default function FichaPaciente() {
       </AppLayout>
     );
   }
+
+  // Edad para la receta: en la farmacia se controla la dosis contra la edad,
+  // sobre todo en los chicos, así que va impresa junto al documento.
+  const edadPaciente = (() => {
+    if (!paciente.fecha_nacimiento) return null;
+    const nac = new Date(`${paciente.fecha_nacimiento}T00:00:00`);
+    if (Number.isNaN(nac.getTime())) return null;
+    const hoy = new Date();
+    let años = hoy.getFullYear() - nac.getFullYear();
+    const mes = hoy.getMonth() - nac.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) años--;
+    return años >= 0 ? `${años} años` : null;
+  })();
 
   // Handle Anamnesis Save
   const handleSaveAnamnesis = async (e: React.FormEvent) => {
@@ -377,7 +393,7 @@ export default function FichaPaciente() {
     if (!paciente) return;
     const cuenta = datosCuenta();
     const mensaje = mensajeEstadoCuenta({
-      clinica: "Clínica Odontológica",
+      clinica: NOMBRE_CLINICA,
       pacienteNombre: cuenta.pacienteNombre,
       fecha: cuenta.fecha,
       planTitulo: cuenta.planTitulo,
@@ -596,11 +612,12 @@ export default function FichaPaciente() {
 
         {/* Tabs navigation */}
         <Tabs defaultValue="odontograma" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7 h-auto p-1.5 bg-muted rounded-xl gap-1">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8 h-auto p-1.5 bg-muted rounded-xl gap-1">
             <TabsTrigger value="odontograma" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><Activity className="w-4 h-4" /> Odontograma</TabsTrigger>
             <TabsTrigger value="evolucion" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><ListTodo className="w-4 h-4" /> Evolución</TabsTrigger>
             <TabsTrigger value="periodontograma" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><HeartPulse className="w-4 h-4" /> Perio.</TabsTrigger>
             <TabsTrigger value="anamnesis" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><FileText className="w-4 h-4" /> Anamnesis</TabsTrigger>
+            <TabsTrigger value="recetas" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><Pill className="w-4 h-4" /> Recetas</TabsTrigger>
             <TabsTrigger value="presupuestos" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><DollarSign className="w-4 h-4" /> Planes</TabsTrigger>
             <TabsTrigger value="imagenes" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><ImageIcon className="w-4 h-4" /> Imágenes</TabsTrigger>
             <TabsTrigger value="consentimientos" className="rounded-lg py-2.5 text-xs font-semibold gap-1.5"><FileSignature className="w-4 h-4" /> Firmas</TabsTrigger>
@@ -758,6 +775,20 @@ export default function FichaPaciente() {
                     </Button>
                   </div>
                 </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Recetas */}
+          <TabsContent value="recetas" className="pt-3">
+            <Card className="shadow-sm">
+              <CardContent className="pt-6">
+                <Recetas
+                  pacienteId={pacienteId}
+                  pacienteNombre={`${paciente.apellidos}, ${paciente.nombres}`}
+                  pacienteDocumento={paciente.documento}
+                  pacienteEdad={edadPaciente}
+                />
               </CardContent>
             </Card>
           </TabsContent>

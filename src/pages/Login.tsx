@@ -7,6 +7,7 @@ import { Eye, EyeOff, Activity, Shield, Stethoscope, UserCheck, Sparkles, CheckC
 import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { useAuth, DEMO_USERS } from "@/context/auth-context"
+import { NOMBRE_CLINICA, NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 
 /**
  * Traduce los errores de Supabase Auth a algo que se entienda y que diga qué
@@ -92,10 +93,10 @@ export default function LoginPage() {
           </div>
 
           <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-teal-200 via-cyan-200 to-white bg-clip-text text-transparent">
-            Clínica Odontológica
+            {NOMBRE_CLINICA_CORTO}
           </CardTitle>
           <CardDescription className="text-slate-400 text-sm mt-1">
-            Gestión de Odontograma y Citas
+            {NOMBRE_CLINICA}
           </CardDescription>
         </CardHeader>
 

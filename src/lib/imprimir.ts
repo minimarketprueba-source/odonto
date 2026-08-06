@@ -1,3 +1,5 @@
+import { NOMBRE_CLINICA } from "@/lib/clinica";
+
 export function cleanQrText(text: string): string {
   return text
     .normalize("NFD")
@@ -238,7 +240,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
           <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: bold; color: #2563eb;">PLANILLA DE PRODUCTIVIDAD POR ESPECIALIDAD Y PROFESIONAL</p>
         </div>
         <div style="text-align: right; font-size: 11px; color: #334155; line-height: 1.4;">
-          <p style="margin: 0; font-weight: bold; color: #0f172a;">CLÍNICA ODONTOLÓGICA</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">${NOMBRE_CLINICA}</p>
           <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Emisión: ${new Date().toLocaleDateString("es-PY")}</p>
         </div>
       </div>
@@ -288,7 +290,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
         <div>
           <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
           <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">V° B° JEFATURA DE SANIDAD</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">Clínica Odontológica</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">${NOMBRE_CLINICA}</p>
           <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y Sello Autorizado</p>
         </div>
       </div>
@@ -336,7 +338,7 @@ export function imprimirPresupuesto(datos: DatosImpresionPresupuesto) {
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a; max-width: 800px; margin: 0 auto;">
       <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">
-        <h1 style="margin: 0; font-size: 18px; color: #1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h1 style="margin: 0; font-size: 18px; color: #1e3a8a;">${NOMBRE_CLINICA}</h1>
         <h2 style="margin: 5px 0; font-size: 14px;">${tituloDoc}</h2>
         <p style="margin: 0; font-size: 11px; color: #475569;">Fecha: ${datos.fecha}</p>
       </div>
@@ -480,7 +482,7 @@ export function imprimirPlanillaHistorial(datos: DatosPlanillaHistorial) {
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 18px; color: #0f172a; max-width: 900px; margin: 0 auto; font-size: 12px;">
       <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 8px;">
-        <h1 style="margin: 0; font-size: 17px; color: #1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h1 style="margin: 0; font-size: 17px; color: #1e3a8a;">${NOMBRE_CLINICA}</h1>
         <h2 style="margin: 4px 0; font-size: 13px;">${tituloDoc}</h2>
         <p style="margin: 0; font-size: 10px; color: #475569;">Emitido el ${new Date().toLocaleDateString("es-PY")}</p>
       </div>
@@ -636,7 +638,7 @@ export function imprimirPeriodontograma(datos: DatosImpresionPeriodontograma) {
   const html = `
     <div style="font-family: Arial, sans-serif; padding:16px; color:#0f172a; max-width:1000px; margin:0 auto;">
       <div style="text-align:center; margin-bottom:12px; border-bottom:2px solid #0f172a; padding-bottom:8px;">
-        <h1 style="margin:0; font-size:16px; color:#1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h1 style="margin:0; font-size:16px; color:#1e3a8a;">${NOMBRE_CLINICA}</h1>
         <h2 style="margin:4px 0; font-size:13px;">${tituloDoc}</h2>
       </div>
 
@@ -723,7 +725,7 @@ export function imprimirComprobantePagos(datos: DatosComprobantePagos) {
   const html = `
     <div style="font-family: Arial, sans-serif; padding:22px; color:#0f172a; max-width:720px; margin:0 auto;">
       <div style="text-align:center; margin-bottom:18px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
-        <h1 style="margin:0; font-size:18px; color:#1e3a8a;">CLÍNICA ODONTOLÓGICA</h1>
+        <h1 style="margin:0; font-size:18px; color:#1e3a8a;">${NOMBRE_CLINICA}</h1>
         <h2 style="margin:5px 0; font-size:14px;">${tituloDoc}</h2>
         <p style="margin:0; font-size:11px; color:#475569;">Emitido el ${datos.fecha}</p>
       </div>
@@ -775,6 +777,138 @@ export function imprimirComprobantePagos(datos: DatosComprobantePagos) {
       <div style="margin-top:45px; text-align:center;">
         <div style="width:220px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
         <span style="font-size:11px;">Firma y Sello de la Clínica</span>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
+// ============================================================================
+// Receta odontológica
+// ============================================================================
+// El papel que se lleva el paciente a la farmacia. Lleva el número correlativo
+// (R-00001) para poder encontrarla después, y la firma con el registro
+// profesional de quien prescribe, que es lo que la hace válida.
+
+/**
+ * Escapa el texto que escribió el odontólogo antes de meterlo en el HTML.
+ * Un nombre de medicamento con `<` o `&` rompería el impreso; acá el contenido
+ * es tipeado a mano, así que no se puede confiar en que sea HTML válido.
+ */
+function esc(txt: string | null | undefined): string {
+  return String(txt ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export interface DatosImpresionReceta {
+  numero: string;
+  fecha: string;
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  pacienteEdad?: string | null;
+  diagnostico?: string | null;
+  indicaciones?: string | null;
+  medicamentos: {
+    medicamento: string;
+    dosis?: string | null;
+    frecuencia?: string | null;
+    duracion?: string | null;
+    indicaciones?: string | null;
+  }[];
+  profesionalNombre?: string | null;
+  profesionalRegistro?: string | null;
+  /** Si está anulada se imprime igual, pero marcada: sirve como constancia. */
+  anulada?: boolean;
+  motivoAnulacion?: string | null;
+}
+
+export function imprimirReceta(datos: DatosImpresionReceta) {
+  const tituloDoc = "RECETA ODONTOLÓGICA";
+
+  const filas = datos.medicamentos
+    .map((m, i) => {
+      // La posología va en una sola línea: así se lee de un vistazo en el
+      // mostrador de la farmacia, que es donde se usa este papel.
+      const posologia = [m.dosis, m.frecuencia, m.duracion]
+        .filter((x) => x && String(x).trim())
+        .map((x) => esc(x))
+        .join(" &nbsp;·&nbsp; ");
+      return `
+      <div style="padding:10px 12px; border-bottom:1px dashed #cbd5e1;">
+        <div style="font-size:14px; font-weight:bold;">${i + 1}. ${esc(m.medicamento)}</div>
+        ${posologia ? `<div style="font-size:13px; margin-top:3px; color:#1e293b;">${posologia}</div>` : ""}
+        ${
+          m.indicaciones && String(m.indicaciones).trim()
+            ? `<div style="font-size:11px; margin-top:3px; color:#475569; font-style:italic;">${esc(m.indicaciones)}</div>`
+            : ""
+        }
+      </div>`;
+    })
+    .join("");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding:22px; color:#0f172a; max-width:720px; margin:0 auto; position:relative;">
+      ${
+        datos.anulada
+          ? `<div style="position:absolute; top:180px; left:0; right:0; text-align:center; font-size:64px; font-weight:bold;
+                        color:#dc2626; opacity:0.18; transform:rotate(-20deg); letter-spacing:8px; pointer-events:none;">ANULADA</div>`
+          : ""
+      }
+
+      <div style="text-align:center; margin-bottom:16px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
+        <h1 style="margin:0; font-size:18px; color:#1e3a8a;">${NOMBRE_CLINICA}</h1>
+        <h2 style="margin:5px 0; font-size:14px;">${tituloDoc}</h2>
+        <p style="margin:0; font-size:11px; color:#475569;">
+          Nº ${esc(datos.numero)} &nbsp;·&nbsp; ${esc(datos.fecha)}
+        </p>
+      </div>
+
+      ${
+        datos.anulada
+          ? `<div style="margin-bottom:14px; padding:8px 10px; border:1px solid #fecaca; background:#fef2f2; border-radius:6px; font-size:12px; color:#b91c1c;">
+               <strong>Receta anulada.</strong> No es válida para su dispensación.
+               ${datos.motivoAnulacion ? ` Motivo: ${esc(datos.motivoAnulacion)}` : ""}
+             </div>`
+          : ""
+      }
+
+      <div style="margin-bottom:16px; padding:10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc;">
+        <p style="margin:4px 0;"><strong>Paciente:</strong> ${esc(datos.pacienteNombre)}</p>
+        <p style="margin:4px 0;"><strong>Documento:</strong> ${esc(datos.pacienteDocumento) || "—"}${
+          datos.pacienteEdad ? ` &nbsp;·&nbsp; <strong>Edad:</strong> ${esc(datos.pacienteEdad)}` : ""
+        }</p>
+        ${
+          datos.diagnostico && datos.diagnostico.trim()
+            ? `<p style="margin:4px 0;"><strong>Diagnóstico:</strong> ${esc(datos.diagnostico)}</p>`
+            : ""
+        }
+      </div>
+
+      <div style="font-size:26px; font-weight:bold; font-family:Georgia, serif; margin-bottom:4px;">Rp/</div>
+      <div style="border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; margin-bottom:16px;">
+        ${filas || `<div style="padding:14px; text-align:center; color:#64748b; font-style:italic;">Sin medicamentos.</div>`}
+      </div>
+
+      ${
+        datos.indicaciones && datos.indicaciones.trim()
+          ? `<div style="margin-bottom:16px; padding:10px; border-left:3px solid #1e3a8a; background:#f8fafc; font-size:12px;">
+               <strong>Indicaciones generales:</strong><br/>${esc(datos.indicaciones).replace(/\n/g, "<br/>")}
+             </div>`
+          : ""
+      }
+
+      <div style="margin-top:55px; text-align:center;">
+        <div style="width:240px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
+        <div style="font-size:12px; font-weight:bold;">${esc(datos.profesionalNombre) || "Firma y sello del odontólogo"}</div>
+        ${
+          datos.profesionalRegistro
+            ? `<div style="font-size:11px; color:#475569;">Reg. Prof. Nº ${esc(datos.profesionalRegistro)}</div>`
+            : ""
+        }
       </div>
     </div>
   `;

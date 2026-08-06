@@ -126,7 +126,7 @@ export const queryKeys = {
   // Recetas
   recetas: {
     all: ['recetas'] as const,
-    porPaciente: (pacienteId: number) =>
+    porPaciente: (pacienteId: string) =>
       [...queryKeys.recetas.all, 'paciente', pacienteId] as const,
   },
   // Enfermería: salas, camas, internaciones y atención ambulatoria
