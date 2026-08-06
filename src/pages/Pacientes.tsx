@@ -12,6 +12,7 @@ import {
   Plus, Search, Edit, User, ChevronLeft, ChevronRight, Minus, Shield, FolderOpen
 } from "lucide-react";
 import { toast } from "sonner";
+import Swal from "sweetalert2";
 import { matchPaciente } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -98,9 +99,28 @@ export default function Pacientes() {
   };
 
   const handleToggleActivo = async (p: Paciente) => {
+    // Dar de baja PREGUNTA primero. Este botón mide 32 px y está pegado al de
+    // editar: desde el celular se le da sin querer, y el paciente desaparecía
+    // de la lista en el acto, porque el filtro viene en "Activos". Pasó de
+    // verdad con varias fichas recién cargadas.
+    //
+    // Reactivar no pregunta: no se pierde nada y es la forma de deshacer.
+    if (p.activo) {
+      const confirmar = await Swal.fire({
+        title: `¿Dar de baja a ${p.apellidos}, ${p.nombres}?`,
+        text: "Deja de aparecer en la lista y no se le pueden cargar citas. No se borra nada: la historia clínica se conserva y se puede reactivar cuando quiera.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, dar de baja",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#dc2626",
+      });
+      if (!confirmar.isConfirmed) return;
+    }
+
     try {
       await cambiarEstado.mutateAsync({ id: p.id, activo: !p.activo });
-      toast.success(p.activo ? "Paciente desactivado." : "Paciente reactivado.");
+      toast.success(p.activo ? "Paciente dado de baja." : "Paciente reactivado.");
     } catch (e) {
       toast.error((e as Error).message);
     }
