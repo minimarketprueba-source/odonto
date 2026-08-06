@@ -868,16 +868,23 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
   const empresa = getEmpresa();
   const colorClaro = aclararColor(empresa.color_primario);
   const logoBanda = empresa.logo_url || LOGO_BANDA_PREDETERMINADO;
-  // La marca de agua sale del ícono cuadrado del consultorio.
+  // Marca de agua: primero el ícono cuadrado, si no el logo, y recién si el
+  // consultorio no cargó ninguno de los dos, la muela de Mova Dent.
   //
-  // Si el consultorio no cargó ícono PERO sí cargó su logo, no se pone
-  // ninguna: la muela de Mova Dent en la receta de otro consultorio sería la
-  // marca de otra empresa impresa en un documento ajeno. Solo se usa la de
-  // fábrica cuando no se personalizó nada.
-  const marcaAgua = empresa.icono_url || (empresa.logo_url ? null : MARCA_AGUA_DIENTE);
-  // La de Mova Dent ya viene aclarada de fábrica; la que sube otro cliente
-  // puede ser de cualquier color, así que a esa se la baja con opacidad.
-  const opacidadAgua = empresa.icono_url ? 0.09 : 0.5;
+  // El orden importa por dos motivos. Uno: la muela de Mova Dent en la receta
+  // de OTRO consultorio sería la marca de otra empresa impresa en un documento
+  // ajeno, así que solo sale si no se personalizó nada. Dos: el ícono es
+  // cuadrado y llena mejor el alto de una A5 que un logo ancho, por eso va
+  // primero cuando están los dos.
+  const propia = empresa.icono_url || empresa.logo_url;
+  const marcaAgua = propia || MARCA_AGUA_DIENTE;
+  // La de Mova Dent ya viene aclarada de fábrica. La que sube el consultorio
+  // puede ser de cualquier color y hasta tener fondo, así que a esa se la baja
+  // mucho más para que no compita con el texto de la receta.
+  const opacidadAgua = propia ? 0.08 : 0.5;
+  // Un logo ancho estirado al alto de la muela quedaría enorme: se le da el
+  // ancho según la forma.
+  const anchoAgua = empresa.icono_url || !propia ? "76mm" : "100mm";
 
   const filas = datos.medicamentos
     .map((m, i) => {
@@ -914,7 +921,7 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
       ${
         marcaAgua
           ? `<img src="${marcaAgua}" alt="" style="position:absolute; top:46%; left:50%;
-               transform:translate(-50%,-50%); width:76mm; opacity:${opacidadAgua}; z-index:0; pointer-events:none;">`
+               transform:translate(-50%,-50%); width:${anchoAgua}; opacity:${opacidadAgua}; z-index:0; pointer-events:none;">`
           : ""
       }
 
@@ -929,7 +936,14 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
       ${/* ---- Banda del encabezado ---- */""}
       <div style="position:relative; z-index:2; background:linear-gradient(90deg,${empresa.color_primario} 0%,${colorClaro} 100%);
                   padding:7px 10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <img src="${logoBanda}" alt="" style="height:19mm; max-width:74mm; object-fit:contain; display:block;">
+        ${/* El logo va sobre un recuadro claro y no directo sobre la banda.
+              El que sube el consultorio es el mismo del membrete, pensado para
+              papel blanco: con trazos oscuros, sobre el color de la marca
+              quedaba oscuro sobre oscuro y no se leía. El recetario de papel
+              resuelve lo mismo poniéndolo sobre un recuadro. */""}
+        <span style="display:inline-block; background:#fff; border-radius:5px; padding:3px 7px; line-height:0;">
+          <img src="${logoBanda}" alt="" style="height:16mm; max-width:70mm; object-fit:contain; display:block;">
+        </span>
         <div style="text-align:right; color:#fff; font-size:11px; font-weight:bold; line-height:1.5; letter-spacing:1px;">
           ${esc(empresa.telefono) || "&nbsp;"}
         </div>
