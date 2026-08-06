@@ -30,7 +30,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { showSwal } from "@/components/ui/swal";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSupabaseUrl, getSupabaseAnonKey } from "@/lib/supabase";
 import { recordAuditAction } from "@/lib/audit";
 import {
   useAuth, esEstadoActivo, DEFAULT_PERMISOS_CLINICA, MODULOS_CLINICA, ROLES_CLINICA_OPCIONES,
@@ -465,8 +465,12 @@ export default function Usuarios() {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error("Sesión no válida. Volvé a iniciar sesión.");
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      // Los mismos valores con los que la app se conecta, no las variables de
+      // entorno crudas: en Vercel NO están definidas (se usan los valores por
+      // defecto de `src/lib/supabase.ts`), así que acá quedaban en `undefined`
+      // y la petición se iba a "undefined/functions/v1/create-user".
+      const supabaseUrl = getSupabaseUrl();
+      const anonKey = getSupabaseAnonKey();
 
       const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
         method: "POST",

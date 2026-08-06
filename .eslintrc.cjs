@@ -38,5 +38,11 @@ module.exports = {
       version: 'detect',
     },
   },
-  ignorePatterns: ['dist', 'node_modules', '*.config.js', '*.config.ts', '_descartado'],
+  // `supabase/functions` corre en Deno, no en el navegador: usa `Deno.serve` e
+  // importa por URL, y no está en el tsconfig del frontend. Lintearlo acá solo
+  // produce ruido sobre un archivo que este eslint no puede entender.
+  ignorePatterns: [
+    'dist', 'node_modules', '*.config.js', '*.config.ts', '_descartado',
+    'supabase/functions',
+  ],
 }

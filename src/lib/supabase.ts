@@ -18,14 +18,14 @@ const DEFAULT_SUPABASE_URL = 'https://othuhgapvnpdjhartrut.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90aHVoZ2Fwdm5wZGpoYXJ0cnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NDE5MTgsImV4cCI6MjEwMTMxNzkxOH0.hcri60V24NIbUnUvs0HPy3pw7ei3kFymw78mvUa8TJM';
 
 // Función para obtener URL de Supabase (localStorage > .env > valor por defecto)
-const getSupabaseUrl = (): string => {
+export const getSupabaseUrl = (): string => {
   const storedUrl = typeof window !== 'undefined' ? localStorage.getItem("supabase_url") : null;
   if (storedUrl) return storedUrl;
   return import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
 };
 
 // Función para obtener la clave anónima (localStorage > .env > valor por defecto)
-const getSupabaseAnonKey = (): string => {
+export const getSupabaseAnonKey = (): string => {
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem("supabase_anon_key") : null;
   if (storedKey) return storedKey;
   return import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
