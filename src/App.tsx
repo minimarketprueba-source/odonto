@@ -6,6 +6,8 @@ import { isSupabaseConfigured } from "@/lib/supabase"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as ToasterSonner } from "@/components/ui/sonner"
 import { useAuth } from "@/context/auth-context"
+import { useEmpresa } from "@/api/empresa"
+import { useMarcaNavegador } from "@/hooks/use-marca-navegador"
 
 // Componente para redirigir usuarios logueados fuera de rutas de auth
 function AuthRedirect({ children }: { children: React.ReactNode }) {
@@ -46,6 +48,10 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 
 function App() {
   const [configured, setConfigured] = useState<boolean | null>(null);
+  // El nombre y el ícono de la pestaña salen de la base, no de index.html:
+  // ese archivo se escribe al compilar y dejaría "Mova Dent" fijo para
+  // cualquier consultorio que use el sistema.
+  useMarcaNavegador(useEmpresa());
 
   useEffect(() => {
     const isConfigured = isSupabaseConfigured();

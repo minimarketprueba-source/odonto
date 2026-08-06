@@ -1,4 +1,4 @@
-import { getEmpresa, lineaContacto } from "@/lib/clinica";
+import { getEmpresa, lineaContacto, aclararColor } from "@/lib/clinica";
 import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
 import { LOGO_BANDA_PREDETERMINADO, MARCA_AGUA_DIENTE } from "@/lib/recetario-base64";
 
@@ -28,7 +28,7 @@ function encabezadoDocumento(
   return `
       <div style="text-align:center; margin-bottom:${margen}px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
         <img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">
-        <h1 style="margin:0; font-size:${tamNombre}px; color:#1e3a8a;">${esc(empresa.nombre)}</h1>
+        <h1 style="margin:0; font-size:${tamNombre}px; color:${empresa.color_primario};">${esc(empresa.nombre)}</h1>
         ${contacto ? `<p style="margin:3px 0 0; font-size:10px; color:#64748b;">${esc(contacto)}</p>` : ""}
         <h2 style="margin:5px 0 0; font-size:14px;">${esc(tituloDoc)}</h2>
         ${sub ? `<p style="margin:3px 0 0; font-size:11px; color:#475569;">${esc(sub)}</p>` : ""}
@@ -866,7 +866,18 @@ export interface DatosImpresionReceta {
 export function imprimirReceta(datos: DatosImpresionReceta) {
   const tituloDoc = "RECETA ODONTOLÓGICA";
   const empresa = getEmpresa();
+  const colorClaro = aclararColor(empresa.color_primario);
   const logoBanda = empresa.logo_url || LOGO_BANDA_PREDETERMINADO;
+  // La marca de agua sale del ícono cuadrado del consultorio.
+  //
+  // Si el consultorio no cargó ícono PERO sí cargó su logo, no se pone
+  // ninguna: la muela de Mova Dent en la receta de otro consultorio sería la
+  // marca de otra empresa impresa en un documento ajeno. Solo se usa la de
+  // fábrica cuando no se personalizó nada.
+  const marcaAgua = empresa.icono_url || (empresa.logo_url ? null : MARCA_AGUA_DIENTE);
+  // La de Mova Dent ya viene aclarada de fábrica; la que sube otro cliente
+  // puede ser de cualquier color, así que a esa se la baja con opacidad.
+  const opacidadAgua = empresa.icono_url ? 0.09 : 0.5;
 
   const filas = datos.medicamentos
     .map((m, i) => {
@@ -891,7 +902,7 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
 
   // Línea de campo con el valor ya escrito encima, como se completaría a mano.
   const campo = (etiqueta: string, valor: string, ancho: string) => `
-    <span style="font-size:9.5px; color:#0e7490; letter-spacing:0.4px;">${etiqueta}</span>
+    <span style="font-size:9.5px; color:${empresa.color_primario}; letter-spacing:0.4px;">${etiqueta}</span>
     <span style="display:inline-block; width:${ancho}; border-bottom:1px solid #7dd3e0;
                  font-size:11.5px; color:#0f172a; padding:0 4px 1px; margin-left:3px;">${valor}</span>`;
 
@@ -900,8 +911,12 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
                 width:100%; min-height:172mm; display:flex; flex-direction:column;">
 
       ${/* Marca de agua: va detrás de todo y no se imprime en negro. */""}
-      <img src="${MARCA_AGUA_DIENTE}" alt="" style="position:absolute; top:46%; left:50%;
-           transform:translate(-50%,-50%); width:76mm; opacity:0.5; z-index:0; pointer-events:none;">
+      ${
+        marcaAgua
+          ? `<img src="${marcaAgua}" alt="" style="position:absolute; top:46%; left:50%;
+               transform:translate(-50%,-50%); width:76mm; opacity:${opacidadAgua}; z-index:0; pointer-events:none;">`
+          : ""
+      }
 
       ${
         datos.anulada
@@ -912,7 +927,7 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
       }
 
       ${/* ---- Banda del encabezado ---- */""}
-      <div style="position:relative; z-index:2; background:linear-gradient(90deg,#0f766e 0%,#22d3ee 100%);
+      <div style="position:relative; z-index:2; background:linear-gradient(90deg,${empresa.color_primario} 0%,${colorClaro} 100%);
                   padding:7px 10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <img src="${logoBanda}" alt="" style="height:19mm; max-width:74mm; object-fit:contain; display:block;">
         <div style="text-align:right; color:#fff; font-size:11px; font-weight:bold; line-height:1.5; letter-spacing:1px;">
@@ -921,7 +936,7 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
       </div>
       ${
         empresa.direccion
-          ? `<div style="position:relative; z-index:2; background:#22d3ee; color:#0f172a; text-align:center;
+          ? `<div style="position:relative; z-index:2; background:${colorClaro}; color:#0f172a; text-align:center;
                         font-size:10px; font-weight:bold; padding:3px 8px; line-height:1.35;">
                ${esc(empresa.direccion)}
              </div>`
@@ -954,14 +969,14 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
 
       ${/* ---- Rp/ y la medicación ---- */""}
       <div style="position:relative; z-index:2; padding:8px 4px 0; flex:1;">
-        <div style="font-size:17px; color:#0e7490; font-family:Georgia,serif; margin-bottom:7px;">RP/</div>
+        <div style="font-size:17px; color:${empresa.color_primario}; font-family:Georgia,serif; margin-bottom:7px;">RP/</div>
         <div style="padding-left:6px;">
           ${filas || `<div style="font-size:11px; color:#94a3b8; font-style:italic;">Sin medicamentos.</div>`}
         </div>
         ${
           datos.indicaciones && datos.indicaciones.trim()
-            ? `<div style="margin-top:9px; padding-left:6px; border-left:2px solid #22d3ee; font-size:10.5px; color:#334155;">
-                 <strong style="color:#0e7490;">INDICACIONES:</strong><br/>${esc(datos.indicaciones).replace(/\n/g, "<br/>")}
+            ? `<div style="margin-top:9px; padding-left:6px; border-left:2px solid ${colorClaro}; font-size:10.5px; color:#334155;">
+                 <strong style="color:${empresa.color_primario};">INDICACIONES:</strong><br/>${esc(datos.indicaciones).replace(/\n/g, "<br/>")}
                </div>`
             : ""
         }
@@ -973,14 +988,14 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
           <div style="border-bottom:1px solid #0f172a; min-width:52mm; padding-bottom:1px; font-size:11px;">
             ${esc(datos.profesionalNombre) || "&nbsp;"}
           </div>
-          <div style="font-size:9.5px; color:#0e7490; letter-spacing:0.5px; margin-top:2px;">FIRMA Y SELLO</div>
+          <div style="font-size:9.5px; color:${empresa.color_primario}; letter-spacing:0.5px; margin-top:2px;">FIRMA Y SELLO</div>
           ${
             datos.profesionalRegistro
               ? `<div style="font-size:9.5px; color:#475569;">Reg. Prof. Nº ${esc(datos.profesionalRegistro)}</div>`
               : ""
           }
         </div>
-        <div style="font-size:9.5px; color:#0e7490; letter-spacing:0.5px; margin-top:7px;">
+        <div style="font-size:9.5px; color:${empresa.color_primario}; letter-spacing:0.5px; margin-top:7px;">
           FECHA: <span style="color:#0f172a; font-size:11px; letter-spacing:0;">${esc(datos.fecha)}</span>
           <span style="margin-left:12px;">Nº ${esc(datos.numero)}</span>
         </div>

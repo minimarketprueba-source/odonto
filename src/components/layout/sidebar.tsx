@@ -6,7 +6,6 @@ import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
 import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
-import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
 import { useEmpresa } from "@/api/empresa";
 
 // Helper para obtener la ruta correcta del logo
@@ -114,7 +113,7 @@ export function Sidebar() {
                   de acceso y los impresos. */}
               <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
                 <img
-                  src={getLogoPath()}
+                  src={empresa.icono_url || getLogoPath()}
                   alt={empresa.nombre}
                   className="w-full h-full object-cover"
                 />
@@ -122,7 +121,7 @@ export function Sidebar() {
               {!isCollapsed && (
                 <div className="transition-all duration-300 overflow-hidden w-auto opacity-100">
                   <h3 className="text-base font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent whitespace-nowrap">
-                    {NOMBRE_CLINICA_CORTO}
+                    {empresa.nombre_corto}
                   </h3>
                   <p className="text-xs text-muted-foreground font-medium leading-tight">
                     Consultorio Odontológico

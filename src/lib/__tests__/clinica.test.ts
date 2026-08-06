@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   EMPRESA_PREDETERMINADA, getEmpresa, setEmpresa, lineaContacto,
+  normalizarColor, aclararColor,
 } from "@/lib/clinica";
 import { imprimirReceta, imprimirComprobantePagos } from "@/lib/imprimir";
 import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
@@ -8,6 +9,9 @@ import { LOGO_BANDA_PREDETERMINADO, MARCA_AGUA_DIENTE } from "@/lib/recetario-ba
 
 const COMPLETA = {
   nombre: "CONSULTORIO ODONTOLÓGICO MOVA DENT",
+  nombre_corto: "Mova Dent",
+  icono_url: null,
+  color_primario: "#0e7490",
   ruc: "80012345-6",
   direccion: "Av. Mcal. López 1234",
   telefono: "0983 559 700",
@@ -188,5 +192,75 @@ describe("la receta sigue el recetario A5 del consultorio", () => {
     expect(anulada).toContain("ANULADA");
     expect(anulada).toContain("No es válida para su dispensación");
     expect(anulada).toContain("Medicamento equivocado");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Que el sistema se pueda entregar a otro consultorio
+// ---------------------------------------------------------------------------
+
+describe("color de la marca", () => {
+  it("acepta un color normal y lo deja en minúsculas", () => {
+    expect(normalizarColor("#7C3AED")).toBe("#7c3aed");
+  });
+
+  it("completa la forma corta de tres dígitos", () => {
+    expect(normalizarColor("#0AF")).toBe("#00aaff");
+  });
+
+  it("descarta cualquier cosa que no sea un color", () => {
+    // El valor entra en el `style` del impreso: algo inválido rompería el CSS
+    // del documento y el papel saldría sin la banda.
+    for (const malo of ["rojo", "", "  ", "#12345", "red; background:url(x)", null, undefined]) {
+      expect(normalizarColor(malo)).toBe(EMPRESA_PREDETERMINADA.color_primario);
+    }
+  });
+
+  it("aclara hacia el blanco para armar el degradado", () => {
+    expect(aclararColor("#000000", 0.5)).toBe("#808080");
+    expect(aclararColor("#ffffff", 0.5)).toBe("#ffffff");
+    // Con un solo color cargado se arma la variante clara sola.
+    expect(aclararColor("#7c3aed")).not.toBe("#7c3aed");
+  });
+});
+
+describe("la receta se adapta a otro consultorio", () => {
+  const OTRO = {
+    nombre: "CENTRO ODONTOLÓGICO SONRISA PLUS",
+    nombre_corto: "Sonrisa+",
+    ruc: "80099887-1",
+    direccion: "Av. España 850",
+    telefono: "021 445 900",
+    email: null,
+    logo_url: "data:image/png;base64,OTROLOGO",
+    icono_url: null,
+    color_primario: "#7c3aed",
+  };
+
+  it("usa el color, el logo y los datos del otro consultorio", async () => {
+    setEmpresa(OTRO);
+    const html = await htmlDeLaReceta();
+    expect(html).toContain("#7c3aed");
+    expect(html).toContain("data:image/png;base64,OTROLOGO");
+    expect(html).toContain("Av. España 850");
+    expect(html).toContain("021 445 900");
+  });
+
+  it("NO le imprime la marca de agua de Mova Dent", async () => {
+    // Sería la marca de otra empresa en un documento ajeno.
+    setEmpresa(OTRO);
+    const html = await htmlDeLaReceta();
+    expect(html).not.toContain(MARCA_AGUA_DIENTE.slice(0, 60));
+  });
+
+  it("si sube su propio ícono, ese sí se usa de marca de agua", async () => {
+    setEmpresa({ ...OTRO, icono_url: "data:image/png;base64,OTROICONO" });
+    const html = await htmlDeLaReceta();
+    expect(html).toContain("data:image/png;base64,OTROICONO");
+  });
+
+  it("sin nada personalizado sigue saliendo la marca de Mova Dent", async () => {
+    const html = await htmlDeLaReceta();
+    expect(html).toContain(MARCA_AGUA_DIENTE.slice(0, 60));
   });
 });

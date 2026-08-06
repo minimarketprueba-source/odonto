@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { esColumnaInexistente, esTablaInexistente } from "@/lib/esquema";
 import {
-  EMPRESA_PREDETERMINADA, setEmpresa, type DatosEmpresa,
+  EMPRESA_PREDETERMINADA, setEmpresa, normalizarColor, type DatosEmpresa,
 } from "@/lib/clinica";
 import { CLINICA_ID } from "./pacientes";
 
@@ -23,7 +23,8 @@ export type ActualizarEmpresaInput = Partial<Omit<DatosEmpresa, "nombre">> & {
   nombre: string;
 };
 
-const COLUMNAS = "nombre, ruc, direccion, telefono, email, logo_url";
+const COLUMNAS =
+  "nombre, nombre_corto, ruc, direccion, telefono, email, logo_url, icono_url, color_primario";
 
 export async function fetchEmpresa(): Promise<DatosEmpresa> {
   const { data, error } = await supabase
@@ -45,11 +46,14 @@ export async function fetchEmpresa(): Promise<DatosEmpresa> {
   const fila = data as unknown as Partial<DatosEmpresa>;
   return {
     nombre: fila.nombre?.trim() || EMPRESA_PREDETERMINADA.nombre,
+    nombre_corto: fila.nombre_corto?.trim() || EMPRESA_PREDETERMINADA.nombre_corto,
     ruc: fila.ruc ?? null,
     direccion: fila.direccion ?? null,
     telefono: fila.telefono ?? null,
     email: fila.email ?? null,
     logo_url: fila.logo_url ?? null,
+    icono_url: fila.icono_url ?? null,
+    color_primario: normalizarColor(fila.color_primario),
   };
 }
 
@@ -61,6 +65,9 @@ export async function actualizarEmpresa(input: ActualizarEmpresaInput): Promise<
     .from("clinicas")
     .update({
       nombre: input.nombre.trim(),
+      nombre_corto: input.nombre_corto?.trim() || null,
+      icono_url: input.icono_url || null,
+      color_primario: normalizarColor(input.color_primario),
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
       telefono: input.telefono?.trim() || null,
@@ -118,6 +125,9 @@ export function useActualizarEmpresa() {
 /** Lo más ancho que se guarda el logo. Más que esto no se nota al imprimir. */
 const ANCHO_MAXIMO_LOGO = 600;
 
+/** El ícono es cuadrado y chico: no tiene sentido guardarlo más grande. */
+const LADO_MAXIMO_ICONO = 256;
+
 /**
  * Achica la imagen y la devuelve como data URL para guardarla en la columna.
  *
@@ -127,6 +137,46 @@ const ANCHO_MAXIMO_LOGO = 600;
  * se imprime igual de bien.
  */
 export function achicarLogo(file: File): Promise<string> {
+  return procesarImagen(file, (img) => {
+    const escala = Math.min(1, ANCHO_MAXIMO_LOGO / img.naturalWidth);
+    return {
+      w: Math.round(img.naturalWidth * escala),
+      h: Math.round(img.naturalHeight * escala),
+      dibujar: (ctx, w, h) => ctx.drawImage(img, 0, 0, w, h),
+    };
+  });
+}
+
+/**
+ * Deja la imagen cuadrada para usarla de ícono, sin deformarla.
+ *
+ * Si viene rectangular se recorta el cuadrado del centro (`object-fit: cover`
+ * hecho a mano). Estirarla a la fuerza dejaría el logo achatado, que es peor
+ * que perder los bordes.
+ */
+export function achicarIcono(file: File): Promise<string> {
+  return procesarImagen(file, (img) => {
+    const lado = Math.min(img.naturalWidth, img.naturalHeight);
+    const destino = Math.min(LADO_MAXIMO_ICONO, lado);
+    const sx = (img.naturalWidth - lado) / 2;
+    const sy = (img.naturalHeight - lado) / 2;
+    return {
+      w: destino,
+      h: destino,
+      dibujar: (ctx, w, h) => ctx.drawImage(img, sx, sy, lado, lado, 0, 0, w, h),
+    };
+  });
+}
+
+/** Lo que comparten las dos: leer el archivo, dibujarlo y devolver el data URL. */
+function procesarImagen(
+  file: File,
+  plan: (img: HTMLImageElement) => {
+    w: number;
+    h: number;
+    dibujar: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
+  }
+): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
       reject(new Error("El archivo no es una imagen."));
@@ -138,10 +188,7 @@ export function achicarLogo(file: File): Promise<string> {
       const img = new Image();
       img.onerror = () => reject(new Error("No se pudo abrir la imagen."));
       img.onload = () => {
-        const escala = Math.min(1, ANCHO_MAXIMO_LOGO / img.naturalWidth);
-        const w = Math.round(img.naturalWidth * escala);
-        const h = Math.round(img.naturalHeight * escala);
-
+        const { w, h, dibujar } = plan(img);
         const lienzo = document.createElement("canvas");
         lienzo.width = w;
         lienzo.height = h;
@@ -150,8 +197,8 @@ export function achicarLogo(file: File): Promise<string> {
           reject(new Error("El navegador no pudo procesar la imagen."));
           return;
         }
-        ctx.drawImage(img, 0, 0, w, h);
-        // PNG y no JPEG: el logo puede tener fondo transparente, y el JPEG lo
+        dibujar(ctx, w, h);
+        // PNG y no JPEG: la imagen puede tener fondo transparente, y el JPEG lo
         // rellenaría de negro.
         resolve(lienzo.toDataURL("image/png"));
       };

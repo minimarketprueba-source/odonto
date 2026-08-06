@@ -19,7 +19,7 @@ import { PacienteForm } from "@/components/pacientes/paciente-form";
 import {
   TIPOS_PACIENTE, labelTipoPaciente, usePacientes, useCambiarEstadoPaciente, type Paciente,
 } from "@/api/pacientes";
-import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
+import { useEmpresa } from "@/api/empresa";
 
 const POR_PAGINA = 24;
 
@@ -32,6 +32,7 @@ function fmtFecha(f: string | null): string {
 export default function Pacientes() {
   const navigate = useNavigate();
   const { hasPermission, canDelete } = usePermissions();
+  const empresa = useEmpresa();
   const canEdit = hasPermission("pacientes", "editar");
   const puedeDarDeBaja = canDelete("pacientes");
 
@@ -117,7 +118,7 @@ export default function Pacientes() {
               </span>
             </h2>
             <p className="text-sm text-muted-foreground">
-              Padrón de {NOMBRE_CLINICA_CORTO} — cadetes, policías, familiares y civiles.
+              Padrón de {empresa.nombre_corto} — cadetes, policías, familiares y civiles.
             </p>
           </div>
           {canEdit && (

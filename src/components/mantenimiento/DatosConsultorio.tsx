@@ -5,9 +5,9 @@ import { Building2, Loader2, Upload, Trash2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEmpresa, useActualizarEmpresa, achicarLogo } from "@/api/empresa";
+import { useEmpresa, useActualizarEmpresa, achicarLogo, achicarIcono } from "@/api/empresa";
 import { usePermissions } from "@/hooks/use-permissions";
-import { lineaContacto } from "@/lib/clinica";
+import { lineaContacto, aclararColor, EMPRESA_PREDETERMINADA } from "@/lib/clinica";
 import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
 
 /**
@@ -22,6 +22,7 @@ export function DatosConsultorio() {
   const { isAdmin } = usePermissions();
   const guardar = useActualizarEmpresa();
   const inputArchivo = useRef<HTMLInputElement>(null);
+  const inputIcono = useRef<HTMLInputElement>(null);
 
   const [nombre, setNombre] = useState(empresa.nombre);
   const [ruc, setRuc] = useState(empresa.ruc ?? "");
@@ -29,7 +30,10 @@ export function DatosConsultorio() {
   const [telefono, setTelefono] = useState(empresa.telefono ?? "");
   const [email, setEmail] = useState(empresa.email ?? "");
   const [logo, setLogo] = useState<string | null>(empresa.logo_url);
-  const [subiendo, setSubiendo] = useState(false);
+  const [icono, setIcono] = useState<string | null>(empresa.icono_url);
+  const [nombreCorto, setNombreCorto] = useState(empresa.nombre_corto);
+  const [color, setColor] = useState(empresa.color_primario);
+  const [subiendo, setSubiendo] = useState<"logo" | "icono" | null>(null);
 
   // La consulta llega después del primer dibujado: cuando contesta, se rellena
   // el formulario. Sin esto los campos quedarían con los valores por omisión.
@@ -40,21 +44,28 @@ export function DatosConsultorio() {
     setTelefono(empresa.telefono ?? "");
     setEmail(empresa.email ?? "");
     setLogo(empresa.logo_url);
+    setIcono(empresa.icono_url);
+    setNombreCorto(empresa.nombre_corto);
+    setColor(empresa.color_primario);
   }, [empresa]);
 
-  const elegirLogo = async (archivo: File | undefined) => {
+  const elegirImagen = async (cual: "logo" | "icono", archivo: File | undefined) => {
     if (!archivo) return;
-    setSubiendo(true);
+    setSubiendo(cual);
     try {
-      setLogo(await achicarLogo(archivo));
+      if (cual === "logo") setLogo(await achicarLogo(archivo));
+      else setIcono(await achicarIcono(archivo));
       // Todavía NO está guardado: se avisa para que no se vaya de la pantalla
       // creyendo que ya quedó.
-      await showSwalInfo("Logo cargado. Todavía falta apretar «Guardar datos».");
+      await showSwalInfo(
+        `${cual === "logo" ? "Logo" : "Ícono"} cargado. Todavía falta apretar «Guardar datos».`
+      );
     } catch (e) {
       await showSwalError((e as Error).message);
     } finally {
-      setSubiendo(false);
-      if (inputArchivo.current) inputArchivo.current.value = "";
+      setSubiendo(null);
+      const input = cual === "logo" ? inputArchivo.current : inputIcono.current;
+      if (input) input.value = "";
     }
   };
 
@@ -64,7 +75,10 @@ export function DatosConsultorio() {
       return;
     }
     try {
-      await guardar.mutateAsync({ nombre, ruc, direccion, telefono, email, logo_url: logo });
+      await guardar.mutateAsync({
+        nombre, nombre_corto: nombreCorto, ruc, direccion, telefono, email,
+        logo_url: logo, icono_url: icono, color_primario: color,
+      });
       await showSwalSuccess(
         "Los datos del consultorio se guardaron. Ya salen en los impresos y en la pantalla de acceso."
       );
@@ -74,6 +88,7 @@ export function DatosConsultorio() {
   };
 
   const vistaPrevia = lineaContacto({
+    ...EMPRESA_PREDETERMINADA,
     nombre, ruc: ruc || null, direccion: direccion || null,
     telefono: telefono || null, email: email || null, logo_url: logo,
   });
@@ -114,6 +129,39 @@ export function DatosConsultorio() {
           />
         </div>
         <div className="space-y-1">
+          <Label htmlFor="emp-corto">Nombre corto</Label>
+          <Input
+            id="emp-corto"
+            value={nombreCorto}
+            onChange={(e) => setNombreCorto(e.target.value)}
+            placeholder="Mova Dent"
+          />
+          <p className="text-xs text-muted-foreground">
+            Para el menú lateral y la pestaña del navegador, donde el nombre completo no entra.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="emp-color">Color de la marca</Label>
+          <div className="flex items-center gap-2">
+            <input
+              id="emp-color"
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-10 w-14 cursor-pointer rounded border bg-background p-1"
+            />
+            <Input
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="#0e7490"
+              className="font-mono"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            La banda de la receta y el nombre en los impresos.
+          </p>
+        </div>
+        <div className="space-y-1">
           <Label htmlFor="emp-ruc">RUC</Label>
           <Input
             id="emp-ruc"
@@ -152,53 +200,88 @@ export function DatosConsultorio() {
         </div>
       </div>
 
-      {/* Logo */}
-      <div className="space-y-2">
-        <Label>Logo</Label>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-20 w-40 items-center justify-center overflow-hidden rounded-lg border bg-slate-900 p-2">
+      {/* Las dos imágenes */}
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Logo (ancho)</Label>
+          <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-lg border bg-slate-900 p-2">
             <img
               src={logo || LOGO_IMPRESION_PREDETERMINADO}
               alt="Logo del consultorio"
               className="max-h-full max-w-full object-contain"
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <input
-              ref={inputArchivo}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => elegirLogo(e.target.files?.[0])}
-            />
+          <input
+            ref={inputArchivo}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => elegirImagen("logo", e.target.files?.[0])}
+          />
+          <div className="flex gap-2">
             <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={subiendo}
+              variant="outline" size="sm" className="gap-2"
+              disabled={subiendo !== null}
               onClick={() => inputArchivo.current?.click()}
             >
-              {subiendo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {logo ? "Cambiar logo" : "Subir logo"}
+              {subiendo === "logo" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {logo ? "Cambiar" : "Subir"}
             </Button>
             {logo && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2 text-red-600 hover:text-red-700"
-                onClick={() => setLogo(null)}
-              >
+              <Button variant="ghost" size="sm" className="gap-2 text-red-600 hover:text-red-700"
+                onClick={() => setLogo(null)}>
                 <Trash2 className="h-4 w-4" /> Quitar
               </Button>
             )}
-            <p className="max-w-xs text-xs text-muted-foreground">
-              {logo
-                ? "Se achica solo a 600 px de ancho."
-                : "Mientras no subas uno, se usa el de Mova Dent."}{" "}
-              Conviene un PNG con fondo transparente y trazos oscuros: se imprime sobre
-              papel blanco.
-            </p>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Va en la pantalla de acceso, el membrete de los impresos y la banda de la receta.
+            Conviene un PNG con fondo transparente y trazos oscuros: se imprime sobre papel blanco.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Ícono (cuadrado)</Label>
+          <div className="flex h-20 items-center gap-3">
+            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-slate-900">
+              <img
+                src={icono || "/mova-dent-icono.png"}
+                alt="Ícono del consultorio"
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md border bg-slate-900">
+              <img src={icono || "/mova-dent-icono.png"} alt="" className="h-full w-full object-cover" />
+            </div>
+          </div>
+          <input
+            ref={inputIcono}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => elegirImagen("icono", e.target.files?.[0])}
+          />
+          <div className="flex gap-2">
+            <Button
+              variant="outline" size="sm" className="gap-2"
+              disabled={subiendo !== null}
+              onClick={() => inputIcono.current?.click()}
+            >
+              {subiendo === "icono" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {icono ? "Cambiar" : "Subir"}
+            </Button>
+            {icono && (
+              <Button variant="ghost" size="sm" className="gap-2 text-red-600 hover:text-red-700"
+                onClick={() => setIcono(null)}>
+                <Trash2 className="h-4 w-4" /> Quitar
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Va en el menú lateral y en la pestaña del navegador. Si la imagen no es
+            cuadrada se recorta el centro. Se ve chiquito: conviene un símbolo, no el
+            nombre escrito.
+          </p>
         </div>
       </div>
 
@@ -207,6 +290,13 @@ export function DatosConsultorio() {
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Así va a salir el encabezado
         </p>
+        <div
+          className="mb-3 flex items-center justify-between gap-3 rounded-t-lg px-3 py-2"
+          style={{ background: `linear-gradient(90deg, ${color} 0%, ${aclararColor(color)} 100%)` }}
+        >
+          <img src={logo || LOGO_IMPRESION_PREDETERMINADO} alt="" className="h-8 object-contain" />
+          <span className="text-xs font-bold text-white">{telefono || " "}</span>
+        </div>
         <div className="rounded-lg border bg-white p-4 text-center">
           {/* El mismo respaldo que usa el impreso: sin logo propio va el de
               Mova Dent, así la vista previa no miente. */}
@@ -222,7 +312,7 @@ export function DatosConsultorio() {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleGuardar} disabled={guardar.isPending || subiendo}>
+        <Button onClick={handleGuardar} disabled={guardar.isPending || subiendo !== null}>
           {guardar.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Guardar datos
         </Button>

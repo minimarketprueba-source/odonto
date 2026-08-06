@@ -16,29 +16,46 @@
 
 export interface DatosEmpresa {
   nombre: string;
+  /** Para donde el nombre completo no entra: el menú lateral, la pestaña. */
+  nombre_corto: string;
   ruc: string | null;
   direccion: string | null;
   telefono: string | null;
   email: string | null;
-  /** Logo en data URL (base64). Ver `empresa.sql` para por qué no va en Storage. */
+  /**
+   * Logo ANCHO, en data URL (base64). Ver `empresa.sql` para por qué no va en
+   * Storage. Se usa donde hay lugar horizontal: la pantalla de acceso y el
+   * membrete de los impresos.
+   */
   logo_url: string | null;
+  /**
+   * Ícono CUADRADO. Va en el recuadro de 40x40 del menú y en la pestaña del
+   * navegador, donde un logo ancho se ve diminuto entre dos franjas vacías.
+   */
+  icono_url: string | null;
+  /** Color de la marca (#rrggbb): la banda de la receta y el nombre impreso. */
+  color_primario: string;
 }
 
-/** Lo que se muestra hasta que la base contesta. */
+/**
+ * Lo que se muestra hasta que la base contesta, y lo que queda si el
+ * consultorio todavía no cargó sus datos.
+ *
+ * Es lo ÚNICO de Mova Dent que queda escrito en el código. Para entregarle el
+ * sistema a otro consultorio no hace falta tocarlo: se cargan sus datos en
+ * Mantenimiento → Consultorio y estos valores dejan de usarse.
+ */
 export const EMPRESA_PREDETERMINADA: DatosEmpresa = {
   nombre: "CONSULTORIO ODONTOLÓGICO MOVA DENT",
+  nombre_corto: "Mova Dent",
   ruc: null,
   direccion: null,
   telefono: null,
   email: null,
   logo_url: null,
+  icono_url: null,
+  color_primario: "#0e7490",
 };
-
-/**
- * Versión corta para donde el nombre completo no entra: el menú lateral en el
- * celular. No se edita desde la app a propósito — es la marca, no un dato.
- */
-export const NOMBRE_CLINICA_CORTO = "Mova Dent";
 
 let empresaActual: DatosEmpresa = EMPRESA_PREDETERMINADA;
 
@@ -58,12 +75,46 @@ export function setEmpresa(datos: Partial<DatosEmpresa> | null | undefined): voi
   if (!datos) return;
   empresaActual = {
     nombre: datos.nombre?.trim() || EMPRESA_PREDETERMINADA.nombre,
+    nombre_corto: datos.nombre_corto?.trim() || EMPRESA_PREDETERMINADA.nombre_corto,
     ruc: datos.ruc?.trim() || null,
     direccion: datos.direccion?.trim() || null,
     telefono: datos.telefono?.trim() || null,
     email: datos.email?.trim() || null,
     logo_url: datos.logo_url || null,
+    icono_url: datos.icono_url || null,
+    color_primario: normalizarColor(datos.color_primario),
   };
+}
+
+/**
+ * Deja el color en `#rrggbb` o devuelve el predeterminado.
+ *
+ * Se valida porque el color entra en el `style` de los impresos: un valor
+ * cualquiera escrito en la base rompería el CSS del documento, y el papel
+ * saldría sin la banda.
+ */
+export function normalizarColor(valor: string | null | undefined): string {
+  const c = (valor ?? "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(c)) {
+    // #abc → #aabbcc
+    return ("#" + c.slice(1).split("").map((d) => d + d).join("")).toLowerCase();
+  }
+  return EMPRESA_PREDETERMINADA.color_primario;
+}
+
+/**
+ * Aclara un color hacia el blanco. Se usa para el degradado de la banda de la
+ * receta: con un solo color cargado se arma la variante clara sin pedirle al
+ * usuario que elija dos.
+ */
+export function aclararColor(hex: string, proporcion = 0.55): string {
+  const c = normalizarColor(hex);
+  const canal = (i: number) => {
+    const v = parseInt(c.slice(1 + i * 2, 3 + i * 2), 16);
+    return Math.round(v + (255 - v) * proporcion);
+  };
+  return `#${[0, 1, 2].map((i) => canal(i).toString(16).padStart(2, "0")).join("")}`;
 }
 
 /**
