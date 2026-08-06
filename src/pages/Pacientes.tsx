@@ -99,24 +99,35 @@ export default function Pacientes() {
   };
 
   const handleToggleActivo = async (p: Paciente) => {
-    // Dar de baja PREGUNTA primero. Este botón mide 32 px y está pegado al de
-    // editar: desde el celular se le da sin querer, y el paciente desaparecía
-    // de la lista en el acto, porque el filtro viene en "Activos". Pasó de
-    // verdad con varias fichas recién cargadas.
-    //
-    // Reactivar no pregunta: no se pierde nada y es la forma de deshacer.
-    if (p.activo) {
-      const confirmar = await Swal.fire({
-        title: `¿Dar de baja a ${p.apellidos}, ${p.nombres}?`,
-        text: "Deja de aparecer en la lista y no se le pueden cargar citas. No se borra nada: la historia clínica se conserva y se puede reactivar cuando quiera.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Sí, dar de baja",
-        cancelButtonText: "Cancelar",
-        confirmButtonColor: "#dc2626",
-      });
-      if (!confirmar.isConfirmed) return;
-    }
+    // Los DOS sentidos preguntan primero. Este botón mide 32 px y está pegado
+    // al de editar: desde el celular se le da sin querer, y el paciente
+    // desaparecía de la lista en el acto, porque el filtro viene en "Activos".
+    // Pasó de verdad con varias fichas recién cargadas.
+    const nombre = `${p.apellidos}, ${p.nombres}`;
+    const confirmar = await Swal.fire(
+      p.activo
+        ? {
+            title: `¿Dar de baja a ${nombre}?`,
+            text:
+              "Deja de aparecer en la lista y no se le pueden cargar citas. " +
+              "No se borra nada: la historia clínica se conserva y se puede reactivar cuando quiera.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Sí, dar de baja",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#dc2626",
+          }
+        : {
+            title: `¿Reactivar a ${nombre}?`,
+            text: "Vuelve a aparecer en la lista y se le pueden cargar citas y tratamientos.",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Sí, reactivar",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#16a34a",
+          }
+    );
+    if (!confirmar.isConfirmed) return;
 
     try {
       await cambiarEstado.mutateAsync({ id: p.id, activo: !p.activo });
