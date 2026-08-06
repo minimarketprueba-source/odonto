@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { showSwalSuccess, showSwalError, showSwalInfo } from "@/lib/swal";
 import { Building2, Loader2, Upload, Trash2, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,9 +47,11 @@ export function DatosConsultorio() {
     setSubiendo(true);
     try {
       setLogo(await achicarLogo(archivo));
-      toast.success("Logo cargado. Falta guardar para que quede.");
+      // Todavía NO está guardado: se avisa para que no se vaya de la pantalla
+      // creyendo que ya quedó.
+      await showSwalInfo("Logo cargado. Todavía falta apretar «Guardar datos».");
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     } finally {
       setSubiendo(false);
       if (inputArchivo.current) inputArchivo.current.value = "";
@@ -58,14 +60,16 @@ export function DatosConsultorio() {
 
   const handleGuardar = async () => {
     if (!nombre.trim()) {
-      toast.error("El nombre del consultorio no puede quedar vacío.");
+      await showSwalError("El nombre del consultorio no puede quedar vacío.");
       return;
     }
     try {
       await guardar.mutateAsync({ nombre, ruc, direccion, telefono, email, logo_url: logo });
-      toast.success("Datos del consultorio guardados.");
+      await showSwalSuccess(
+        "Los datos del consultorio se guardaron. Ya salen en los impresos y en la pantalla de acceso."
+      );
     } catch (e) {
-      toast.error((e as Error).message);
+      await showSwalError((e as Error).message);
     }
   };
 

@@ -55,7 +55,16 @@ export function formatTipoGrado(tipo?: string | null, grado?: string | null): st
   return g || t || "—";
 }
 
-function ejecutarImpresionIframe(titulo: string, bodyContent: string) {
+/**
+ * @param pagina Tamaño y márgenes de la hoja. La receta se imprime en A5, que
+ *   es el tamaño del recetario de papel del consultorio; el resto en A4.
+ */
+function ejecutarImpresionIframe(
+  titulo: string,
+  bodyContent: string,
+  pagina: { tamano?: string; margen?: string } = {}
+) {
+  const { tamano = "A4", margen = "12mm 15mm 12mm 15mm" } = pagina;
   // Eliminar iframe previo si existe
   const idIframe = "anp-print-iframe";
   const viejo = document.getElementById(idIframe);
@@ -86,8 +95,8 @@ function ejecutarImpresionIframe(titulo: string, bodyContent: string) {
         <title>${titulo}</title>
         <style>
           @page {
-            size: A4;
-            margin: 12mm 15mm 12mm 15mm;
+            size: ${tamano};
+            margin: ${margen};
           }
           * {
             box-sizing: border-box;

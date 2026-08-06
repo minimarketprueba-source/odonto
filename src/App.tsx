@@ -4,6 +4,7 @@ import { HelmetProvider } from 'react-helmet-async'
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { isSupabaseConfigured } from "@/lib/supabase"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as ToasterSonner } from "@/components/ui/sonner"
 import { useAuth } from "@/context/auth-context"
 
 // Componente para redirigir usuarios logueados fuera de rutas de auth
@@ -121,7 +122,16 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      {/* DOS sistemas de avisos, y hay que montar los dos.
+          `Toaster` es el de shadcn, que usa `useToast` de @/hooks/use-toast.
+          `ToasterSonner` es el de la librería sonner, que usa `toast` de
+          "sonner" — lo llaman 12 pantallas (odontograma, periodontograma,
+          evolución, presupuestos, pacientes, citas, horarios, liquidaciones,
+          mantenimiento…). Faltaba montarlo, así que TODOS esos mensajes se
+          perdían en silencio, incluidos los de error: se guardaba mal y no
+          aparecía nada en pantalla. */}
       <Toaster />
+      <ToasterSonner />
     </HelmetProvider>
   )
 }
