@@ -4,7 +4,9 @@ Guía para Claude Code (claude.ai/code) al trabajar en este repositorio.
 
 > **El usuario prefiere respuestas en español. No es programador**: espera que Claude implemente, pruebe y publique los cambios por él, con explicaciones claras y sin jerga. Trabaja también desde el celular.
 
-**Clínica Odontológica** — sistema de gestión dental: pacientes, odontograma, periodontograma, agenda, presupuestos, pagos y reportes. SPA React desplegada en Vercel sobre Supabase.
+**CONSULTORIO ODONTOLÓGICO MOVA DENT** — sistema de gestión dental: pacientes, odontograma, periodontograma, agenda, presupuestos, pagos, recetas y reportes. SPA React desplegada en Vercel sobre Supabase.
+
+El nombre está **una sola vez** en `src/lib/clinica.ts` (`NOMBRE_CLINICA` y `NOMBRE_CLINICA_CORTO`). Antes estaba escrito a mano en 13 lugares y cambiarlo obligaba a encontrarlos todos. No volver a escribirlo literal en ningún archivo.
 
 **Es odontología pura.** Nació como clon de un sistema médico policial (Sanidad ISEPOL) que a su vez venía de otro de control de peso, y arrastra restos de ambos. Cuando aparezca algo de enfermería, reposos, cadetes, salvoconductos o urgencias: **es herencia, no funcionalidad**. El usuario lo confirmó expresamente el 2026-08-05.
 
@@ -48,6 +50,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `auth_roles_setup.sql` | `profiles`, `user_roles`, RLS y `es_odonto_admin()` | Aplicada |
 | `esquema_completo.sql` | Columnas y tablas que el código pedía y no existían | Aplicada |
 | `rls_completo.sql` | Permisos de acceso a los datos | Aplicada |
+| `recetas.sql` | `recetas` + `receta_items`, correlativo único y `es_odonto_prescriptor()` | Aplicada 2026-08-06 |
 
 ---
 
@@ -70,6 +73,8 @@ Las tablas quedaron con Row Level Security prendido y **sin ninguna regla**: la 
 Y al revés: las migraciones dentales habían creado políticas `FOR ALL TO authenticated USING (true)`, que significan **cualquiera que esté logueado**, sin rol ni estado. Como las reglas se SUMAN, anulaban el criterio real. **Verificado**: una cuenta sin ningún rol podía escribir en las tablas clínicas. `rls_completo.sql` las quitó y dejó 4 reglas por tabla (`es_odonto_activo()` para leer y escribir, admin para borrar).
 
 Al agregar una tabla, agregarla también a la lista de `rls_completo.sql`.
+
+⚠️ **`recetas` y `receta_items` son la excepción**: no van en esa lista. Sus reglas están en `recetas.sql` y el INSERT es más estricto que el genérico — solo el rol `medico` (`es_odonto_prescriptor()`), porque la receta lleva firma y registro profesional. Si se las agrega al bucle de `rls_completo.sql`, recepción pasaría a poder emitir recetas.
 
 ### 3. Los totales guardados no se actualizan solos
 
@@ -181,7 +186,9 @@ Trampas de los scripts de prueba: PostgREST exige que todos los objetos de un lo
 ## Pendientes
 
 1. **Apagar el registro en Supabase** (Authentication → Providers → Email → "Allow new users to sign up"). Es lo único de seguridad que queda y solo se hace desde el panel.
-2. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta.
-3. **Revisar las tarifas**: hay 12 de ejemplo.
-4. **Confirmación de correo**: sigue activada en Supabase, así que una cuenta nueva con dominio inventado (`@odonto.com`) queda trabada. Se destraba apagándola en el panel o creando las cuentas por API admin.
-5. Sin revisar: los impresos de odontograma y consentimiento, y cómo se ve en celular.
+2. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta. **Bloquea las recetas**: sin ficha vinculada no se puede emitir ninguna, porque el documento se firma con ese nombre y su `numero_colegiatura`. Al 2026-08-06 sigue habiendo 0.
+3. **El logo de Mova Dent no está en el proyecto.** El `public/favicon.png` todavía es el de "Control de Peso" (el sistema de dietas del que se clonó todo) y `public/logos/` solo tiene los escudos de Paraguay del sistema policial. Falta que el usuario mande el archivo para ponerlo en los impresos, el login y el ícono de la pestaña.
+4. **Botones "Accesos Rápidos de Prueba / Demo"** en el login (`src/pages/Login.tsx`): entran con las cuatro cuentas. Las contraseñas cambiaron el 2026-08-05, así que ya no funcionan, pero siguen a la vista en la pantalla de entrada. Preguntado al usuario el 2026-08-06, sin respuesta todavía.
+5. **Revisar las tarifas**: hay 12 de ejemplo.
+6. **Confirmación de correo**: sigue activada en Supabase, así que una cuenta nueva con dominio inventado (`@odonto.com`) queda trabada. Se destraba apagándola en el panel o creando las cuentas por API admin.
+7. Sin revisar: los impresos de odontograma y consentimiento, cómo se ve en celular, y **emitir una receta de punta a punta** (no se pudo por el punto 2).
