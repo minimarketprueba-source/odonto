@@ -18,7 +18,8 @@ import { useProductividadReporte } from "@/api/productividad";
 import { useAuth } from "@/context/auth-context";
 import { usePerfilProfesional } from "@/api/perfil";
 import { imprimirPlanillaProductividad } from "@/lib/imprimir";
-import { NOMBRE_CLINICA, NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
+import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
+import { useEmpresa } from "@/api/empresa";
 
 type TipoPeriodo = "diario" | "semanal" | "mensual" | "personalizado";
 
@@ -83,6 +84,7 @@ function Barra({ etiqueta, valor, max, color }: { etiqueta: string; valor: numbe
 
 export default function Reportes() {
   const { user, role } = useAuth();
+  const empresa = useEmpresa();
   const { data: perfilPropio } = usePerfilProfesional(user);
 
   // Pestaña activa
@@ -188,7 +190,7 @@ export default function Reportes() {
       especialistaColegiatura: especialistaColegiatura,
       fecha: prodFechaDesde === prodFechaHasta ? formatFechaLarga(prodFechaDesde) : `${formatFechaLarga(prodFechaDesde)} al ${formatFechaLarga(prodFechaHasta)}`,
       horario: prodHorario,
-      unidad: NOMBRE_CLINICA,
+      unidad: empresa.nombre,
       tipoPeriodo,
       periodoEtiqueta: periodoTexto,
       filas: atenciones.map((a) => ({

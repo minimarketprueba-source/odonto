@@ -63,10 +63,11 @@ import { mensajeEstadoCuenta, enlaceWhatsApp, telefonoParaWhatsApp } from "@/lib
 import { useEvoluciones } from "@/api/evoluciones";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
-import { NOMBRE_CLINICA } from "@/lib/clinica";
+import { useEmpresa } from "@/api/empresa";
 
 export default function FichaPaciente() {
   const { id } = useParams<{ id: string }>();
+  const empresa = useEmpresa();
   const pacienteId = id as string;
 
   const { data: paciente, isLoading: loadingPaciente } = usePaciente(pacienteId);
@@ -393,7 +394,7 @@ export default function FichaPaciente() {
     if (!paciente) return;
     const cuenta = datosCuenta();
     const mensaje = mensajeEstadoCuenta({
-      clinica: NOMBRE_CLINICA,
+      clinica: empresa.nombre,
       pacienteNombre: cuenta.pacienteNombre,
       fecha: cuenta.fecha,
       planTitulo: cuenta.planTitulo,

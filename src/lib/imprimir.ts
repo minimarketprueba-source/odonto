@@ -1,4 +1,37 @@
-import { NOMBRE_CLINICA } from "@/lib/clinica";
+import { getEmpresa, lineaContacto } from "@/lib/clinica";
+
+/**
+ * El encabezado que comparten todos los impresos: logo, nombre del
+ * consultorio, datos de contacto y título del documento.
+ *
+ * Está acá una sola vez porque los datos ahora se editan en Mantenimiento →
+ * Consultorio: si el usuario cambia la dirección o el RUC, tiene que cambiar
+ * en los cinco impresos a la vez. Antes cada uno traía el nombre escrito a
+ * mano y bastaba con olvidarse de uno.
+ *
+ * `getEmpresa()` y no un hook: los impresos no son componentes de React.
+ */
+function encabezadoDocumento(
+  tituloDoc: string,
+  opciones: { sub?: string | null; tamNombre?: number; margen?: number } = {}
+): string {
+  const { sub = null, tamNombre = 18, margen = 16 } = opciones;
+  const empresa = getEmpresa();
+  const contacto = lineaContacto(empresa);
+
+  return `
+      <div style="text-align:center; margin-bottom:${margen}px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
+        ${
+          empresa.logo_url
+            ? `<img src="${empresa.logo_url}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">`
+            : ""
+        }
+        <h1 style="margin:0; font-size:${tamNombre}px; color:#1e3a8a;">${esc(empresa.nombre)}</h1>
+        ${contacto ? `<p style="margin:3px 0 0; font-size:10px; color:#64748b;">${esc(contacto)}</p>` : ""}
+        <h2 style="margin:5px 0 0; font-size:14px;">${esc(tituloDoc)}</h2>
+        ${sub ? `<p style="margin:3px 0 0; font-size:11px; color:#475569;">${esc(sub)}</p>` : ""}
+      </div>`;
+}
 
 export function cleanQrText(text: string): string {
   return text
@@ -240,7 +273,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
           <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: bold; color: #2563eb;">PLANILLA DE PRODUCTIVIDAD POR ESPECIALIDAD Y PROFESIONAL</p>
         </div>
         <div style="text-align: right; font-size: 11px; color: #334155; line-height: 1.4;">
-          <p style="margin: 0; font-weight: bold; color: #0f172a;">${NOMBRE_CLINICA}</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">${esc(getEmpresa().nombre)}</p>
           <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Emisión: ${new Date().toLocaleDateString("es-PY")}</p>
         </div>
       </div>
@@ -289,8 +322,8 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
         </div>
         <div>
           <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
-          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">V° B° JEFATURA DE SANIDAD</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">${NOMBRE_CLINICA}</p>
+          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">V° B° DIRECCIÓN</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">${esc(getEmpresa().nombre)}</p>
           <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y Sello Autorizado</p>
         </div>
       </div>
@@ -337,11 +370,7 @@ export function imprimirPresupuesto(datos: DatosImpresionPresupuesto) {
 
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a; max-width: 800px; margin: 0 auto;">
-      <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">
-        <h1 style="margin: 0; font-size: 18px; color: #1e3a8a;">${NOMBRE_CLINICA}</h1>
-        <h2 style="margin: 5px 0; font-size: 14px;">${tituloDoc}</h2>
-        <p style="margin: 0; font-size: 11px; color: #475569;">Fecha: ${datos.fecha}</p>
-      </div>
+      ${encabezadoDocumento(tituloDoc, { sub: `Fecha: ${datos.fecha}`, tamNombre: 18, margen: 20 })}
 
       <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
         <p style="margin: 4px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
@@ -481,11 +510,7 @@ export function imprimirPlanillaHistorial(datos: DatosPlanillaHistorial) {
 
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 18px; color: #0f172a; max-width: 900px; margin: 0 auto; font-size: 12px;">
-      <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 8px;">
-        <h1 style="margin: 0; font-size: 17px; color: #1e3a8a;">${NOMBRE_CLINICA}</h1>
-        <h2 style="margin: 4px 0; font-size: 13px;">${tituloDoc}</h2>
-        <p style="margin: 0; font-size: 10px; color: #475569;">Emitido el ${new Date().toLocaleDateString("es-PY")}</p>
-      </div>
+      ${encabezadoDocumento(tituloDoc, { sub: `Emitido el ${new Date().toLocaleDateString("es-PY")}`, tamNombre: 17, margen: 16 })}
 
       <div style="margin-bottom: 14px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc;">
         <p style="margin: 3px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
@@ -637,10 +662,7 @@ export function imprimirPeriodontograma(datos: DatosImpresionPeriodontograma) {
 
   const html = `
     <div style="font-family: Arial, sans-serif; padding:16px; color:#0f172a; max-width:1000px; margin:0 auto;">
-      <div style="text-align:center; margin-bottom:12px; border-bottom:2px solid #0f172a; padding-bottom:8px;">
-        <h1 style="margin:0; font-size:16px; color:#1e3a8a;">${NOMBRE_CLINICA}</h1>
-        <h2 style="margin:4px 0; font-size:13px;">${tituloDoc}</h2>
-      </div>
+      ${encabezadoDocumento(tituloDoc, { tamNombre: 16, margen: 12 })}
 
       <div style="margin-bottom:10px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-size:11px;">
         <p style="margin:2px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre} &nbsp;·&nbsp; <strong>Documento:</strong> ${datos.pacienteDocumento || "—"}</p>
@@ -724,11 +746,7 @@ export function imprimirComprobantePagos(datos: DatosComprobantePagos) {
 
   const html = `
     <div style="font-family: Arial, sans-serif; padding:22px; color:#0f172a; max-width:720px; margin:0 auto;">
-      <div style="text-align:center; margin-bottom:18px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
-        <h1 style="margin:0; font-size:18px; color:#1e3a8a;">${NOMBRE_CLINICA}</h1>
-        <h2 style="margin:5px 0; font-size:14px;">${tituloDoc}</h2>
-        <p style="margin:0; font-size:11px; color:#475569;">Emitido el ${datos.fecha}</p>
-      </div>
+      ${encabezadoDocumento(tituloDoc, { sub: `Emitido el ${datos.fecha}`, tamNombre: 18, margen: 18 })}
 
       <div style="margin-bottom:16px; padding:10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc;">
         <p style="margin:4px 0;"><strong>Paciente:</strong> ${datos.pacienteNombre}</p>
@@ -859,13 +877,9 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
           : ""
       }
 
-      <div style="text-align:center; margin-bottom:16px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
-        <h1 style="margin:0; font-size:18px; color:#1e3a8a;">${NOMBRE_CLINICA}</h1>
-        <h2 style="margin:5px 0; font-size:14px;">${tituloDoc}</h2>
-        <p style="margin:0; font-size:11px; color:#475569;">
-          Nº ${esc(datos.numero)} &nbsp;·&nbsp; ${esc(datos.fecha)}
-        </p>
-      </div>
+      ${/* Sin esc() ni &nbsp; acá: encabezadoDocumento ya escapa el subtítulo,
+            y escaparlo dos veces dejaba los "&nbsp;" escritos en el papel. */""}
+      ${encabezadoDocumento(tituloDoc, { sub: `Nº ${datos.numero}  ·  ${datos.fecha}`, tamNombre: 18, margen: 16 })}
 
       ${
         datos.anulada

@@ -7,6 +7,7 @@ import { useSidebar } from "@/context/sidebar-context"
 import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { NOMBRE_CLINICA_CORTO } from "@/lib/clinica";
+import { useEmpresa } from "@/api/empresa";
 
 // Helper para obtener la ruta correcta del logo
 const getLogoPath = () => {
@@ -26,6 +27,7 @@ export function Sidebar() {
   const location = useLocation()
   const pathname = location.pathname
   const { user, logout } = useAuth()
+  const empresa = useEmpresa()
   // Nombre real de la persona, si lo cargó en Mi perfil o tiene ficha de
   // odontólogo. Si no hay ninguno, se cae al correo.
   const { data: perfil } = usePerfilProfesional(user)
@@ -103,8 +105,18 @@ export function Sidebar() {
               tabIndex={isCollapsed ? 0 : undefined}
               title={isCollapsed ? "Expandir menú" : undefined}
             >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
-                <img src={getLogoPath()} alt="Logo" className="w-full h-full object-cover" />
+              {/* Con logo cargado: fondo oscuro propio y `object-contain`, porque
+                  un logo ancho recortado a un cuadrado quedaría partido al medio.
+                  Sin logo cargado: el ícono de Mova Dent, que ya viene cuadrado. */}
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden",
+                empresa.logo_url && "bg-slate-900 p-1"
+              )}>
+                <img
+                  src={empresa.logo_url || getLogoPath()}
+                  alt={empresa.nombre}
+                  className={cn("w-full h-full", empresa.logo_url ? "object-contain" : "object-cover")}
+                />
               </div>
               {!isCollapsed && (
                 <div className="transition-all duration-300 overflow-hidden w-auto opacity-100">

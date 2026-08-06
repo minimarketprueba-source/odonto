@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { mensajeEstadoCuenta, telefonoParaWhatsApp, enlaceWhatsApp } from "@/lib/estado-cuenta";
-import { NOMBRE_CLINICA } from "@/lib/clinica";
+import { EMPRESA_PREDETERMINADA } from "@/lib/clinica";
 
 const CUENTA_BASE = {
-  clinica: NOMBRE_CLINICA,
+  clinica: EMPRESA_PREDETERMINADA.nombre,
   pacienteNombre: "ROMERO, TOBIAS",
   fecha: "5/8/2026",
   planTitulo: "Tratamiento integral",

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Activity, Eye, EyeOff, Sparkles } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
-import { NOMBRE_CLINICA } from "@/lib/clinica";
+import { useEmpresa } from "@/api/empresa";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("")
@@ -20,6 +20,7 @@ export default function SignUpPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [repeatPasswordError, setRepeatPasswordError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const empresa = useEmpresa()
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -120,7 +121,7 @@ export default function SignUpPage() {
             Crear Cuenta de Usuario
           </CardTitle>
           <CardDescription className="text-slate-400 text-sm mt-1">
-            {NOMBRE_CLINICA}
+            {empresa.nombre}
           </CardDescription>
         </CardHeader>
 

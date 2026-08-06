@@ -20,6 +20,7 @@ import {
   createEspecialidad, updateEspecialidad, createMedico, updateMedico, createCie10,
   type MedicoAdmin,
 } from "@/api/mantenimiento";
+import { DatosConsultorio } from "@/components/mantenimiento/DatosConsultorio";
 
 const MEDICO_VACIO = {
   nombres: "", apellidos: "", documento: "", email: "", telefono: "",
@@ -148,11 +149,16 @@ export default function Mantenimiento() {
         </h2>
 
         <Tabs defaultValue="medicos">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="medicos">Médicos</TabsTrigger>
             <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
             <TabsTrigger value="cie10">CIE-10</TabsTrigger>
+            <TabsTrigger value="consultorio">Consultorio</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="consultorio" className="py-4">
+            <DatosConsultorio />
+          </TabsContent>
 
           <TabsContent value="medicos" className="space-y-3 py-3">
             <div className="flex items-center justify-between gap-2">

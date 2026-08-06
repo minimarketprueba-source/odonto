@@ -7,7 +7,7 @@ import { Eye, EyeOff, Shield, Stethoscope, UserCheck, Sparkles, CheckCircle2 } f
 import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { useAuth, DEMO_USERS } from "@/context/auth-context"
-import { NOMBRE_CLINICA } from "@/lib/clinica";
+import { useEmpresa } from "@/api/empresa";
 
 /**
  * Traduce los errores de Supabase Auth a algo que se entienda y que diga qué
@@ -42,6 +42,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuth()
+  const empresa = useEmpresa()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,8 +84,8 @@ export default function LoginPage() {
               para lo que está hecho, y ya trae "MOVA DENT" en su tipografía. */}
           <CardTitle className="mb-1">
             <img
-              src="/mova-dent-logo-transparente.png"
-              alt={NOMBRE_CLINICA}
+              src={empresa.logo_url || "/mova-dent-logo-transparente.png"}
+              alt={empresa.nombre}
               className="mx-auto h-14 w-auto sm:h-16"
             />
           </CardTitle>
@@ -95,7 +96,7 @@ export default function LoginPage() {
           </div>
 
           <CardDescription className="text-slate-400 text-sm mt-1">
-            {NOMBRE_CLINICA}
+            {empresa.nombre}
           </CardDescription>
         </CardHeader>
 
