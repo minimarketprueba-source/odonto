@@ -1,5 +1,6 @@
 import { getEmpresa, lineaContacto } from "@/lib/clinica";
 import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
+import { LOGO_BANDA_PREDETERMINADO, MARCA_AGUA_DIENTE } from "@/lib/recetario-base64";
 
 /**
  * El encabezado que comparten todos los impresos: logo, nombre del
@@ -854,8 +855,18 @@ export interface DatosImpresionReceta {
   motivoAnulacion?: string | null;
 }
 
+/**
+ * La receta sigue el recetario A5 que diseñó el consultorio: banda celeste con
+ * el logo y los datos de contacto, los campos del paciente, "RP/" con la
+ * medicación, la muela de marca de agua al fondo, y firma y fecha abajo.
+ *
+ * Va en A5 y no en A4 porque es el tamaño del talonario de papel: así una
+ * receta impresa desde el sistema y una del talonario son el mismo papel.
+ */
 export function imprimirReceta(datos: DatosImpresionReceta) {
   const tituloDoc = "RECETA ODONTOLÓGICA";
+  const empresa = getEmpresa();
+  const logoBanda = empresa.logo_url || LOGO_BANDA_PREDETERMINADO;
 
   const filas = datos.medicamentos
     .map((m, i) => {
@@ -864,78 +875,118 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
       const posologia = [m.dosis, m.frecuencia, m.duracion]
         .filter((x) => x && String(x).trim())
         .map((x) => esc(x))
-        .join(" &nbsp;·&nbsp; ");
+        .join(" · ");
       return `
-      <div style="padding:10px 12px; border-bottom:1px dashed #cbd5e1;">
-        <div style="font-size:14px; font-weight:bold;">${i + 1}. ${esc(m.medicamento)}</div>
-        ${posologia ? `<div style="font-size:13px; margin-top:3px; color:#1e293b;">${posologia}</div>` : ""}
+      <div style="margin-bottom:9px;">
+        <div style="font-size:12.5px; font-weight:bold; color:#0f172a;">${i + 1}. ${esc(m.medicamento)}</div>
+        ${posologia ? `<div style="font-size:11.5px; margin-top:1px; color:#155e75;">${posologia}</div>` : ""}
         ${
           m.indicaciones && String(m.indicaciones).trim()
-            ? `<div style="font-size:11px; margin-top:3px; color:#475569; font-style:italic;">${esc(m.indicaciones)}</div>`
+            ? `<div style="font-size:10px; margin-top:1px; color:#64748b; font-style:italic;">${esc(m.indicaciones)}</div>`
             : ""
         }
       </div>`;
     })
     .join("");
 
+  // Línea de campo con el valor ya escrito encima, como se completaría a mano.
+  const campo = (etiqueta: string, valor: string, ancho: string) => `
+    <span style="font-size:9.5px; color:#0e7490; letter-spacing:0.4px;">${etiqueta}</span>
+    <span style="display:inline-block; width:${ancho}; border-bottom:1px solid #7dd3e0;
+                 font-size:11.5px; color:#0f172a; padding:0 4px 1px; margin-left:3px;">${valor}</span>`;
+
   const html = `
-    <div style="font-family: Arial, sans-serif; padding:22px; color:#0f172a; max-width:720px; margin:0 auto; position:relative;">
+    <div style="font-family: Arial, Helvetica, sans-serif; color:#0f172a; position:relative;
+                width:100%; min-height:172mm; display:flex; flex-direction:column;">
+
+      ${/* Marca de agua: va detrás de todo y no se imprime en negro. */""}
+      <img src="${MARCA_AGUA_DIENTE}" alt="" style="position:absolute; top:46%; left:50%;
+           transform:translate(-50%,-50%); width:76mm; opacity:0.5; z-index:0; pointer-events:none;">
+
       ${
         datos.anulada
-          ? `<div style="position:absolute; top:180px; left:0; right:0; text-align:center; font-size:64px; font-weight:bold;
-                        color:#dc2626; opacity:0.18; transform:rotate(-20deg); letter-spacing:8px; pointer-events:none;">ANULADA</div>`
+          ? `<div style="position:absolute; top:44%; left:0; right:0; z-index:3; text-align:center;
+                        font-size:52px; font-weight:bold; color:#dc2626; opacity:0.2;
+                        transform:rotate(-20deg); letter-spacing:6px;">ANULADA</div>`
           : ""
       }
 
-      ${/* Sin esc() ni &nbsp; acá: encabezadoDocumento ya escapa el subtítulo,
-            y escaparlo dos veces dejaba los "&nbsp;" escritos en el papel. */""}
-      ${encabezadoDocumento(tituloDoc, { sub: `Nº ${datos.numero}  ·  ${datos.fecha}`, tamNombre: 18, margen: 16 })}
+      ${/* ---- Banda del encabezado ---- */""}
+      <div style="position:relative; z-index:2; background:linear-gradient(90deg,#0f766e 0%,#22d3ee 100%);
+                  padding:7px 10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <img src="${logoBanda}" alt="" style="height:19mm; max-width:74mm; object-fit:contain; display:block;">
+        <div style="text-align:right; color:#fff; font-size:11px; font-weight:bold; line-height:1.5; letter-spacing:1px;">
+          ${esc(empresa.telefono) || "&nbsp;"}
+        </div>
+      </div>
+      ${
+        empresa.direccion
+          ? `<div style="position:relative; z-index:2; background:#22d3ee; color:#0f172a; text-align:center;
+                        font-size:10px; font-weight:bold; padding:3px 8px; line-height:1.35;">
+               ${esc(empresa.direccion)}
+             </div>`
+          : ""
+      }
 
       ${
         datos.anulada
-          ? `<div style="margin-bottom:14px; padding:8px 10px; border:1px solid #fecaca; background:#fef2f2; border-radius:6px; font-size:12px; color:#b91c1c;">
+          ? `<div style="position:relative; z-index:2; margin-top:6px; padding:5px 8px; border:1px solid #fecaca;
+                        background:#fef2f2; font-size:10px; color:#b91c1c;">
                <strong>Receta anulada.</strong> No es válida para su dispensación.
                ${datos.motivoAnulacion ? ` Motivo: ${esc(datos.motivoAnulacion)}` : ""}
              </div>`
           : ""
       }
 
-      <div style="margin-bottom:16px; padding:10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc;">
-        <p style="margin:4px 0;"><strong>Paciente:</strong> ${esc(datos.pacienteNombre)}</p>
-        <p style="margin:4px 0;"><strong>Documento:</strong> ${esc(datos.pacienteDocumento) || "—"}${
-          datos.pacienteEdad ? ` &nbsp;·&nbsp; <strong>Edad:</strong> ${esc(datos.pacienteEdad)}` : ""
-        }</p>
+      ${/* ---- Datos del paciente ---- */""}
+      <div style="position:relative; z-index:2; padding:9px 4px 0; line-height:2.1;">
+        <div>${campo("NOMBRE DEL PACIENTE:", esc(datos.pacienteNombre), "63%")}</div>
+        <div>
+          ${campo("C.I.Nº:", esc(datos.pacienteDocumento) || "", "30%")}
+          ${campo("EDAD:", esc(datos.pacienteEdad) || "", "22%")}
+        </div>
         ${
           datos.diagnostico && datos.diagnostico.trim()
-            ? `<p style="margin:4px 0;"><strong>Diagnóstico:</strong> ${esc(datos.diagnostico)}</p>`
+            ? `<div>${campo("DIAGNÓSTICO:", esc(datos.diagnostico), "68%")}</div>`
             : ""
         }
       </div>
 
-      <div style="font-size:26px; font-weight:bold; font-family:Georgia, serif; margin-bottom:4px;">Rp/</div>
-      <div style="border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; margin-bottom:16px;">
-        ${filas || `<div style="padding:14px; text-align:center; color:#64748b; font-style:italic;">Sin medicamentos.</div>`}
-      </div>
-
-      ${
-        datos.indicaciones && datos.indicaciones.trim()
-          ? `<div style="margin-bottom:16px; padding:10px; border-left:3px solid #1e3a8a; background:#f8fafc; font-size:12px;">
-               <strong>Indicaciones generales:</strong><br/>${esc(datos.indicaciones).replace(/\n/g, "<br/>")}
-             </div>`
-          : ""
-      }
-
-      <div style="margin-top:55px; text-align:center;">
-        <div style="width:240px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
-        <div style="font-size:12px; font-weight:bold;">${esc(datos.profesionalNombre) || "Firma y sello del odontólogo"}</div>
+      ${/* ---- Rp/ y la medicación ---- */""}
+      <div style="position:relative; z-index:2; padding:8px 4px 0; flex:1;">
+        <div style="font-size:17px; color:#0e7490; font-family:Georgia,serif; margin-bottom:7px;">RP/</div>
+        <div style="padding-left:6px;">
+          ${filas || `<div style="font-size:11px; color:#94a3b8; font-style:italic;">Sin medicamentos.</div>`}
+        </div>
         ${
-          datos.profesionalRegistro
-            ? `<div style="font-size:11px; color:#475569;">Reg. Prof. Nº ${esc(datos.profesionalRegistro)}</div>`
+          datos.indicaciones && datos.indicaciones.trim()
+            ? `<div style="margin-top:9px; padding-left:6px; border-left:2px solid #22d3ee; font-size:10.5px; color:#334155;">
+                 <strong style="color:#0e7490;">INDICACIONES:</strong><br/>${esc(datos.indicaciones).replace(/\n/g, "<br/>")}
+               </div>`
             : ""
         }
+      </div>
+
+      ${/* ---- Firma y fecha, abajo a la derecha como en el talonario ---- */""}
+      <div style="position:relative; z-index:2; margin-top:12px; text-align:right; padding-right:6px;">
+        <div style="display:inline-block; text-align:center;">
+          <div style="border-bottom:1px solid #0f172a; min-width:52mm; padding-bottom:1px; font-size:11px;">
+            ${esc(datos.profesionalNombre) || "&nbsp;"}
+          </div>
+          <div style="font-size:9.5px; color:#0e7490; letter-spacing:0.5px; margin-top:2px;">FIRMA Y SELLO</div>
+          ${
+            datos.profesionalRegistro
+              ? `<div style="font-size:9.5px; color:#475569;">Reg. Prof. Nº ${esc(datos.profesionalRegistro)}</div>`
+              : ""
+          }
+        </div>
+        <div style="font-size:9.5px; color:#0e7490; letter-spacing:0.5px; margin-top:7px;">
+          FECHA: <span style="color:#0f172a; font-size:11px; letter-spacing:0;">${esc(datos.fecha)}</span>
+          <span style="margin-left:12px;">Nº ${esc(datos.numero)}</span>
+        </div>
       </div>
     </div>
   `;
 
-  ejecutarImpresionIframe(tituloDoc, html);
+  ejecutarImpresionIframe(tituloDoc, html, { tamano: "A5", margen: "8mm 9mm" });
 }
