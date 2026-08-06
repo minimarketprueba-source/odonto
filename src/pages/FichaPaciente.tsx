@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { usePaciente } from "@/api/pacientes";
+import { usePaciente, useCambiarEstadoPaciente } from "@/api/pacientes";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   usePacienteAnamnesis,
   useSavePacienteAnamnesis,
@@ -56,7 +57,9 @@ import {
   ListTodo,
   Printer,
   MessageCircle,
-  Pill
+  Pill,
+  Loader2,
+  UserCheck
 } from "lucide-react";
 import { imprimirPresupuesto, imprimirPlanillaHistorial, imprimirComprobantePagos } from "@/lib/imprimir";
 import { mensajeEstadoCuenta, enlaceWhatsApp, telefonoParaWhatsApp } from "@/lib/estado-cuenta";
@@ -68,6 +71,9 @@ import { useEmpresa } from "@/api/empresa";
 export default function FichaPaciente() {
   const { id } = useParams<{ id: string }>();
   const empresa = useEmpresa();
+  const { hasPermission } = usePermissions();
+  const puedeReactivar = hasPermission("pacientes", "editar");
+  const cambiarEstado = useCambiarEstadoPaciente();
   const pacienteId = id as string;
 
   const { data: paciente, isLoading: loadingPaciente } = usePaciente(pacienteId);
@@ -224,6 +230,24 @@ export default function FichaPaciente() {
     if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) años--;
     return años >= 0 ? `${años} años` : null;
   })();
+
+  const handleReactivar = async () => {
+    const confirmar = await Swal.fire({
+      title: "¿Reactivar a este paciente?",
+      text: "Vuelve a aparecer en la lista y se le pueden cargar citas y tratamientos.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Sí, reactivar",
+      cancelButtonText: "Cancelar",
+    });
+    if (!confirmar.isConfirmed) return;
+    try {
+      await cambiarEstado.mutateAsync({ id: pacienteId, activo: true });
+      toast.success("Paciente reactivado.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   // Handle Anamnesis Save
   const handleSaveAnamnesis = async (e: React.FormEvent) => {
@@ -588,7 +612,27 @@ export default function FichaPaciente() {
             {paciente.activo ? (
               <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-0 text-xs">Paciente Activo</Badge>
             ) : (
-              <Badge variant="destructive">Inactivo</Badge>
+              <>
+                <Badge variant="destructive">Inactivo</Badge>
+                {/* El botón va acá y no solo en la lista de Pacientes: esa lista
+                    filtra por "Activos" de entrada, así que un paciente dado de
+                    baja no aparece y no había desde dónde reactivarlo sin saber
+                    que primero hay que cambiar el filtro. */}
+                {puedeReactivar && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 bg-background"
+                    disabled={cambiarEstado.isPending}
+                    onClick={handleReactivar}
+                  >
+                    {cambiarEstado.isPending
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <UserCheck className="w-4 h-4" />}
+                    Reactivar paciente
+                  </Button>
+                )}
+              </>
             )}
             {alergiaLatex && <Badge variant="destructive">⚠️ Alergia Látex</Badge>}
             {alergiaAnestesia && <Badge variant="destructive">⚠️ Alergia Anestésicos</Badge>}
