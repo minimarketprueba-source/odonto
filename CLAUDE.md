@@ -6,7 +6,11 @@ Guía para Claude Code (claude.ai/code) al trabajar en este repositorio.
 
 **CONSULTORIO ODONTOLÓGICO MOVA DENT** — sistema de gestión dental: pacientes, odontograma, periodontograma, agenda, presupuestos, pagos, recetas y reportes. SPA React desplegada en Vercel sobre Supabase.
 
-El nombre está **una sola vez** en `src/lib/clinica.ts` (`NOMBRE_CLINICA` y `NOMBRE_CLINICA_CORTO`). Antes estaba escrito a mano en 13 lugares y cambiarlo obligaba a encontrarlos todos. No volver a escribirlo literal en ningún archivo.
+**El nombre y los datos del consultorio salen de la base** (tabla `clinicas`) y se editan en Mantenimiento → Consultorio. Antes estaban escritos a mano en 13 lugares y cambiarlos obligaba a encontrarlos todos. No volver a escribir el nombre literal en ningún archivo:
+
+- En componentes de React: `useEmpresa()` de `src/api/empresa.ts`.
+- En código que no es React (los impresos): `getEmpresa()` de `src/lib/clinica.ts`.
+- `EMPRESA_PREDETERMINADA` es solo el respaldo mientras la consulta no contestó.
 
 **Es odontología pura.** Nació como clon de un sistema médico policial (Sanidad ISEPOL) que a su vez venía de otro de control de peso, y arrastra restos de ambos. Cuando aparezca algo de enfermería, reposos, cadetes, salvoconductos o urgencias: **es herencia, no funcionalidad**. El usuario lo confirmó expresamente el 2026-08-05.
 
@@ -34,7 +38,17 @@ El nombre está **una sola vez** en `src/lib/clinica.ts` (`NOMBRE_CLINICA` y `NO
 
 **Las contraseñas ya no son las de prueba.** El 2026-08-05 se cambiaron por API admin y se le pasaron al usuario por chat; la de admin la cambió él antes. **No van en este archivo**: es un repositorio de GitHub. Si hace falta reponer una, se resetea por API admin con la service_role key (se la pide al usuario, no se guarda en ningún archivo).
 
-**Registro público**: cerrado en la app (sin enlace, y `/auth/sign-up` redirige al login). ⚠️ **Falta cerrarlo en Supabase**: apagar "Allow new users to sign up" en Authentication → Providers → Email. Mientras siga prendido, cualquiera puede registrarse llamando a la API directamente, porque la anon key es pública. Quien se registre queda sin rol y sin acceso a nada, pero es una puerta abierta.
+**Registro público**: cerrado por los dos lados. En la app (sin enlace, y `/auth/sign-up` redirige al login) y en Supabase. Verificado el 2026-08-06 sin tocar nada:
+
+```bash
+curl -s "https://othuhgapvnpdjhartrut.supabase.co/auth/v1/settings" -H "apikey: <anon key>"
+# disable_signup: true   → cerrado
+# mailer_autoconfirm: false → la confirmación de correo sigue pedida
+```
+
+Ese endpoint es la forma de comprobar la configuración de autenticación sin abrir el panel y sin crear ninguna cuenta de prueba.
+
+**Las cuentas nuevas se crean con la Edge Function `create-user`**, que las marca como confirmadas (`email_confirm: true`). Por eso la confirmación de correo, que sigue activada, ya no traba nada: los correos son de un dominio inventado (`@odonto.com`) y el mail nunca llegaría.
 
 ### Datos cargados (2026-08-05)
 
@@ -51,6 +65,9 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `esquema_completo.sql` | Columnas y tablas que el código pedía y no existían | Aplicada |
 | `rls_completo.sql` | Permisos de acceso a los datos | Aplicada |
 | `recetas.sql` | `recetas` + `receta_items`, correlativo único y `es_odonto_prescriptor()` | Aplicada 2026-08-06 |
+| `empresa.sql` | `ruc` y `logo_url` en `clinicas`, lectura pública, escritura solo admin | Aplicada 2026-08-06 |
+| `empresa_nombre_inicial.sql` | Corrige el nombre viejo que había quedado en la fila | Aplicada 2026-08-06 |
+| `medicos_vinculo_unico.sql` | Índice único: una cuenta, una sola ficha de odontólogo | Aplicada 2026-08-06 |
 
 ---
 
@@ -127,6 +144,75 @@ Arrancó con "no puedo iniciar sesión" y terminó con el sistema funcionando de
 
 ---
 
+## Lo que se hizo el 2026-08-06
+
+**Recetario** (`src/api/recetas.ts`, `src/components/pacientes/Recetas.tsx`)
+
+El módulo existía desde el clon del sistema policial pero **nunca funcionó**:
+las tablas no existían en esta base (verificado, `PGRST205`) y ningún
+componente lo importaba. Además declaraba los ids como `number` cuando son
+UUID. Tres decisiones que no conviene deshacer sin entender por qué:
+
+1. **El aviso de alergias** (`alergiasEnConflicto` en `src/lib/medicamentos.ts`)
+   cruza lo recetado con la anamnesis antes de emitir. El caso que lo justifica
+   es la amoxicilina: no dice "penicilina" en ninguna parte del nombre, pero lo
+   es, y esa alergia se cargó meses atrás en otra pestaña. **Avisa, no bloquea**:
+   la decisión es del profesional.
+2. **Se anula, no se borra.** La receta anulada conserva su número, como el
+   talonario de papel. Si desapareciera, el correlativo quedaría con un hueco
+   imposible de explicar.
+3. **Emitir es solo del rol `medico`**, y eso lo hace cumplir la base, no la
+   pantalla (ver la trampa 2).
+
+**Datos del consultorio editables** (`src/api/empresa.ts`)
+
+Se pidió "una tabla `empresa` nueva" y **no se hizo**: `clinicas` ya existía con
+nombre, dirección, teléfono y email, y todas las tablas apuntan a ella por
+`clinica_id`. Una tabla paralela dejaría dos lugares diciendo cuál es el
+consultorio. Se le agregaron `ruc` y `logo_url`.
+
+`clinicas` se lee **sin haber iniciado sesión** (política `TO anon`): el nombre
+y el logo se muestran en el login, que es anterior a tener cuenta. No hay
+ningún dato de pacientes en esa tabla.
+
+**Alta de usuarios**: no funcionaba por dos motivos independientes — la pantalla
+armaba la URL con `import.meta.env.VITE_SUPABASE_URL`, que en Vercel no está
+definida, y la Edge Function `create-user` nunca existió (`404`). Se arregló lo
+primero y se escribió la función; falta publicarla desde el panel.
+
+**Vínculo ficha ↔ cuenta**: la pantalla ya impedía reasignar una cuenta tomada,
+pero la base no. Con dos fichas apuntando a la misma cuenta, `fetchMiMedico()`
+reventaba y el odontólogo quedaba sin recetas, sin firma y sin «Mi perfil».
+Se agregó un índice único y la consulta ya no usa `.maybeSingle()`.
+
+
+## Los logos
+
+| Archivo | Para qué | Dónde se usa |
+|---|---|---|
+| `public/mova-dent-logo-transparente.png` | El original, cian claro | Login (fondo oscuro) |
+| `public/mova-dent-icono.png` | La muela recortada en 512x512 sobre fondo oscuro propio | Ícono del navegador y menú lateral |
+| `public/mova-dent-logo-impresion.png` | Versión oscurecida | Los impresos |
+| `src/lib/logo-impresion-base64.ts` | El anterior incrustado en base64 | Lo que consume `imprimir.ts` |
+
+Tres cosas que no son obvias:
+
+1. **El logo original es para fondo oscuro.** Su color más usado es `#60F0F0`,
+   cian claro, y sobre papel blanco se lava. Por eso existe la versión de
+   impresión: se le bajó la luminancia al cian y el relleno casi blanco de las
+   letras pasó a azul oscuro.
+2. **El de impresión va incrustado en base64, no como `<img src="/archivo.png">`.**
+   Los impresos se arman en un iframe y se manda a imprimir 250 ms después: con
+   una URL, si la imagen no bajó a tiempo, el papel sale sin logo. Mismo motivo
+   que el viejo `header-logos-base64.ts`.
+3. **Es solo el valor de fábrica.** El logo que el admin suba en Mantenimiento →
+   Consultorio (columna `clinicas.logo_url`, data URL) le gana en todos lados.
+
+Los íconos cuadrados se generaron midiendo la muela sobre un canvas
+(x 0..118, y 2..123 de un logo de 457x124) y recortándola con Playwright. No
+hay Pillow ni ImageMagick en este equipo: para procesar imágenes se usa el
+Chrome del sistema vía Playwright.
+
 ## Comandos
 
 ```bash
@@ -185,10 +271,24 @@ Trampas de los scripts de prueba: PostgREST exige que todos los objetos de un lo
 
 ## Pendientes
 
-1. **Apagar el registro en Supabase** (Authentication → Providers → Email → "Allow new users to sign up"). Es lo único de seguridad que queda y solo se hace desde el panel.
-2. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta. **Bloquea las recetas**: sin ficha vinculada no se puede emitir ninguna, porque el documento se firma con ese nombre y su `numero_colegiatura`. Al 2026-08-06 sigue habiendo 0.
-3. **El logo de Mova Dent no está en el proyecto.** El `public/favicon.png` todavía es el de "Control de Peso" (el sistema de dietas del que se clonó todo) y `public/logos/` solo tiene los escudos de Paraguay del sistema policial. Falta que el usuario mande el archivo para ponerlo en los impresos, el login y el ícono de la pestaña.
-4. **Botones "Accesos Rápidos de Prueba / Demo"** en el login (`src/pages/Login.tsx`): entran con las cuatro cuentas. Las contraseñas cambiaron el 2026-08-05, así que ya no funcionan, pero siguen a la vista en la pantalla de entrada. Preguntado al usuario el 2026-08-06, sin respuesta todavía.
-5. **Revisar las tarifas**: hay 12 de ejemplo.
-6. **Confirmación de correo**: sigue activada en Supabase, así que una cuenta nueva con dominio inventado (`@odonto.com`) queda trabada. Se destraba apagándola en el panel o creando las cuentas por API admin.
-7. Sin revisar: los impresos de odontograma y consentimiento, cómo se ve en celular, y **emitir una receta de punta a punta** (no se pudo por el punto 2).
+1. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta. **Bloquea las recetas**: sin ficha vinculada no se puede emitir ninguna, porque el documento se firma con ese nombre y su `numero_colegiatura`. Al 2026-08-06 sigue habiendo 0.
+2. **Publicar la Edge Function `create-user`** desde el panel (Edge Functions → Deploy via Editor, nombre exacto `create-user`, pegar `supabase/functions/create-user/index.ts`). Sin ella el botón "Crear usuario" falla: **la función nunca existió en el servidor**, respondía `404 NOT_FOUND`.
+3. **Completar los datos del consultorio** en Mantenimiento → Consultorio: el nombre ya está, faltan RUC, dirección y teléfono. Salen en todos los impresos.
+4. **Revisar las tarifas**: hay 12 de ejemplo.
+5. Sin revisar: los impresos de odontograma y consentimiento, cómo se ve en celular, y **emitir una receta de punta a punta** (no se pudo por el punto 1).
+6. Sin decidir: el PDF `Documento A5 Recetario...` que el usuario dejó en `public/`. **No está commiteado, así que NO se publica**, pero conviene sacarlo de esa carpeta: todo lo que está ahí queda accesible en internet. Puede ser el diseño que quiere para la receta impresa.
+
+### Cosas que YA NO son pendientes (verificadas el 2026-08-06)
+
+- ~~Apagar el registro público en Supabase~~ → **ya está cerrado**. Se comprueba
+  sin tocar nada en `GET /auth/v1/settings` (`disable_signup: true`).
+- ~~Confirmación de correo trabando cuentas nuevas~~ → resuelto de raíz: la
+  Edge Function crea las cuentas con `email_confirm: true`. Mejor que apagar la
+  confirmación en el panel, que la dejaría apagada si algún día se reabre el
+  registro.
+- ~~Botones "Accesos Rápidos de Prueba / Demo" a la vista en el login~~ →
+  **falsa alarma**. Están dentro de `{import.meta.env.DEV && ...}`, así que no
+  llegan al sitio publicado. Verificado buscando "Accesos R" y los correos de
+  las cuentas en `dist/assets/*.js`: no aparecen. Si se ven, es porque se está
+  mirando `npm run dev`.
+- ~~Falta el logo de Mova Dent~~ → cargado. Ver la sección de logos más abajo.
