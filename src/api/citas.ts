@@ -320,6 +320,17 @@ export function useMiMedico(userId: string | null | undefined) {
     queryKey: queryKeys.medicos.mio(userId || ""),
     queryFn: () => fetchMiMedico(userId!),
     enabled: !!userId,
+    // Se vuelve a consultar cada vez que se abre una pantalla que la usa, en
+    // lugar de darla por buena 5 minutos como el resto (el `staleTime` general
+    // de `query-client.ts`).
+    //
+    // Por qué: de esta consulta depende si la persona puede emitir recetas y si
+    // su firma sale en la agenda. Alguien que acaba de vincular su ficha en
+    // Mantenimiento volvía a Recetas y le seguía diciendo que no tenía ficha,
+    // sin ninguna explicación, hasta que se le ocurriera recargar la página.
+    // Es una fila y se consulta por id: no cuesta nada pedirla de nuevo.
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 

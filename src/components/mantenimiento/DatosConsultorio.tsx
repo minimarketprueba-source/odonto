@@ -285,29 +285,70 @@ export function DatosConsultorio() {
         </div>
       </div>
 
-      {/* Cómo va a salir impreso, para no tener que imprimir para verlo. */}
-      <div className="rounded-xl border bg-muted/20 p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Así va a salir el encabezado
-        </p>
-        <div
-          className="mb-3 flex items-center justify-between gap-3 rounded-t-lg px-3 py-2"
-          style={{ background: `linear-gradient(90deg, ${color} 0%, ${aclararColor(color)} 100%)` }}
-        >
-          <img src={logo || LOGO_IMPRESION_PREDETERMINADO} alt="" className="h-8 object-contain" />
-          <span className="text-xs font-bold text-white">{telefono || " "}</span>
+      {/* Cómo sale impreso, para no tener que imprimir para verlo.
+          Son DOS encabezados distintos y la vista previa muestra los dos: antes
+          mostraba solo el genérico y lo rotulaba "RECETA ODONTOLÓGICA", así que
+          prometía un RUC que la receta no lleva. */}
+      <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            La receta
+          </p>
+          <div className="overflow-hidden rounded-lg border bg-white">
+            <div
+              className="flex items-center justify-between gap-3 px-3 py-2"
+              style={{ background: `linear-gradient(90deg, ${color} 0%, ${aclararColor(color)} 100%)` }}
+            >
+              <span className="inline-block rounded bg-white px-1.5 py-1 leading-none">
+                <img
+                  src={logo || LOGO_IMPRESION_PREDETERMINADO}
+                  alt=""
+                  className="h-7 max-w-[150px] object-contain"
+                />
+              </span>
+              <span className="text-[11px] font-bold tracking-wide text-white">
+                {telefono || " "}
+              </span>
+            </div>
+            {direccion && (
+              <div
+                className="px-3 py-1 text-center text-[10px] font-bold text-slate-900"
+                style={{ background: aclararColor(color) }}
+              >
+                {direccion}
+              </div>
+            )}
+            <div className="p-3">
+              <p className="text-[10px] tracking-wide" style={{ color }}>
+                NOMBRE DEL PACIENTE:{" "}
+                <span className="border-b border-slate-300 px-8 text-slate-900">&nbsp;</span>
+              </p>
+              <p className="mt-2 font-serif text-base" style={{ color }}>RP/</p>
+            </div>
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Lleva el logo, el teléfono y la dirección. <strong>No lleva el RUC</strong>: en el
+            recetario de papel tampoco va, y acá el RUC corresponde a los documentos de cobro.
+          </p>
         </div>
-        <div className="rounded-lg border bg-white p-4 text-center">
-          {/* El mismo respaldo que usa el impreso: sin logo propio va el de
-              Mova Dent, así la vista previa no miente. */}
-          <img
-            src={logo || LOGO_IMPRESION_PREDETERMINADO}
-            alt=""
-            className="mx-auto mb-1.5 max-h-12 max-w-[200px] object-contain"
-          />
-          <p className="text-base font-bold text-[#1e3a8a]">{nombre || "—"}</p>
-          {vistaPrevia && <p className="mt-0.5 text-[11px] text-slate-500">{vistaPrevia}</p>}
-          <p className="mt-1 text-sm font-semibold text-slate-800">RECETA ODONTOLÓGICA</p>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Presupuestos, comprobantes de pago y planillas
+          </p>
+          <div className="rounded-lg border bg-white p-4 text-center">
+            <img
+              src={logo || LOGO_IMPRESION_PREDETERMINADO}
+              alt=""
+              className="mx-auto mb-1.5 max-h-12 max-w-[200px] object-contain"
+            />
+            <p className="text-base font-bold" style={{ color }}>{nombre || "—"}</p>
+            {vistaPrevia && <p className="mt-0.5 text-[11px] text-slate-500">{vistaPrevia}</p>}
+            <p className="mt-1 text-sm font-semibold text-slate-800">COMPROBANTE DE PAGOS</p>
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Estos sí llevan el RUC, porque son los que respaldan un cobro.
+          </p>
         </div>
       </div>
 
