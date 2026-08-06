@@ -26,6 +26,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      watch: {
+        ignored: ['**/public/**']
+      },
       host: true,
       strictPort: true,
       port: Number(env.VITE_PORT ?? 5173),
