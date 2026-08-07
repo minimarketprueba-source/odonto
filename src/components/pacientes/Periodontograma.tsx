@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Save, Printer, Droplet, History, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
+import { fechaHoyISO } from "@/api/citas";
 import { useMiMedico } from "@/api/citas";
 import {
   type Sitio,
@@ -109,7 +110,7 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
       await guardar.mutateAsync({
         pacienteId,
         medicoId: miMedico?.id ?? null,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaHoyISO(),
         datos,
         observaciones: observaciones.trim() || null,
       });

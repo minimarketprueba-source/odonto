@@ -12,7 +12,7 @@ import {
 import {
   BarChart2, FileSpreadsheet, Printer, Users, Stethoscope, Filter, Calendar, Clock, Building2, CalendarDays, CalendarRange, UserCheck, Wallet, Coins
 } from "lucide-react";
-import { useCitasRango, fechaHoyISO, ESTADOS_CITA } from "@/api/citas";
+import { useCitasRango, fechaHoyISO, fechaLocalISO, ESTADOS_CITA } from "@/api/citas";
 import { useEspecialidades, useMedicosAdmin } from "@/api/mantenimiento";
 import { useProductividadReporte } from "@/api/productividad";
 import { useAuth } from "@/context/auth-context";
@@ -33,7 +33,9 @@ function getRangoSemana(fechaBaseISO?: string): { desde: string; hasta: string }
   const lunes = new Date(base.setDate(diffALunes));
   const domingo = new Date(lunes);
   domingo.setDate(lunes.getDate() + 6);
-  const fmt = (date: Date) => date.toISOString().slice(0, 10);
+  // Local y no UTC: sin fecha base, `new Date()` de las 21:30 daba el día
+  // siguiente y la semana salía corrida.
+  const fmt = (date: Date) => fechaLocalISO(date);
   return { desde: fmt(lunes), hasta: fmt(domingo) };
 }
 

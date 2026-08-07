@@ -16,7 +16,7 @@ import {
   type RecetaItem,
 } from "@/api/recetas";
 import { usePacienteAnamnesis } from "@/api/odontologia";
-import { useMiMedico } from "@/api/citas";
+import { useMiMedico, fechaHoyISO } from "@/api/citas";
 import { useAuth } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -145,7 +145,7 @@ export function Recetas({
       await crearReceta.mutateAsync({
         paciente_id: pacienteId,
         medico_id: miMedico.id,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaHoyISO(),
         diagnostico: diagnostico.trim() || null,
         indicaciones: indicaciones.trim() || null,
         registrado_por: user?.id ?? null,

@@ -97,10 +97,22 @@ export interface CreateCitaInput {
 const CITA_SELECT =
   "*, paciente:pacientes(id, nombres, apellidos, documento, tipo), medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color))";
 
+/**
+ * Una fecha en formato yyyy-mm-dd, tomando el día del CALENDARIO LOCAL.
+ *
+ * Nunca usar `new Date().toISOString().slice(0, 10)` para esto: eso da el día
+ * en hora de Londres. Paraguay está 3 o 4 horas atrás, así que a partir de las
+ * 20 o 21 de la noche —hora de trabajo normal en un consultorio— devuelve el
+ * día SIGUIENTE. Una receta, un pago o un periodontograma de las 21:30
+ * quedaban fechados mañana.
+ */
+export function fechaLocalISO(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Fecha local de hoy en formato yyyy-mm-dd. */
 export function fechaHoyISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return fechaLocalISO();
 }
 
 export async function fetchCitasDelDia(fecha: string): Promise<Cita[]> {
