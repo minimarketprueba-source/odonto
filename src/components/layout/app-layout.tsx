@@ -31,12 +31,29 @@ interface AppLayoutProps {
     fecha_nacimiento: string | null
     sexo: string | null
   }
+  clinicalSection?: string
+  onClinicalSectionChange?: (section: string) => void
 }
 
-export const AppLayout: FC<AppLayoutProps> = ({ children, clinical = false, clinicalPatient }) => {
+export const AppLayout: FC<AppLayoutProps> = ({
+  children,
+  clinical = false,
+  clinicalPatient,
+  clinicalSection,
+  onClinicalSectionChange,
+}) => {
   const { isCollapsed } = useSidebar()
 
-  if (clinical) return <ClinicalLayout patient={clinicalPatient}>{children}</ClinicalLayout>
+  if (clinical)
+    return (
+      <ClinicalLayout
+        patient={clinicalPatient}
+        section={clinicalSection}
+        onSectionChange={onClinicalSectionChange}
+      >
+        {children}
+      </ClinicalLayout>
+    )
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -69,19 +86,29 @@ const clinicalNavigation = [
 ]
 
 const clinicalTools = [
-  { label: 'Odontogram', icon: FileText },
-  { label: 'Periodontal', icon: ChartNoAxesColumn },
-  { label: 'Imaging', icon: FileText },
-  { label: 'History', icon: CalendarDays },
-  { label: 'Notes', icon: FileText },
+  { label: 'Odontogram', value: 'odontograma', icon: FileText },
+  { label: 'Periodontal', value: 'periodontograma', icon: ChartNoAxesColumn },
+  { label: 'Imaging', value: 'imagenes', icon: FileText },
+  { label: 'History', value: 'evolucion', icon: CalendarDays },
+  { label: 'Notes', value: 'anamnesis', icon: FileText },
 ]
 
-function ClinicalLayout({ children, patient }: { children: ReactNode; patient?: AppLayoutProps['clinicalPatient'] }) {
+function ClinicalLayout({
+  children,
+  patient,
+  section,
+  onSectionChange,
+}: {
+  children: ReactNode
+  patient?: AppLayoutProps['clinicalPatient']
+  section?: string
+  onSectionChange?: (section: string) => void
+}) {
   const location = useLocation()
   const { logout } = useAuth()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f7f9fb] text-[#191c1e]">
+    <div className="clinical-light flex h-screen overflow-hidden bg-[#f7f9fb] text-[#191c1e]">
       <aside className="hidden w-[230px] shrink-0 border-r border-[#d8dadc] bg-white lg:flex lg:flex-col">
         <div className="flex h-[57px] items-center border-b border-[#d8dadc] px-4">
           <span className="text-[18px] font-semibold tracking-[-0.02em] text-[#0061a5]">
@@ -94,31 +121,37 @@ function ClinicalLayout({ children, patient }: { children: ReactNode; patient?: 
               {patient ? `${patient.nombres[0] ?? ''}${patient.apellidos[0] ?? ''}` : 'P'}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[16px] font-semibold">{patient ? `${patient.nombres} ${patient.apellidos}` : 'Paciente'}</p>
-              <p className="text-[11px] text-[#3f4753]">ID: {patient?.documento || 'Sin documento'}</p>
+              <p className="truncate text-[16px] font-semibold">
+                {patient ? `${patient.nombres} ${patient.apellidos}` : 'Paciente'}
+              </p>
+              <p className="text-[11px] text-[#3f4753]">
+                ID: {patient?.documento || 'Sin documento'}
+              </p>
             </div>
           </div>
           <div className="mt-4 space-y-1 text-[11px] text-[#3f4753]">
             <p className="flex justify-between">
-              Last Visit: <span className="font-medium text-[#191c1e]">Oct 12, 2023</span>
+              Last Visit: <span className="font-medium text-[#191c1e]">—</span>
             </p>
             <p className="flex justify-between">
-              Allergies: <span className="font-semibold text-[#ba1a1a]">Penicillin</span>
+              Allergies: <span className="font-semibold text-[#ba1a1a]">See anamnesis</span>
             </p>
           </div>
         </div>
         <nav className="flex-1 space-y-1 p-3">
-          {clinicalTools.map(({ label, icon: Icon }, index) => (
-            <div
+          {clinicalTools.map(({ label, value, icon: Icon }) => (
+            <button
+              type="button"
               key={label}
+              onClick={() => onSectionChange?.(value)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-3 text-sm',
-                index === 0 ? 'bg-[#d2e4ff] text-[#3f4753]' : 'text-[#3f4753]'
+                'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm',
+                section === value ? 'bg-[#d2e4ff] text-[#3f4753]' : 'text-[#3f4753]'
               )}
             >
               <Icon className="h-4 w-4" />
               {label}
-            </div>
+            </button>
           ))}
         </nav>
         <div className="space-y-3 border-t border-[#e6e8ea] p-4">

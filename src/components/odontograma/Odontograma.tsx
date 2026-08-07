@@ -66,8 +66,9 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
   // Herramienta activa: se elige una vez y se marca con un clic por cara, en
   // lugar de abrir un menú en cada diente. Es como se carga un odontograma en
   // papel: se agarra el lápiz rojo y se recorre la boca.
-  const [herramienta, setHerramienta] = useState<EstadoDental | null>(null)
+  const [herramienta, setHerramienta] = useState<EstadoDental | null>(ESTADOS_DENTALES[0])
   const [ultimoDetalle, setUltimoDetalle] = useState<string | null>(null)
+  const [piezaSeleccionada, setPiezaSeleccionada] = useState<number | null>(null)
 
   // Lo marcado en esta sesión, todavía SIN guardar. Antes cada clic escribía
   // derecho en la base: un clic por error quedaba asentado para siempre en la
@@ -97,6 +98,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
   // Al cambiar de paciente, lo no guardado no debe arrastrarse a la otra ficha.
   useEffect(() => {
     setPendientes({})
+    setPiezaSeleccionada(null)
   }, [pacienteId])
 
   // Cerrar la pestaña con marcas sin guardar tiene que avisar: el navegador
@@ -265,25 +267,63 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
     // abajo): así el esquema de caras de las dos arcadas queda mirando al
     // centro de la boca, como en el odontograma de papel.
     return (
-      <div
-        className={`flex shrink-0 items-center gap-1 ${
-          esSuperior(numero) ? 'flex-col' : 'flex-col-reverse'
-        }`}
-      >
-        <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
+      <div className="flex shrink-0 flex-col items-center gap-1">
+        <span className="order-2 text-[10px] font-semibold tabular-nums text-slate-700">
           {numero}
         </span>
 
         <button
           type="button"
           title={titulo}
-          onClick={() => aplicar(numero, 'completo')}
-          className={`rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${
-            piezaSinGuardar ? 'ring-dashed ring-2 ring-sky-500' : ''
+          onClick={() => {
+            setPiezaSeleccionada(numero)
+            if (!herramienta || herramienta.piezaCompleta) aplicar(numero, 'completo')
+          }}
+          className={`group/tooth relative rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${
+            esSuperior(numero) ? 'order-1' : 'order-3'
+          } ${piezaSinGuardar ? 'ring-dashed ring-2 ring-sky-500' : ''} ${
+            piezaSeleccionada === numero ? 'ring-2 ring-sky-500 ring-offset-2' : ''
           }`}
           disabled={guardando}
         >
-          <DienteFigura numero={numero} color={colorPieza} tachado={ausente} className="h-11 w-7" />
+          <DienteFigura numero={numero} color={colorPieza} tachado={ausente} className="h-14 w-9" />
+          <svg viewBox="0 0 40 64" className="absolute inset-0 h-14 w-9 overflow-visible">
+            <g transform={esSuperior(numero) ? undefined : 'rotate(180 20 32)'}>
+              {[
+                { cara: 'vestibular', puntos: '6,33 34,33 29,43 11,43' },
+                { cara: 'distal', puntos: '34,33 36,62 29,55 29,43' },
+                { cara: 'palatina', puntos: '6,62 36,62 29,55 11,55' },
+                { cara: 'mesial', puntos: '6,33 6,62 11,55 11,43' },
+                { cara: 'oclusal', puntos: '11,43 29,43 29,55 11,55' },
+              ].map(({ cara, puntos }) => {
+                const estado = marcaVigente(numero, cara) ?? marcaPieza
+                const sinGuardar = estaPendiente(numero, cara)
+                return (
+                  <polygon
+                    key={cara}
+                    points={puntos}
+                    fill={estado?.color}
+                    fillOpacity={estado ? 0.82 : 1}
+                    stroke={sinGuardar ? '#0d99ff' : 'transparent'}
+                    strokeDasharray={sinGuardar ? '2 1' : undefined}
+                    strokeWidth="1.2"
+                    className={
+                      estado
+                        ? 'cursor-pointer transition-all hover:brightness-90 group-hover/tooth:stroke-sky-500'
+                        : 'cursor-pointer fill-transparent transition-all hover:fill-sky-200/80 hover:stroke-sky-600 group-hover/tooth:stroke-sky-400'
+                    }
+                    onClick={(evento) => {
+                      evento.stopPropagation()
+                      setPiezaSeleccionada(numero)
+                      aplicar(numero, cara)
+                    }}
+                  >
+                    <title>{`${NOMBRE_CARA[cara] ?? cara} · Pieza ${numero}`}</title>
+                  </polygon>
+                )
+              })}
+            </g>
+          </svg>
         </button>
 
         {/* Esquema de las cinco caras: es donde se marca una caries o una
@@ -291,7 +331,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
             Lo que todavía no se guardó lleva borde punteado. */}
         <svg
           viewBox="0 0 40 40"
-          className="h-8 w-8"
+          className="hidden"
           role="group"
           aria-label={`Caras de la pieza ${numero}`}
         >
@@ -335,18 +375,109 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
     </div>
   )
 
+  const GuiaSuperficies = () => {
+    const zonas = [
+      {
+        cara: 'vestibular',
+        forma: 'path',
+        d: 'M40 9 A31 31 0 0 1 71 40 L55 40 A15 15 0 0 0 40 25 Z',
+      },
+      {
+        cara: 'distal',
+        forma: 'path',
+        d: 'M71 40 A31 31 0 0 1 40 71 L40 55 A15 15 0 0 0 55 40 Z',
+      },
+      {
+        cara: 'palatina',
+        forma: 'path',
+        d: 'M40 71 A31 31 0 0 1 9 40 L25 40 A15 15 0 0 0 40 55 Z',
+      },
+      {
+        cara: 'mesial',
+        forma: 'path',
+        d: 'M9 40 A31 31 0 0 1 40 9 L40 25 A15 15 0 0 0 25 40 Z',
+      },
+      { cara: 'oclusal', forma: 'rect' },
+    ] as const
+
+    const activarCara = (cara: string) => {
+      if (piezaSeleccionada === null) {
+        toast.info('Primero seleccione una pieza dental')
+        return
+      }
+      aplicar(piezaSeleccionada, cara)
+    }
+
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <svg
+          viewBox="0 0 80 80"
+          className={`h-16 w-16 ${piezaSeleccionada === null ? 'opacity-70' : ''}`}
+          role="group"
+          aria-label={
+            piezaSeleccionada === null
+              ? 'Selector de superficies: seleccione primero una pieza'
+              : `Selector de superficies de la pieza ${piezaSeleccionada}`
+          }
+        >
+          <circle cx="40" cy="40" r="31" fill="#fff" stroke="#475569" strokeWidth="1.2" />
+          {zonas.map((zona) => {
+            const estado =
+              piezaSeleccionada === null
+                ? undefined
+                : (marcaVigente(piezaSeleccionada, zona.cara) ??
+                  marcaVigente(piezaSeleccionada, 'completo'))
+            const propiedades = {
+              key: zona.cara,
+              role: 'button',
+              tabIndex: 0,
+              fill: estado?.color ?? '#ffffff',
+              stroke: '#475569',
+              strokeWidth: 1.2,
+              className:
+                'cursor-pointer outline-none transition-all hover:fill-sky-200 hover:stroke-sky-600 focus:fill-sky-200 focus:stroke-sky-600',
+              onClick: () => activarCara(zona.cara),
+              onKeyDown: (evento: React.KeyboardEvent<SVGElement>) => {
+                if (evento.key === 'Enter' || evento.key === ' ') {
+                  evento.preventDefault()
+                  activarCara(zona.cara)
+                }
+              },
+              'aria-label': `${NOMBRE_CARA[zona.cara] ?? zona.cara}${
+                piezaSeleccionada === null ? '' : ` de la pieza ${piezaSeleccionada}`
+              }`,
+            }
+
+            return zona.forma === 'rect' ? (
+              <rect {...propiedades} x="25" y="25" width="30" height="30" rx="3">
+                <title>{NOMBRE_CARA[zona.cara] ?? zona.cara}</title>
+              </rect>
+            ) : (
+              <path {...propiedades} d={zona.d}>
+                <title>{NOMBRE_CARA[zona.cara] ?? zona.cara}</title>
+              </path>
+            )
+          })}
+        </svg>
+        <span className="text-[9px] font-semibold text-slate-500">
+          {piezaSeleccionada === null ? 'Seleccione una pieza' : `Pieza ${piezaSeleccionada}`}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="relative space-y-4">
       {/* Encabezado contextual inspirado en la referencia: la ficha sigue
           siendo la fuente de datos, pero el paciente queda visible mientras
           se trabaja sobre el odontograma. */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="hidden flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sky-100 text-sky-700">
             <UserRound className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-base font-bold text-slate-900 dark:text-white">
+            <p className="truncate text-base font-bold text-slate-900">
               {paciente ? `${paciente.nombres} ${paciente.apellidos}` : 'Cargando paciente...'}
             </p>
             <p className="truncate text-xs text-slate-500">
@@ -366,7 +497,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
         </div>
       </div>
 
-      <Card className="border-0 shadow-sm ring-1 ring-slate-200/80 dark:ring-slate-800">
+      <Card className="border border-slate-200 bg-white text-slate-900 shadow-none">
         <CardHeader className="border-b pb-3">
           <div className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -383,7 +514,12 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 rounded-lg text-xs"
+                aria-expanded={historialAbierto}
+                className={`h-8 gap-1.5 rounded-lg border-slate-300 text-xs ${
+                  historialAbierto
+                    ? 'bg-sky-50 text-sky-700 hover:bg-sky-100'
+                    : 'bg-white text-slate-700 hover:bg-slate-50'
+                }`}
                 onClick={() => setHistorialAbierto((abierto) => !abierto)}
               >
                 <History className="h-3.5 w-3.5" /> Historial
@@ -404,7 +540,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
               onClick={() => setHerramienta(null)}
             >
               <MousePointer2 className="h-3.5 w-3.5" />
-              Consultar
+              Seleccionar
             </Button>
 
             {ESTADOS_DENTALES.map((e) => {
@@ -446,8 +582,8 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
 
           {/* Nada se asienta en la historia clínica hasta que se confirma acá. */}
           {hayPendientes && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2.5 dark:border-sky-900 dark:bg-sky-950/40">
-              <span className="min-w-[180px] flex-1 text-xs font-medium text-sky-900 dark:text-sky-200">
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2.5">
+              <span className="min-w-[180px] flex-1 text-xs font-medium text-sky-900">
                 {cantidadPendiente === 1
                   ? '1 marca sin guardar'
                   : `${cantidadPendiente} marcas sin guardar`}{' '}
@@ -482,16 +618,20 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
           )}
         </CardHeader>
 
-        <CardContent className="overflow-x-auto bg-gradient-to-b from-white to-slate-50/70 p-4 dark:from-slate-950 dark:to-slate-900/70 sm:p-6">
-          <div className="flex min-w-[760px] flex-col gap-8">
+        <CardContent className="overflow-x-auto bg-white p-4 sm:p-6">
+          <div className="flex min-w-[760px] flex-col gap-7 py-1">
             <Arcada derecha={SUP_DER} izquierda={SUP_IZQ} />
 
-            <div className="flex flex-col gap-6 rounded-2xl border border-slate-200/80 bg-slate-100/55 py-4 dark:border-slate-800 dark:bg-slate-900/50">
-              <p className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Dentición temporal
-              </p>
+            <div className="grid grid-cols-[72px_1fr_72px] items-center gap-3 px-5">
+              <GuiaSuperficies />
               <Arcada derecha={TEMP_SUP_DER} izquierda={TEMP_SUP_IZQ} />
+              <GuiaSuperficies />
+            </div>
+
+            <div className="grid grid-cols-[72px_1fr_72px] items-center gap-3 px-5">
+              <GuiaSuperficies />
               <Arcada derecha={TEMP_INF_DER} izquierda={TEMP_INF_IZQ} />
+              <GuiaSuperficies />
             </div>
 
             <Arcada derecha={INF_DER} izquierda={INF_IZQ} />
@@ -499,7 +639,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="hidden grid-cols-1 gap-4 xl:grid-cols-2">
         {/* Referencia de colores */}
         <Card className="border-0 shadow-sm ring-1 ring-border/50">
           <CardHeader className="pb-2">
@@ -569,7 +709,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
       </div>
 
       {historialAbierto && (
-        <div className="absolute right-4 top-[4.5rem] z-20 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+        <div className="absolute right-4 top-[4.5rem] z-20 w-[min(360px,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
               <p className="font-semibold">Historial</p>

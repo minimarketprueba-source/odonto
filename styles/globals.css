@@ -85,7 +85,8 @@
     background: #fff !important;
     box-shadow: none !important;
   }
-  body, html {
+  body,
+  html {
     background: #fff !important;
   }
 }
@@ -185,6 +186,31 @@
   }
 }
 
+/* La ficha clínica replica el diseño de referencia y debe permanecer clara
+   aunque el usuario tenga activo el tema oscuro en el resto de la aplicación. */
+.clinical-light {
+  color-scheme: light;
+  --background: 247 249 251;
+  --foreground: 25 28 30;
+  --card: 255 255 255;
+  --card-foreground: 25 28 30;
+  --popover: 255 255 255;
+  --popover-foreground: 25 28 30;
+  --primary: 0 97 165;
+  --primary-foreground: 255 255 255;
+  --secondary: 80 95 118;
+  --secondary-foreground: 255 255 255;
+  --muted: 242 244 246;
+  --muted-foreground: 63 71 83;
+  --accent: 208 225 251;
+  --accent-foreground: 84 100 122;
+  --destructive: 186 26 26;
+  --destructive-foreground: 255 255 255;
+  --border: 224 227 229;
+  --input: 224 227 229;
+  --ring: 0 97 165;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -192,7 +218,9 @@
 
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
 
   /* Scroll personalizado */
@@ -206,7 +234,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-primary/50 rounded-full;
+    @apply rounded-full bg-primary/50;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -230,7 +258,7 @@
 @layer utilities {
   /* Tabla responsiva: scroll horizontal en m\u00f3vil */
   .table-responsive {
-    @apply w-full overflow-x-auto -mx-0;
+    @apply -mx-0 w-full overflow-x-auto;
   }
 
   /* Scrollbar m\u00e1s delgado en m\u00f3vil */

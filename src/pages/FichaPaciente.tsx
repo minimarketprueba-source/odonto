@@ -86,6 +86,7 @@ export default function FichaPaciente() {
   const puedeReactivar = hasPermission('pacientes', 'editar')
   const cambiarEstado = useCambiarEstadoPaciente()
   const pacienteId = id as string
+  const [seccionClinica, setSeccionClinica] = useState('odontograma')
 
   const { data: paciente, isLoading: loadingPaciente } = usePaciente(pacienteId)
   const { data: anamnesis, isLoading: loadingAnamnesis } = usePacienteAnamnesis(pacienteId)
@@ -207,7 +208,7 @@ export default function FichaPaciente() {
 
   if (loadingPaciente || loadingAnamnesis) {
     return (
-      <AppLayout clinical>
+      <AppLayout>
         <div className="flex min-h-[400px] items-center justify-center">
           <div className="mr-3 h-12 w-12 animate-spin rounded-full border-b-2 border-primary"></div>
           <p className="text-muted-foreground">Cargando ficha dental del paciente...</p>
@@ -218,7 +219,7 @@ export default function FichaPaciente() {
 
   if (!paciente) {
     return (
-      <AppLayout clinical>
+      <AppLayout>
         <div className="py-12 text-center">
           <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-destructive" />
           <h2 className="text-xl font-bold">Paciente no encontrado</h2>
@@ -591,7 +592,7 @@ export default function FichaPaciente() {
     alergiaLatex || alergiaAnestesia || problemasCardiacos || (anamnesis && anamnesis.alergias)
 
   return (
-    <AppLayout clinical clinicalPatient={paciente}>
+    <AppLayout>
       <div className="space-y-4">
         {/* Header / Patient info */}
         <div className="relative flex flex-col justify-between gap-4 overflow-hidden rounded-2xl border bg-card p-6 shadow-sm md:flex-row md:items-center">
@@ -700,7 +701,7 @@ export default function FichaPaciente() {
         )}
 
         {/* Tabs navigation */}
-        <Tabs defaultValue="odontograma" className="w-full">
+        <Tabs value={seccionClinica} onValueChange={setSeccionClinica} className="w-full">
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-muted p-1.5 lg:grid-cols-8">
             <TabsTrigger
               value="odontograma"
