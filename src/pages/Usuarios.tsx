@@ -131,6 +131,30 @@ const ROLE_LABELS: Record<string, string> = {
 
 const getRoleLabel = (role: string) => ROLE_LABELS[role.toLowerCase()] ?? role;
 
+/**
+ * Traduce el error de llamar a una Edge Function que no está publicada.
+ *
+ * Cuando la función no existe, el navegador NO dice "404": el preflight se
+ * queda sin respuesta y lo reporta como "blocked by CORS policy", y la
+ * librería de Supabase lo envuelve en "Failed to send a request to the Edge
+ * Function". Ninguno de los dos mensajes dice qué hacer, y mandan a buscar un
+ * problema de permisos de dominio que no existe.
+ */
+function mensajeErrorFuncion(error: unknown, nombreFuncion: string): string {
+  const texto = error instanceof Error ? error.message : String(error ?? "");
+  const noExiste =
+    /Failed to send a request|Failed to fetch|NetworkError|FunctionsFetchError/i.test(texto);
+  if (noExiste) {
+    return (
+      `Falta publicar la funcion "${nombreFuncion}" en Supabase. ` +
+      "En el panel: Edge Functions -> Deploy a new function -> Via Editor, " +
+      `con ese nombre exacto, pegando supabase/functions/${nombreFuncion}/index.ts. ` +
+      "Mientras tanto la contrasena se puede cambiar desde Authentication -> Users."
+    );
+  }
+  return texto || "No se pudo actualizar la contrasena.";
+}
+
 /** Solo estos roles se pueden asignar desde esta pantalla. */
 const esRolAsignable = (role: string) => ROLE_OPTIONS.some((r) => r.value === role);
 
@@ -499,6 +523,8 @@ export default function Usuarios() {
         throw new Error(`Respuesta inesperada del servidor (status ${res.status})`);
       }
 
+      // Un 404 acá es la funcion sin publicar, no un problema de datos.
+      if (res.status === 404) throw new Error(mensajeErrorFuncion(new Error("Failed to fetch"), "create-user"));
       if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
 
       // Registrar auditoría (no bloquea el flujo)
@@ -848,8 +874,8 @@ export default function Usuarios() {
     } catch (error) {
       console.error("Error updating password:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo actualizar la contraseña.",
+        title: "No se pudo cambiar la contraseña",
+        description: mensajeErrorFuncion(error, "update-user-password"),
         variant: "destructive",
       });
     } finally {
