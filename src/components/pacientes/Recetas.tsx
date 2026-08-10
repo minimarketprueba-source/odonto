@@ -55,6 +55,8 @@ export function Recetas({
   const [diagnostico, setDiagnostico] = useState("");
   const [indicaciones, setIndicaciones] = useState("");
   const [items, setItems] = useState<RecetaItem[]>([{ ...FILA_VACIA }]);
+  const [profesionalNombreManual, setProfesionalNombreManual] = useState("");
+  const [profesionalRegistroManual, setProfesionalRegistroManual] = useState("");
 
   // El odontólogo y el administrador emiten. En este consultorio el dueño es
   // las dos cosas con una sola cuenta, así que exigir el rol `medico` lo
@@ -78,6 +80,8 @@ export function Recetas({
     setDiagnostico("");
     setIndicaciones("");
     setItems([{ ...FILA_VACIA }]);
+    setProfesionalNombreManual("");
+    setProfesionalRegistroManual("");
   };
 
   /** Agrega una fila ya cargada con la posología habitual del vademécum. */
@@ -142,7 +146,7 @@ export function Recetas({
     }
 
     try {
-      await crearReceta.mutateAsync({
+      const nueva = await crearReceta.mutateAsync({
         paciente_id: pacienteId,
         medico_id: miMedico.id,
         fecha: fechaHoyISO(),
@@ -156,6 +160,25 @@ export function Recetas({
           duracion: i.duracion?.trim() || null,
           indicaciones: i.indicaciones?.trim() || null,
         })),
+      });
+      // Imprimir de inmediato con el nombre y registro que se tipeo en el form.
+      imprimirReceta({
+        numero: nueva.numero,
+        fecha: new Date().toLocaleDateString("es-PY"),
+        pacienteNombre,
+        pacienteDocumento,
+        pacienteEdad,
+        diagnostico: diagnostico.trim() || null,
+        indicaciones: indicaciones.trim() || null,
+        medicamentos: cargados.map((i) => ({
+          medicamento: i.medicamento.trim(),
+          dosis: i.dosis?.trim() || null,
+          frecuencia: i.frecuencia?.trim() || null,
+          duracion: i.duracion?.trim() || null,
+          indicaciones: i.indicaciones?.trim() || null,
+        })),
+        profesionalNombre: profesionalNombreManual.trim() || null,
+        profesionalRegistro: profesionalRegistroManual.trim() || null,
       });
       toast.success("Receta emitida.");
       limpiar();
@@ -202,8 +225,10 @@ export function Recetas({
         duracion: i.duracion,
         indicaciones: i.indicaciones,
       })),
-      profesionalNombre: null,
-      profesionalRegistro: null,
+      profesionalNombre: receta.medico
+        ? `Dr(a). ${receta.medico.nombres} ${receta.medico.apellidos}`
+        : null,
+      profesionalRegistro: receta.medico?.numero_colegiatura ?? null,
       anulada: !!receta.anulada_at,
       motivoAnulacion: receta.motivo_anulacion,
     });
@@ -409,6 +434,28 @@ export function Recetas({
               value={indicaciones}
               onChange={(e) => setIndicaciones(e.target.value)}
             />
+          </div>
+
+          <div className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-3 space-y-3">
+            <p className="text-xs text-muted-foreground font-medium">Firma del profesional (se imprime en la receta)</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Nombre y apellido de la Dra.</Label>
+                <Input
+                  placeholder="Ej: Karen Nair Vallejos Duarte"
+                  value={profesionalNombreManual}
+                  onChange={(e) => setProfesionalNombreManual(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Nº de Registro Profesional</Label>
+                <Input
+                  placeholder="Ej: 6899"
+                  value={profesionalRegistroManual}
+                  onChange={(e) => setProfesionalRegistroManual(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
