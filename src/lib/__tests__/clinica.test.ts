@@ -3,7 +3,7 @@ import {
   EMPRESA_PREDETERMINADA, getEmpresa, setEmpresa, lineaContacto,
   normalizarColor, aclararColor,
 } from "@/lib/clinica";
-import { imprimirReceta, imprimirComprobantePagos } from "@/lib/imprimir";
+import { imprimirReceta, imprimirComprobantePagos, imprimirPresupuesto } from "@/lib/imprimir";
 import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
 import { LOGO_BANDA_PREDETERMINADO, MARCA_AGUA_DIENTE } from "@/lib/recetario-base64";
 
@@ -84,6 +84,22 @@ async function htmlDelComprobante(): Promise<string> {
   return iframe.contentWindow!.document.documentElement.outerHTML;
 }
 
+async function htmlDelPresupuesto(): Promise<string> {
+  imprimirPresupuesto({
+    pacienteNombre: "González, María",
+    titulo: "Restauración",
+    fecha: "6/8/2026",
+    estado: "Aprobado",
+    total: 100000,
+    saldoPendiente: 100000,
+    detalles: [{ tratamiento: "Resina", costo: 100000, descuento: 0 }],
+    pagos: [],
+  });
+  await new Promise((r) => setTimeout(r, 350));
+  const iframe = document.getElementById("anp-print-iframe") as HTMLIFrameElement;
+  return iframe.contentWindow!.document.documentElement.outerHTML;
+}
+
 /** Imprime una receta mínima y devuelve el HTML que quedó en el iframe. */
 async function htmlDeLaReceta(numero = "R-00007"): Promise<string> {
   imprimirReceta({
@@ -139,6 +155,13 @@ describe("encabezado compartido de los impresos", () => {
     setEmpresa(COMPLETA);
     const html = await htmlDelComprobante();
     expect(html).not.toContain("&amp;nbsp;");
+  });
+
+  it("no imprime el RUC en los presupuestos", async () => {
+    setEmpresa(COMPLETA);
+    const html = await htmlDelPresupuesto();
+    expect(html).not.toContain("RUC");
+    expect(html).not.toContain(COMPLETA.ruc);
   });
 });
 
