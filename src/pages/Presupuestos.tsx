@@ -14,7 +14,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { usePresupuestos, useOdontoPrecios, useSaveOdontoPrecio } from '@/api/odontologia'
+import {
+  usePresupuestos,
+  useOdontoPrecios,
+  useSaveOdontoPrecio,
+  useDeletePresupuesto,
+} from '@/api/odontologia'
 import {
   DollarSign,
   Search,
@@ -26,13 +31,16 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Bookmark,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { showSwal } from '@/components/ui/swal'
 
 export default function Presupuestos() {
   const { data: presupuestos = [], isLoading: loadingPres } = usePresupuestos()
   const { data: precios = [], isLoading: loadingPrecios } = useOdontoPrecios()
   const savePrecio = useSaveOdontoPrecio()
+  const deletePresupuesto = useDeletePresupuesto()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
@@ -82,6 +90,30 @@ export default function Presupuestos() {
         activo: !p.activo,
       })
       toast.success(p.activo ? 'Procedimiento desactivado.' : 'Procedimiento reactivado.')
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  const handleDeletePresupuesto = async (p: (typeof presupuestos)[number]) => {
+    const paciente = `${p.pacientes?.apellidos ?? ''}, ${p.pacientes?.nombres ?? ''}`.trim()
+    const { isConfirmed } = await showSwal({
+      icon: 'warning',
+      title: '¿Eliminar presupuesto?',
+      text: `Se eliminará «${p.titulo}» de ${paciente}. Esta acción no se puede deshacer.`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+    })
+    if (!isConfirmed) {
+      return
+    }
+
+    try {
+      await deletePresupuesto.mutateAsync({ id: p.id, pacienteId: p.paciente_id })
+      toast.success('Presupuesto eliminado.')
     } catch (err) {
       toast.error((err as Error).message)
     }
@@ -331,14 +363,25 @@ export default function Presupuestos() {
                         </div>
 
                         {/* Action link */}
-                        <div className="flex justify-end border-t pt-2">
+                        <div className="flex gap-2 border-t pt-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="w-full text-xs font-semibold"
+                            className="flex-1 text-xs font-semibold"
                             asChild
                           >
                             <Link to={`/pacientes/${p.paciente_id}`}>Ver Ficha Paciente</Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Eliminar presupuesto"
+                            aria-label={`Eliminar presupuesto ${p.titulo}`}
+                            onClick={() => handleDeletePresupuesto(p)}
+                            disabled={deletePresupuesto.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </CardContent>
