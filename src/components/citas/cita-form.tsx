@@ -59,11 +59,10 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
     if (open) {
       setBusquedaPaciente("");
       setPaciente(null);
-      // Un odontólogo agenda para sí mismo: el campo viene con su nombre en vez
-      // de obligarlo a buscarse en la lista, y queda fijo para que nadie agende
-      // a nombre de otro profesional.
-      setMedicoId(miMedico ? String(miMedico.id) : "");
-      setBusquedaMedico(miMedico ? `${miMedico.apellidos}, ${miMedico.nombres}` : "");
+      // El campo de profesional siempre arranca vacío para que quien agenda
+      // elija manualmente sin importar con qué cuenta está entrando.
+      setMedicoId("");
+      setBusquedaMedico("");
       setMostrarListaMedicos(false);
       setFecha(fechaInicial || fechaHoyISO());
       setHora("08:00");
@@ -71,7 +70,7 @@ export function CitaForm({ open, onOpenChange, fechaInicial }: CitaFormProps) {
       setSillonId("");
       setMotivo("");
     }
-  }, [open, fechaInicial, miMedico]);
+  }, [open, fechaInicial]);
 
   const medicosFiltrados = useMemo(() => {
     if (!busquedaMedico.trim()) return medicos;
