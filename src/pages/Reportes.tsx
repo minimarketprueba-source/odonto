@@ -137,7 +137,7 @@ export default function Reportes() {
   const [prodEspecialidadId, setProdEspecialidadId] = useState<string>('todas')
   // Por defecto "mi_usuario": muestra la productividad propia de los pacientes que el usuario atendió
   const [prodMedicoId, setProdMedicoId] = useState<string>('mi_usuario')
-  const [prodHorario, setProdHorario] = useState<string>('13:00 a 19:00')
+  const [prodHorario, setProdHorario] = useState<string>('')
 
   // Manejo de cambio de tipo de período
   const cambiarPeriodo = (nuevoModo: TipoPeriodo, fechaReferencia = prodFechaDesde) => {
@@ -242,7 +242,7 @@ export default function Reportes() {
         prodFechaDesde === prodFechaHasta
           ? formatFechaLarga(prodFechaDesde)
           : `${formatFechaLarga(prodFechaDesde)} al ${formatFechaLarga(prodFechaHasta)}`,
-      horario: prodHorario,
+      horario: prodHorario || null,
       unidad: empresa.nombre,
       tipoPeriodo,
       periodoEtiqueta: periodoTexto,
@@ -337,7 +337,7 @@ export default function Reportes() {
               disabled={cargandoProd}
               className="gap-2 rounded-xl bg-primary font-bold text-primary-foreground shadow-md hover:bg-primary/90"
             >
-              <Printer className="h-4 w-4" /> Imprimir Planilla A4
+              <Printer className="h-4 w-4" /> Imprimir informe A4
             </Button>
           </div>
         </div>
@@ -350,14 +350,14 @@ export default function Reportes() {
         >
           <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted p-1 lg:w-[420px]">
             <TabsTrigger value="planilla" className="gap-2 rounded-lg text-sm font-semibold">
-              <FileSpreadsheet className="h-4 w-4" /> Planilla de Productividad
+              <FileSpreadsheet className="h-4 w-4" /> Informe de Producción
             </TabsTrigger>
             <TabsTrigger value="estadisticas" className="gap-2 rounded-lg text-sm font-semibold">
               <BarChart2 className="h-4 w-4" /> Estadísticas de citas
             </TabsTrigger>
           </TabsList>
 
-          {/* PESTAÑA 1: PLANILLA DE PRODUCTIVIDAD (MODELO OFICIAL) */}
+          {/* PESTAÑA 1: INFORME DE PRODUCCIÓN */}
           <TabsContent value="planilla" className="mt-6 space-y-6">
             {/* Tarjeta de Filtros */}
             <Card className="rounded-2xl border-border shadow-sm">
@@ -520,7 +520,6 @@ export default function Reportes() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todas">Todas las Especialidades</SelectItem>
-                        <SelectItem value="enfermeria">Enfermería</SelectItem>
                         {especialidades.map((esp) => (
                           <SelectItem key={esp.id} value={String(esp.id)}>
                             {esp.nombre}
@@ -535,12 +534,12 @@ export default function Reportes() {
                       htmlFor="prod-horario"
                       className="flex items-center gap-1 text-xs font-semibold"
                     >
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Horario / Turno
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Horario (opcional)
                     </Label>
                     <Input
                       id="prod-horario"
                       type="text"
-                      placeholder="13:00 a 19:00"
+                      placeholder="Ej.: 08:00 a 18:00"
                       className="rounded-xl"
                       value={prodHorario}
                       onChange={(e) => setProdHorario(e.target.value)}
@@ -625,14 +624,14 @@ export default function Reportes() {
               </Card>
             </div>
 
-            {/* Vista Previa de la Planilla Oficial */}
+            {/* Vista previa del informe */}
             <Card className="overflow-hidden rounded-2xl border-border shadow-md">
               <CardHeader className="border-b border-border bg-muted/40 pb-4">
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
                   <div>
                     <div className="flex items-center gap-2">
                       <Badge className="bg-blue-600 text-xs font-bold uppercase text-white">
-                        Modelo Oficial
+                        Clínica particular
                       </Badge>
                       <Badge
                         variant="outline"
@@ -677,13 +676,13 @@ export default function Reportes() {
                 {cargandoProd ? (
                   <div className="p-12 text-center text-muted-foreground">
                     <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-                    Cargando informe de productividad {tipoPeriodo}...
+                    Cargando informe de producción {tipoPeriodo}...
                   </div>
                 ) : atenciones.length === 0 ? (
                   <div className="p-12 text-center text-muted-foreground">
                     <FileSpreadsheet className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
                     <p className="font-semibold">
-                      Sin atenciones ni consultas registradas en este período ({periodoTexto}).
+                      Sin procedimientos registrados en este período ({periodoTexto}).
                     </p>
                     <p className="mt-1 text-xs">
                       Pruebe seleccionando otro período (Semanal o Mensual) o ajustando el

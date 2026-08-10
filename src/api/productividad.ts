@@ -76,12 +76,6 @@ export function formatSexo(sexo?: string | null): string {
   return s;
 }
 
-/** Identificación del paciente en la planilla: su documento, o el tipo si no tiene. */
-export function formatJerarquia(tipo?: string | null, grado?: string | null): string {
-  const partes = [grado, tipo].filter((x) => x && String(x).trim().length > 0);
-  return partes.length ? partes.join(" ") : "—";
-}
-
 /** Hora legible (HH:mm) a partir de un timestamp. */
 function horaDe(valor?: string | null): string | null {
   if (!valor) return null;
@@ -119,7 +113,7 @@ export async function fetchProduccionDental(
         id, nombres, apellidos, numero_colegiatura, especialidad_id,
         especialidad:especialidades(id, nombre)
       ),
-      paciente:pacientes(id, nombres, apellidos, documento, tipo, grado, sexo)
+      paciente:pacientes(id, nombres, apellidos, documento, sexo)
     `)
     .gte("fecha_registro", fechaDesde)
     .lt("fecha_registro", hastaISO)
@@ -156,7 +150,7 @@ export async function fetchProduccionDental(
       pacienteNombre: paciente
         ? `${paciente.apellidos ?? ""}, ${paciente.nombres ?? ""}`.replace(/^, |, $/, "")
         : "—",
-      pacienteJerarquia: paciente?.documento || formatJerarquia(paciente?.tipo, paciente?.grado),
+      pacienteJerarquia: paciente?.documento || "Sin documento",
       pacienteSexo: formatSexo(paciente?.sexo),
       pieza: e.pieza ? String(e.pieza) : "",
       procedimiento: e.procedimiento || "—",

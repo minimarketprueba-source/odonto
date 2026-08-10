@@ -261,6 +261,9 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
   }
 
   const tituloDoc = tituloPrincipal;
+  const empresa = getEmpresa();
+  const contacto = lineaContacto(empresa);
+  const logo = empresa.logo_url || LOGO_IMPRESION_PREDETERMINADO;
 
   const trs = datos.filas.map((f) => `
     <tr>
@@ -275,18 +278,14 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
 
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 15px; color: #0f172a; max-width: 900px; margin: 0 auto;">
-      <!-- CABECERA INSTITUCIONAL OFICIAL -->
-      <div style="border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="text-align: left;">
-          <h3 style="margin: 0; font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.5px;">POLICÍA NACIONAL DEL PARAGUAY</h3>
-          <h2 style="margin: 2px 0; font-size: 13px; font-weight: 800; color: #0f172a;">HOSPITAL CENTRAL DE POLICÍA "RIGOBERTO CABALLERO"</h2>
-          <h1 style="margin: 4px 0 0 0; font-size: 15px; font-weight: 900; color: #1e3a8a; text-transform: UPPERCASE; letter-spacing: 0.5px;">${tituloPrincipal}</h1>
-          <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: bold; color: #2563eb;">PLANILLA DE PRODUCTIVIDAD POR ESPECIALIDAD Y PROFESIONAL</p>
-        </div>
-        <div style="text-align: right; font-size: 11px; color: #334155; line-height: 1.4;">
-          <p style="margin: 0; font-weight: bold; color: #0f172a;">${esc(getEmpresa().nombre)}</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Emisión: ${new Date().toLocaleDateString("es-PY")}</p>
-        </div>
+      <!-- CABECERA DEL CONSULTORIO -->
+      <div style="border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; text-align: center;">
+        <img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: ${empresa.color_primario};">${esc(empresa.nombre)}</h2>
+        ${contacto ? `<p style="margin:3px 0 0; font-size:10px; color:#64748b;">${esc(contacto)}</p>` : ""}
+        <h1 style="margin: 7px 0 0; font-size: 15px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">${tituloPrincipal}</h1>
+        <p style="margin: 2px 0 0; font-size: 11px; font-weight: bold; color: #475569;">RESUMEN DE PROCEDIMIENTOS Y ATENCIONES</p>
+        <p style="margin: 2px 0 0; font-size: 10px; color: #64748b;">Emisión: ${new Date().toLocaleDateString("es-PY")}</p>
       </div>
 
       <!-- METADATOS DE CABECERA -->
@@ -294,7 +293,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
         <div><strong>Especialidad:</strong> <span style="color: #1e40af; font-weight: bold; text-transform: uppercase;">${datos.especialidadNombre}</span></div>
         <div><strong>Especialista / Profesional:</strong> <span style="font-weight: bold; color: #0f172a;">${datos.especialistaNombre}</span> ${datos.especialistaColegiatura ? `(Reg. N° ${datos.especialistaColegiatura})` : ""}</div>
         <div><strong>Período de Atención:</strong> <span style="font-weight: bold; color: #0369a1;">${datos.periodoEtiqueta || datos.fecha}</span></div>
-        <div><strong>Horario / Turno:</strong> <span style="font-weight: bold;">${datos.horario || "13:00 a 19:00"} hs</span></div>
+        ${datos.horario ? `<div><strong>Horario de atención:</strong> <span style="font-weight: bold;">${esc(datos.horario)} hs</span></div>` : ""}
       </div>
 
       <!-- TABLA DE PACIENTES ATENDIDOS -->
@@ -323,7 +322,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
         </div>
       </div>
 
-      <!-- FIRMAS OFICIALES -->
+      <!-- FIRMAS -->
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; text-align: center; page-break-inside: avoid; margin-top: 50px;">
         <div>
           <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
@@ -333,9 +332,9 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
         </div>
         <div>
           <div style="width: 220px; border-bottom: 1px solid #0f172a; margin: 0 auto 6px auto;"></div>
-          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">V° B° DIRECCIÓN</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">${esc(getEmpresa().nombre)}</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y Sello Autorizado</p>
+          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #0f172a;">RESPONSABLE DEL CONSULTORIO</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #475569;">${esc(empresa.nombre)}</p>
+          <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Firma y sello</p>
         </div>
       </div>
     </div>

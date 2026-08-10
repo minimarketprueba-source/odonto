@@ -17,6 +17,8 @@ import {
   useGuardarPeriodontograma,
 } from "@/api/periodontograma";
 import { imprimirPeriodontograma } from "@/lib/imprimir";
+import { DienteFigura } from "@/components/odontograma/diente-figura";
+import { calcularNIC } from "@/api/periodontograma";
 
 interface PeriodontogramaProps {
   pacienteId: string;
@@ -84,7 +86,7 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
   const actualizarSitio = (
     n: number,
     sitio: Sitio,
-    cambio: Partial<{ ps: number | null; sangra: boolean; placa: boolean }>
+    cambio: Partial<{ ps: number | null; rec: number | null; sangra: boolean; placa: boolean; pus: boolean }>
   ) => {
     setSinGuardar(true);
     setDatos((prev) => {
@@ -136,119 +138,103 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
     });
   };
 
-  /** Los tres sitios de una cara de un diente. */
-  const FilaSitios = ({ numero, sitios }: { numero: number; sitios: Sitio[] }) => {
-    const d = dienteDe(numero);
-    return (
-      <div className="flex gap-px">
-        {sitios.map((s) => {
-          const m = d.sitios?.[s];
-          return (
-            <div key={s} className="flex flex-col items-center gap-px">
-              <input
-                type="number"
-                min={0}
-                max={15}
-                inputMode="numeric"
-                aria-label={`Pieza ${numero}, sitio ${s}, profundidad en mm`}
-                className={`w-7 h-6 text-[11px] text-center border rounded-sm tabular-nums outline-none focus:ring-1 focus:ring-primary ${colorPS(m?.ps)}`}
-                value={m?.ps ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  actualizarSitio(numero, s, {
-                    ps: v === "" ? null : Math.min(15, Math.max(0, Number(v))),
-                  });
-                }}
-              />
-              <div className="flex gap-px">
-                <button
-                  type="button"
-                  title="Sangrado al sondaje"
-                  aria-label={`Pieza ${numero}, sitio ${s}, sangrado`}
-                  onClick={() => actualizarSitio(numero, s, { sangra: !m?.sangra })}
-                  className={`w-3 h-3 rounded-full border ${m?.sangra ? "bg-red-600 border-red-700" : "bg-background border-muted-foreground/40"}`}
-                />
-                <button
-                  type="button"
-                  title="Placa"
-                  aria-label={`Pieza ${numero}, sitio ${s}, placa`}
-                  onClick={() => actualizarSitio(numero, s, { placa: !m?.placa })}
-                  className={`w-3 h-3 rounded-sm border ${m?.placa ? "bg-blue-600 border-blue-700" : "bg-background border-muted-foreground/40"}`}
-                />
-              </div>
-            </div>
-          );
+  const columnas = { gridTemplateColumns: "148px repeat(16, minmax(62px, 1fr))" };
+
+  /** Planilla periodontal por arcada, inspirada en el formato clínico convencional. */
+  const ArcadaClinica = ({ titulo, dientes }: { titulo: string; dientes: number[] }) => {
+    const Fila = ({ etiqueta, children, tono = "" }: { etiqueta: string; children: (n: number) => React.ReactNode; tono?: string }) => (
+      <div className={`grid min-w-[1140px] ${tono}`} style={columnas}>
+        <div className="flex items-center justify-end border border-border bg-muted/60 px-2 text-right text-[11px] font-bold leading-tight">{etiqueta}</div>
+        {dientes.map((n) => <div key={n} className="flex min-h-8 items-center justify-center border border-border bg-card px-0.5">{children(n)}</div>)}
+      </div>
+    );
+
+    const SelectDiente = ({ numero, campo, etiqueta }: { numero: number; campo: "movilidad" | "furca"; etiqueta: string }) => {
+      const d = dienteDe(numero);
+      return (
+        <select
+          aria-label={`Pieza ${numero}, ${etiqueta}`}
+          className="h-6 w-11 rounded border bg-background text-center text-[11px]"
+          value={d[campo] ?? ""}
+          onChange={(e) => actualizarDiente(numero, { [campo]: e.target.value === "" ? null : Number(e.target.value) })}
+        >
+          <option value="">—</option><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+        </select>
+      );
+    };
+
+    const ValoresSitio = ({ numero, sitios, campo }: { numero: number; sitios: Sitio[]; campo: "ps" | "rec" | "nic" }) => {
+      const d = dienteDe(numero);
+      return <div className="flex gap-px">{sitios.map((s) => {
+        const medicion = d.sitios?.[s];
+        const nic = calcularNIC(medicion);
+        if (campo === "nic") return <span key={s} className="flex h-6 w-[18px] items-center justify-center rounded-sm bg-slate-100 text-[10px] font-bold tabular-nums dark:bg-slate-800">{nic ?? ""}</span>;
+        const valor = campo === "ps" ? medicion?.ps : medicion?.rec;
+        return <input key={s} type="number" min={campo === "ps" ? 0 : -15} max={15} inputMode="numeric"
+          aria-label={`Pieza ${numero}, sitio ${s}, ${campo === "ps" ? "profundidad de sondaje" : "margen gingival"}`}
+          className={`h-6 w-[18px] rounded-sm border text-center text-[10px] tabular-nums outline-none focus:ring-1 focus:ring-primary ${campo === "ps" ? colorPS(medicion?.ps) : "bg-background"}`}
+          value={valor ?? ""}
+          onChange={(e) => { const v = e.target.value; actualizarSitio(numero, s, { [campo]: v === "" ? null : Math.min(15, Math.max(campo === "ps" ? 0 : -15, Number(v))) }); }} />;
+      })}</div>;
+    };
+
+    const MarcasSitio = ({ numero, sitios, campo, simbolo, color }: { numero: number; sitios: Sitio[]; campo: "sangra" | "placa" | "pus"; simbolo: string; color: string }) => {
+      const d = dienteDe(numero);
+      return <div className="flex gap-1">{sitios.map((s) => {
+        const activo = !!d.sitios?.[s]?.[campo];
+        return <button key={s} type="button" onClick={() => actualizarSitio(numero, s, { [campo]: !activo })}
+          aria-label={`Pieza ${numero}, sitio ${s}, ${campo}`} className={`flex h-5 w-5 items-center justify-center rounded-sm border text-[9px] font-black ${activo ? color : "bg-background text-muted-foreground/30"}`}>{simbolo}</button>;
+      })}</div>;
+    };
+
+    const SangradoSupuracion = ({ numero, sitios }: { numero: number; sitios: Sitio[] }) => {
+      const d = dienteDe(numero);
+      return <div className="flex gap-0.5">{sitios.map((s) => {
+        const m = d.sitios?.[s];
+        return <div key={s} className="flex flex-col gap-px">
+          <button type="button" title="Sangrado al sondaje" onClick={() => actualizarSitio(numero, s, { sangra: !m?.sangra })} className={`flex h-[11px] w-5 items-center justify-center rounded-sm border text-[8px] font-black ${m?.sangra ? "border-red-600 bg-red-600 text-white" : "bg-background text-muted-foreground/30"}`}>S</button>
+          <button type="button" title="Supuración" onClick={() => actualizarSitio(numero, s, { pus: !m?.pus })} className={`flex h-[11px] w-5 items-center justify-center rounded-sm border text-[8px] font-black ${m?.pus ? "border-amber-600 bg-amber-500 text-white" : "bg-background text-muted-foreground/30"}`}>U</button>
+        </div>;
+      })}</div>;
+    };
+
+    const Dientes = ({ cara, invertido = false }: { cara: string; invertido?: boolean }) => (
+      <div className="grid min-w-[1140px]" style={columnas}>
+        <div className="flex items-center justify-end border-x border-border bg-muted/60 px-2 text-right text-[11px] font-bold">{cara}</div>
+        {dientes.map((n) => {
+          const d = dienteDe(n);
+          return <div key={n} className={`flex h-20 items-center justify-center border-x border-border bg-card ${d.ausente ? "opacity-35" : ""}`}>
+            <DienteFigura numero={n} color="transparent" tachado={d.ausente} className={`h-[72px] w-[52px] ${invertido ? "rotate-180" : ""}`} />
+          </div>;
         })}
       </div>
     );
-  };
 
-  const Arcada = ({ titulo, dientes }: { titulo: string; dientes: number[] }) => (
-    <div className="space-y-2">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{titulo}</h4>
-      <div className="overflow-x-auto">
-        <div className="flex gap-1 min-w-max pb-1">
-          {dientes.map((n) => {
-            const d = dienteDe(n);
-            return (
-              <div
-                key={n}
-                className={`flex flex-col items-center gap-1 p-1 rounded border ${
-                  d.ausente ? "opacity-40 bg-muted" : "bg-card"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => actualizarDiente(n, { ausente: !d.ausente })}
-                  title={d.ausente ? "Marcar como presente" : "Marcar como ausente"}
-                  className="text-[11px] font-bold tabular-nums hover:text-primary"
-                >
-                  {n}
-                </button>
-
-                <FilaSitios numero={n} sitios={SITIOS_VESTIBULAR} />
-                <div className="w-full border-t border-dashed border-muted-foreground/30" />
-                <FilaSitios numero={n} sitios={SITIOS_PALATINO} />
-
-                <div className="flex gap-px items-center">
-                  <select
-                    aria-label={`Pieza ${n}, movilidad`}
-                    title="Movilidad (0 a 3)"
-                    className="w-7 h-5 text-[10px] text-center border rounded-sm bg-background"
-                    value={d.movilidad ?? ""}
-                    onChange={(e) =>
-                      actualizarDiente(n, { movilidad: e.target.value === "" ? null : Number(e.target.value) })
-                    }
-                  >
-                    <option value="">M</option>
-                    <option value="0">0</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
-                  <select
-                    aria-label={`Pieza ${n}, furca`}
-                    title="Furca (0 a 3)"
-                    className="w-7 h-5 text-[10px] text-center border rounded-sm bg-background"
-                    value={d.furca ?? ""}
-                    onChange={(e) =>
-                      actualizarDiente(n, { furca: e.target.value === "" ? null : Number(e.target.value) })
-                    }
-                  >
-                    <option value="">F</option>
-                    <option value="0">0</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
-                </div>
-              </div>
-            );
-          })}
+    return (
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        <div className="min-w-[1140px] bg-violet-800 px-3 py-1 text-center text-xs font-extrabold uppercase tracking-wider text-white">{titulo}</div>
+        <div className="grid min-w-[1140px]" style={columnas}>
+          <div className="border border-border bg-muted/60" />
+          {dientes.map((n) => <button key={n} type="button" onClick={() => actualizarDiente(n, { ausente: !dienteDe(n).ausente })} title="Clic: marcar pieza ausente/presente" className="border border-border bg-slate-100 py-1 text-xs font-extrabold tabular-nums hover:bg-primary/10 dark:bg-slate-900">{n}</button>)}
         </div>
+        <Fila etiqueta="Implante">{(n) => <button type="button" onClick={() => actualizarDiente(n, { implante: !dienteDe(n).implante })} className={`h-5 w-8 rounded border text-[10px] font-bold ${dienteDe(n).implante ? "border-violet-600 bg-violet-100 text-violet-800 dark:bg-violet-900" : "bg-background text-muted-foreground"}`}>{dienteDe(n).implante ? "Sí" : "—"}</button>}</Fila>
+        <Fila etiqueta="Movilidad">{(n) => <SelectDiente numero={n} campo="movilidad" etiqueta="movilidad" />}</Fila>
+        <Fila etiqueta="Furca">{(n) => <SelectDiente numero={n} campo="furca" etiqueta="furca" />}</Fila>
+        <Fila etiqueta="Sangrado / supuración">{(n) => <SangradoSupuracion numero={n} sitios={SITIOS_VESTIBULAR} />}</Fila>
+        <Fila etiqueta="Placa">{(n) => <MarcasSitio numero={n} sitios={SITIOS_VESTIBULAR} campo="placa" simbolo="P" color="border-blue-600 bg-blue-600 text-white" />}</Fila>
+        <Fila etiqueta="Margen gingival">{(n) => <ValoresSitio numero={n} sitios={SITIOS_VESTIBULAR} campo="rec" />}</Fila>
+        <Fila etiqueta="Profundidad de sondaje">{(n) => <ValoresSitio numero={n} sitios={SITIOS_VESTIBULAR} campo="ps" />}</Fila>
+        <Fila etiqueta="Nivel de inserción">{(n) => <ValoresSitio numero={n} sitios={SITIOS_VESTIBULAR} campo="nic" />}</Fila>
+        <Dientes cara="Vestibular" />
+        <Dientes cara="Palatino / lingual" invertido />
+        <Fila etiqueta="Nivel de inserción">{(n) => <ValoresSitio numero={n} sitios={SITIOS_PALATINO} campo="nic" />}</Fila>
+        <Fila etiqueta="Profundidad de sondaje">{(n) => <ValoresSitio numero={n} sitios={SITIOS_PALATINO} campo="ps" />}</Fila>
+        <Fila etiqueta="Margen gingival">{(n) => <ValoresSitio numero={n} sitios={SITIOS_PALATINO} campo="rec" />}</Fila>
+        <Fila etiqueta="Placa">{(n) => <MarcasSitio numero={n} sitios={SITIOS_PALATINO} campo="placa" simbolo="P" color="border-blue-600 bg-blue-600 text-white" />}</Fila>
+        <Fila etiqueta="Sangrado / supuración">{(n) => <SangradoSupuracion numero={n} sitios={SITIOS_PALATINO} />}</Fila>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -294,14 +280,14 @@ export function Periodontograma({ pacienteId, pacienteNombre, pacienteDocumento 
           <span className="w-3 h-3 rounded-sm bg-blue-600" /> placa
         </span>
         <span className="text-muted-foreground">
-          M = movilidad · F = furca · clic en el número del diente = ausente
+          S = sangrado · P = placa · clic en el número del diente = ausente · margen gingival admite valores negativos
         </span>
       </div>
 
       <Card className="border-0 ring-1 ring-border/50">
-        <CardContent className="p-4 space-y-5">
-          <Arcada titulo="Arcada superior (18 a 28)" dientes={SUP} />
-          <Arcada titulo="Arcada inferior (48 a 38)" dientes={INF} />
+        <CardContent className="p-3 space-y-5">
+          <ArcadaClinica titulo="Superior · vestibular y palatino" dientes={SUP} />
+          <ArcadaClinica titulo="Inferior · vestibular y lingual" dientes={INF} />
         </CardContent>
       </Card>
 

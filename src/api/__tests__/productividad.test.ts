@@ -22,7 +22,7 @@ vi.mock("@/lib/supabase", () => {
   return { supabase: { from: (tabla: string) => encadenable(tabla) } };
 });
 
-import { fetchProduccionDental, formatSexo, formatJerarquia } from "@/api/productividad";
+import { fetchProduccionDental, formatSexo } from "@/api/productividad";
 
 const FILTROS_BASE = { fechaDesde: "2026-08-01", fechaHasta: "2026-08-31" };
 
@@ -163,13 +163,13 @@ describe("producción odontológica", () => {
     expect(r.atenciones[0].pacienteJerarquia).toBe("123456");
   });
 
-  it("cae en el tipo cuando el paciente no tiene documento", async () => {
+  it("no muestra categoría institucional cuando el paciente no tiene documento", async () => {
     RESPUESTAS.evoluciones_clinicas = {
       data: [evolucion({ paciente: { nombres: "N", apellidos: "N", documento: null, tipo: "civil", grado: null, sexo: "F" } })],
       error: null,
     };
     const r = await fetchProduccionDental(FILTROS_BASE);
-    expect(r.atenciones[0].pacienteJerarquia).toBe("civil");
+    expect(r.atenciones[0].pacienteJerarquia).toBe("Sin documento");
   });
 });
 
@@ -180,8 +180,4 @@ describe("formateo", () => {
     expect(formatSexo(null)).toBe("—");
   });
 
-  it("arma la identificación sin dejar separadores sueltos", () => {
-    expect(formatJerarquia("civil", null)).toBe("civil");
-    expect(formatJerarquia(null, null)).toBe("—");
-  });
 });
