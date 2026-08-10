@@ -125,8 +125,7 @@ export function aclararColor(hex: string, proporcion = 0.55): string {
 export function lineaContacto(empresa: DatosEmpresa = getEmpresa()): string {
   const partes = [
     empresa.direccion,
-    empresa.telefono ? `Tel: ${empresa.telefono}` : null,
-    empresa.ruc ? `RUC: ${empresa.ruc}` : null,
+    "Tel: 0981 522 615 / 0971 934 679",
   ].filter((p) => p && p.trim());
-  return partes.join(" · ");
+  return partes.join(" - ");
 }

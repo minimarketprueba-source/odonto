@@ -44,19 +44,18 @@ describe("datos del consultorio", () => {
 });
 
 describe("línea de contacto del encabezado", () => {
-  it("arma dirección, teléfono y RUC separados por puntos", () => {
+  it("arma dirección y teléfono separados por guiones", () => {
     expect(lineaContacto(COMPLETA)).toBe(
-      "Av. Mcal. López 1234 · Tel: 0983 559 700 · RUC: 80012345-6"
+      "Av. Mcal. López 1234 - Tel: 0981 522 615 / 0971 934 679"
     );
   });
 
   it("no deja separadores sueltos cuando faltan datos", () => {
-    expect(lineaContacto({ ...COMPLETA, telefono: null, ruc: null })).toBe("Av. Mcal. López 1234");
-    expect(lineaContacto({ ...COMPLETA, direccion: null, telefono: null })).toBe("RUC: 80012345-6");
+    expect(lineaContacto({ ...COMPLETA, direccion: null })).toBe("Tel: 0981 522 615 / 0971 934 679");
   });
 
-  it("queda vacía si no se cargó ningún dato de contacto", () => {
-    expect(lineaContacto(EMPRESA_PREDETERMINADA)).toBe("");
+  it("si no se cargó dirección, queda solo el teléfono", () => {
+    expect(lineaContacto(EMPRESA_PREDETERMINADA)).toBe("Tel: 0981 522 615 / 0971 934 679");
   });
 });
 
@@ -105,7 +104,6 @@ describe("encabezado compartido de los impresos", () => {
     const html = await htmlDelComprobante();
     expect(html).toContain(COMPLETA.nombre);
     expect(html).toContain("Av. Mcal. López 1234");
-    expect(html).toContain("RUC: 80012345-6");
     expect(html).toContain(COMPLETA.logo_url);
   });
 

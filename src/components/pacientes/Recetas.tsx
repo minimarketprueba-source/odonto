@@ -202,10 +202,8 @@ export function Recetas({
         duracion: i.duracion,
         indicaciones: i.indicaciones,
       })),
-      profesionalNombre: receta.medico
-        ? `Dr(a). ${receta.medico.nombres} ${receta.medico.apellidos}`
-        : null,
-      profesionalRegistro: receta.medico?.numero_colegiatura ?? null,
+      profesionalNombre: null,
+      profesionalRegistro: null,
       anulada: !!receta.anulada_at,
       motivoAnulacion: receta.motivo_anulacion,
     });
