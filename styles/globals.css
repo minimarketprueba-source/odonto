@@ -111,38 +111,38 @@
   :root {
     /* Tema claro - Clinical Precision */
     --background: 247 249 251; /* #f7f9fb */
-    --foreground: 25 28 30; /* #191c1e */
+    --foreground: 15 23 42; /* #0f172a */
     --card: 255 255 255; /* #ffffff */
-    --card-foreground: 25 28 30;
+    --card-foreground: 15 23 42;
     --popover: 255 255 255;
-    --popover-foreground: 25 28 30;
+    --popover-foreground: 15 23 42;
     --primary: 0 97 165; /* #0061a5 */
     --primary-foreground: 255 255 255;
-    --secondary: 80 95 118; /* #505f76 */
-    --secondary-foreground: 255 255 255;
+    --secondary: 232 238 246;
+    --secondary-foreground: 30 41 59;
     --muted: 242 244 246; /* surface-container-low */
-    --muted-foreground: 63 71 83; /* on-surface-variant */
+    --muted-foreground: 71 85 105; /* #475569 */
     --accent: 208 225 251; /* secondary-container */
-    --accent-foreground: 84 100 122; /* on-secondary-container */
+    --accent-foreground: 15 59 94;
     --destructive: 186 26 26; /* #ba1a1a */
     --destructive-foreground: 255 255 255;
     --border: 224 227 229; /* surface-variant #e0e3e5 */
     --input: 224 227 229;
     --ring: 0 97 165;
     --radius: 0.25rem; /* rounded DEFAULT: 0.25rem */
-    --chart-1: 255 255 255;
-    --chart-2: 125 211 252;
-    --chart-3: 96 165 250;
-    --chart-4: 255 255 255;
-    --chart-5: 199 210 254;
+    --chart-1: 37 99 235;
+    --chart-2: 5 150 105;
+    --chart-3: 245 158 11;
+    --chart-4: 139 92 246;
+    --chart-5: 244 63 94;
 
     /* Sidebar */
     --sidebar: 247 249 251;
-    --sidebar-foreground: 25 28 30;
+    --sidebar-foreground: 15 23 42;
     --sidebar-primary: 0 97 165;
     --sidebar-primary-foreground: 255 255 255;
     --sidebar-accent: 242 244 246;
-    --sidebar-accent-foreground: 25 28 30;
+    --sidebar-accent-foreground: 15 23 42;
     --sidebar-border: 224 227 229;
     --sidebar-ring: 0 97 165;
   }
@@ -150,66 +150,44 @@
   .dark {
     /* Tema oscuro - Azul brillante con fondo negro */
     --background: 2 6 23; /* Fondo oscuro azulado */
-    --foreground: 255 255 255;
+    --foreground: 241 245 249;
     --card: 15 23 42; /* Card oscuro */
-    --card-foreground: 255 255 255;
+    --card-foreground: 241 245 249;
     --popover: 15 23 42;
-    --popover-foreground: 255 255 255;
-    --primary: 96 165 250; /* Azul brillante #60A5FA */
+    --popover-foreground: 241 245 249;
+    --primary: 59 130 246;
     --primary-foreground: 255 255 255;
-    --secondary: 96 165 250;
-    --secondary-foreground: 255 255 255;
-    --muted: 30 58 138; /* Azul oscuro */
-    --muted-foreground: 203 213 225;
-    --accent: 125 211 252; /* Celeste brillante #7DD3FC */
-    --accent-foreground: 255 255 255;
+    --secondary: 30 41 59;
+    --secondary-foreground: 241 245 249;
+    --muted: 30 41 59;
+    --muted-foreground: 148 163 184;
+    --accent: 30 58 138;
+    --accent-foreground: 239 246 255;
     --destructive: 248 113 113;
     --destructive-foreground: 255 255 255;
     --border: 51 65 85;
     --input: 51 65 85;
-    --ring: 96 165 250;
-    --chart-1: 255 255 255;
-    --chart-2: 125 211 252;
-    --chart-3: 96 165 250;
-    --chart-4: 255 255 255;
-    --chart-5: 199 210 254;
+    --ring: 59 130 246;
+    --chart-1: 96 165 250;
+    --chart-2: 52 211 153;
+    --chart-3: 251 191 36;
+    --chart-4: 167 139 250;
+    --chart-5: 251 113 133;
 
     /* Sidebar oscuro */
     --sidebar: 15 23 42;
-    --sidebar-foreground: 255 255 255;
-    --sidebar-primary: 96 165 250;
+    --sidebar-foreground: 241 245 249;
+    --sidebar-primary: 59 130 246;
     --sidebar-primary-foreground: 255 255 255;
     --sidebar-accent: 30 58 138;
-    --sidebar-accent-foreground: 255 255 255;
+    --sidebar-accent-foreground: 239 246 255;
     --sidebar-border: 51 65 85;
-    --sidebar-ring: 96 165 250;
+    --sidebar-ring: 59 130 246;
   }
 }
 
 /* La ficha clínica replica el diseño de referencia y debe permanecer clara
    aunque el usuario tenga activo el tema oscuro en el resto de la aplicación. */
-.clinical-light {
-  color-scheme: light;
-  --background: 247 249 251;
-  --foreground: 25 28 30;
-  --card: 255 255 255;
-  --card-foreground: 25 28 30;
-  --popover: 255 255 255;
-  --popover-foreground: 25 28 30;
-  --primary: 0 97 165;
-  --primary-foreground: 255 255 255;
-  --secondary: 80 95 118;
-  --secondary-foreground: 255 255 255;
-  --muted: 242 244 246;
-  --muted-foreground: 63 71 83;
-  --accent: 208 225 251;
-  --accent-foreground: 84 100 122;
-  --destructive: 186 26 26;
-  --destructive-foreground: 255 255 255;
-  --border: 224 227 229;
-  --input: 224 227 229;
-  --ring: 0 97 165;
-}
 
 @layer base {
   * {

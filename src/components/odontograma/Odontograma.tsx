@@ -42,7 +42,7 @@ const TEMP_SUP_IZQ = [61, 62, 63, 64, 65]
 const TEMP_INF_DER = [85, 84, 83, 82, 81]
 const TEMP_INF_IZQ = [71, 72, 73, 74, 75]
 
-const SIN_COLOR = '#ffffff'
+const SIN_COLOR = 'rgb(var(--card))'
 
 /** Las cinco caras del esquema, cada una con su polígono. */
 const CARAS_DIBUJO: { cara: string; puntos: string }[] = [
@@ -268,7 +268,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
     // centro de la boca, como en el odontograma de papel.
     return (
       <div className="flex shrink-0 flex-col items-center gap-1">
-        <span className="order-2 text-[10px] font-semibold tabular-nums text-slate-700">
+        <span className="order-2 text-[10px] font-semibold tabular-nums text-foreground">
           {numero}
         </span>
 
@@ -366,7 +366,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
           <Diente key={n} numero={n} />
         ))}
       </div>
-      <div className="self-stretch border-l border-dashed border-slate-300" />
+      <div className="self-stretch border-l border-dashed border-border" />
       <div className="flex gap-1">
         {izquierda.map((n) => (
           <Diente key={n} numero={n} />
@@ -420,7 +420,14 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
               : `Selector de superficies de la pieza ${piezaSeleccionada}`
           }
         >
-          <circle cx="40" cy="40" r="31" fill="#fff" stroke="#475569" strokeWidth="1.2" />
+          <circle
+            cx="40"
+            cy="40"
+            r="31"
+            fill="rgb(var(--card))"
+            stroke="rgb(var(--muted-foreground))"
+            strokeWidth="1.2"
+          />
           {zonas.map((zona) => {
             const estado =
               piezaSeleccionada === null
@@ -431,11 +438,11 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
               key: zona.cara,
               role: 'button',
               tabIndex: 0,
-              fill: estado?.color ?? '#ffffff',
-              stroke: '#475569',
+              fill: estado?.color ?? 'rgb(var(--card))',
+              stroke: 'rgb(var(--muted-foreground))',
               strokeWidth: 1.2,
               className:
-                'cursor-pointer outline-none transition-all hover:fill-sky-200 hover:stroke-sky-600 focus:fill-sky-200 focus:stroke-sky-600',
+                'cursor-pointer outline-none transition-all hover:fill-accent hover:stroke-primary focus:fill-accent focus:stroke-primary',
               onClick: () => activarCara(zona.cara),
               onKeyDown: (evento: React.KeyboardEvent<SVGElement>) => {
                 if (evento.key === 'Enter' || evento.key === ' ') {
@@ -459,7 +466,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
             )
           })}
         </svg>
-        <span className="text-[9px] font-semibold text-slate-500">
+        <span className="text-[9px] font-semibold text-muted-foreground">
           {piezaSeleccionada === null ? 'Seleccione una pieza' : `Pieza ${piezaSeleccionada}`}
         </span>
       </div>
@@ -471,23 +478,23 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
       {/* Encabezado contextual inspirado en la referencia: la ficha sigue
           siendo la fuente de datos, pero el paciente queda visible mientras
           se trabaja sobre el odontograma. */}
-      <div className="hidden flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="hidden flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3 text-card-foreground shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sky-100 text-sky-700">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-accent text-accent-foreground">
             <UserRound className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-base font-bold text-slate-900">
+            <p className="truncate text-base font-bold text-foreground">
               {paciente ? `${paciente.nombres} ${paciente.apellidos}` : 'Cargando paciente...'}
             </p>
-            <p className="truncate text-xs text-slate-500">
+            <p className="truncate text-xs text-muted-foreground">
               ID: {paciente?.documento || 'Sin documento'}{' '}
               {edadPaciente !== null ? `· ${edadPaciente} años` : ''}
               {paciente?.sexo ? ` · ${paciente.sexo === 'M' ? 'Masculino' : 'Femenino'}` : ''}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-xs text-slate-500">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="hidden items-center gap-1.5 sm:flex">
             <CalendarDays className="h-3.5 w-3.5" /> Última visita: ver evolución
           </span>
@@ -497,7 +504,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
         </div>
       </div>
 
-      <Card className="border border-slate-200 bg-white text-slate-900 shadow-none">
+      <Card className="border border-border bg-card text-card-foreground shadow-none">
         <CardHeader className="border-b pb-3">
           <div className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -515,10 +522,10 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
                 variant="outline"
                 size="sm"
                 aria-expanded={historialAbierto}
-                className={`h-8 gap-1.5 rounded-lg border-slate-300 text-xs ${
+                className={`h-8 gap-1.5 rounded-lg border-border text-xs ${
                   historialAbierto
-                    ? 'bg-sky-50 text-sky-700 hover:bg-sky-100'
-                    : 'bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'bg-accent text-accent-foreground hover:bg-accent/80'
+                    : 'bg-background text-foreground hover:bg-muted'
                 }`}
                 onClick={() => setHistorialAbierto((abierto) => !abierto)}
               >
@@ -582,8 +589,8 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
 
           {/* Nada se asienta en la historia clínica hasta que se confirma acá. */}
           {hayPendientes && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2.5">
-              <span className="min-w-[180px] flex-1 text-xs font-medium text-sky-900">
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 p-2.5">
+              <span className="min-w-[180px] flex-1 text-xs font-medium text-foreground">
                 {cantidadPendiente === 1
                   ? '1 marca sin guardar'
                   : `${cantidadPendiente} marcas sin guardar`}{' '}
@@ -618,7 +625,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
           )}
         </CardHeader>
 
-        <CardContent className="overflow-x-auto bg-white p-4 sm:p-6">
+        <CardContent className="overflow-x-auto bg-card p-4 sm:p-6">
           <div className="flex min-w-[760px] flex-col gap-7 py-1">
             <Arcada derecha={SUP_DER} izquierda={SUP_IZQ} />
 
@@ -709,7 +716,7 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
       </div>
 
       {historialAbierto && (
-        <div className="absolute right-4 top-[4.5rem] z-20 w-[min(360px,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl">
+        <div className="absolute right-4 top-[4.5rem] z-20 w-[min(360px,calc(100vw-2rem))] rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
               <p className="font-semibold">Historial</p>

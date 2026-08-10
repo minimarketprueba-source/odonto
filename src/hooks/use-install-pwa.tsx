@@ -75,11 +75,11 @@ export function InstallPWAPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
+    <div className="fixed bottom-4 left-4 right-4 z-50 rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-lg md:left-auto md:right-4 md:max-w-sm">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
           <svg
-            className="w-6 h-6 text-primary"
+            className="h-6 w-6 text-primary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -93,22 +93,20 @@ export function InstallPWAPrompt() {
           </svg>
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-            Instalar Aplicación
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+          <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">Instalar Aplicación</h3>
+          <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
             Instala Control de Peso en tu dispositivo para un acceso rápido y funciones offline.
           </p>
           <div className="flex gap-2">
             <button
               onClick={handleInstall}
-              className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
               Instalar
             </button>
             <button
               onClick={() => setDismissed(true)}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             >
               Ahora no
             </button>
@@ -118,7 +116,7 @@ export function InstallPWAPrompt() {
           onClick={() => setDismissed(true)}
           className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

@@ -108,33 +108,33 @@ function ClinicalLayout({
   const { logout } = useAuth()
 
   return (
-    <div className="clinical-light flex h-screen overflow-hidden bg-[#f7f9fb] text-[#191c1e]">
-      <aside className="hidden w-[230px] shrink-0 border-r border-[#d8dadc] bg-white lg:flex lg:flex-col">
-        <div className="flex h-[57px] items-center border-b border-[#d8dadc] px-4">
-          <span className="text-[18px] font-semibold tracking-[-0.02em] text-[#0061a5]">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <aside className="hidden w-[230px] shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex lg:flex-col">
+        <div className="flex h-[57px] items-center border-b border-sidebar-border px-4">
+          <span className="text-[18px] font-semibold tracking-[-0.02em] text-primary">
             DentoChart Pro
           </span>
         </div>
-        <div className="border-b border-[#e6e8ea] px-5 py-5">
+        <div className="border-b border-sidebar-border px-5 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#d2e4ff] text-sm font-semibold text-[#00497e]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground">
               {patient ? `${patient.nombres[0] ?? ''}${patient.apellidos[0] ?? ''}` : 'P'}
             </div>
             <div className="min-w-0">
               <p className="truncate text-[16px] font-semibold">
                 {patient ? `${patient.nombres} ${patient.apellidos}` : 'Paciente'}
               </p>
-              <p className="text-[11px] text-[#3f4753]">
+              <p className="text-[11px] text-muted-foreground">
                 ID: {patient?.documento || 'Sin documento'}
               </p>
             </div>
           </div>
-          <div className="mt-4 space-y-1 text-[11px] text-[#3f4753]">
+          <div className="mt-4 space-y-1 text-[11px] text-muted-foreground">
             <p className="flex justify-between">
-              Last Visit: <span className="font-medium text-[#191c1e]">—</span>
+              Last Visit: <span className="font-medium text-foreground">—</span>
             </p>
             <p className="flex justify-between">
-              Allergies: <span className="font-semibold text-[#ba1a1a]">See anamnesis</span>
+              Allergies: <span className="font-semibold text-destructive">See anamnesis</span>
             </p>
           </div>
         </div>
@@ -146,7 +146,9 @@ function ClinicalLayout({
               onClick={() => onSectionChange?.(value)}
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm',
-                section === value ? 'bg-[#d2e4ff] text-[#3f4753]' : 'text-[#3f4753]'
+                section === value
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
               )}
             >
               <Icon className="h-4 w-4" />
@@ -154,17 +156,20 @@ function ClinicalLayout({
             </button>
           ))}
         </nav>
-        <div className="space-y-3 border-t border-[#e6e8ea] p-4">
-          <button className="flex w-full items-center justify-center rounded-md bg-[#0d99ff] px-3 py-2.5 text-sm font-medium text-white shadow-sm">
+        <div className="space-y-3 border-t border-sidebar-border p-4">
+          <button className="flex w-full items-center justify-center rounded-md bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
             Complete Exam
           </button>
-          <button onClick={logout} className="flex items-center gap-2 px-2 text-sm text-[#3f4753]">
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-2 text-sm text-muted-foreground hover:text-foreground"
+          >
             <LogOut className="h-4 w-4" /> Logout
           </button>
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-[57px] shrink-0 items-center justify-between border-b border-[#d8dadc] bg-white px-4 sm:px-6">
+        <header className="flex h-[57px] shrink-0 items-center justify-between border-b border-border bg-card px-4 text-card-foreground sm:px-6">
           <div className="flex items-center gap-7">
             <button className="lg:hidden">
               <Menu className="h-5 w-5" />
@@ -177,8 +182,8 @@ function ClinicalLayout({
                   className={cn(
                     'border-b-2 border-transparent py-5 text-sm',
                     location.pathname === href
-                      ? 'border-[#0061a5] text-[#0061a5]'
-                      : 'whitespace-nowrap text-[#191c1e]'
+                      ? 'border-primary text-primary'
+                      : 'whitespace-nowrap text-foreground'
                   )}
                 >
                   {label}
@@ -187,12 +192,12 @@ function ClinicalLayout({
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <button className="hidden rounded-md bg-[#0d99ff] px-4 py-2.5 text-sm font-medium text-white sm:block">
+            <button className="hidden rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:block">
               New Consultation
             </button>
             <Bell className="h-[18px] w-[18px]" />
             <Settings className="h-[18px] w-[18px]" />
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d2e4ff] text-xs font-semibold text-[#00497e]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
               DR
             </div>
           </div>
