@@ -1600,23 +1600,26 @@ export default function FichaPaciente() {
                         key={img.id}
                         className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md"
                       >
-                        <div className="flex aspect-square items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-950">
+                        <button
+                          type="button"
+                          className="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100 p-0 border-0 cursor-pointer dark:bg-slate-950"
+                          onClick={() => {
+                            Swal.fire({
+                              imageUrl: img.url,
+                              imageAlt: img.descripcion || 'Visualización de Radiografía',
+                              title: `Radiografía ${img.tipo}`,
+                              text: img.descripcion || '',
+                              confirmButtonText: 'Cerrar',
+                              width: '650px',
+                            })
+                          }}
+                        >
                           <img
                             src={img.url}
                             alt={img.descripcion || 'Imagen dental'}
                             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                            onClick={() => {
-                              Swal.fire({
-                                imageUrl: img.url,
-                                imageAlt: img.descripcion || 'Visualización de Radiografía',
-                                title: `Radiografía ${img.tipo}`,
-                                text: img.descripcion || '',
-                                confirmButtonText: 'Cerrar',
-                                width: '650px',
-                              })
-                            }}
                           />
-                        </div>
+                        </button>
                         <div className="space-y-1 p-3 text-xs">
                           <div className="flex items-center justify-between">
                             <Badge

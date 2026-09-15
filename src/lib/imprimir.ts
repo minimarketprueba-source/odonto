@@ -947,7 +947,7 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
           <img src="${logoBanda}" alt="" style="height:16mm; max-width:70mm; object-fit:contain; display:block;">
         </span>
         <div style="text-align:right; color:#fff; font-size:11px; font-weight:bold; line-height:1.5; letter-spacing:1px;">
-          0981 522 615 / 0971 934 679
+          ${esc(empresa.telefono || "0981 522 615 / 0971 934 679")}
         </div>
       </div>
       ${

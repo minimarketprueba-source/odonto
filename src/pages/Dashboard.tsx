@@ -363,7 +363,7 @@ export default function Dashboard() {
                         </p>
                         {c.motivo && (
                           <p className="max-w-[160px] truncate text-[11px] italic text-muted-foreground">
-                            "{c.motivo}"
+                            &ldquo;{c.motivo}&rdquo;
                           </p>
                         )}
                       </div>
