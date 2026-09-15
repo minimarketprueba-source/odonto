@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { usePerfilProfesional } from '@/api/perfil'
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
-import { Menu, X, Home, LogOut, Users, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
+import { Menu, X, Home, LogOut, Users, ScanLine, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useEmpresa } from "@/api/empresa";
 
@@ -37,6 +37,7 @@ export function Sidebar() {
   const navigation = [
     { name: "Dashboard", href: "/", icon: Home, badge: null as number | null },
     { name: "Pacientes", href: "/pacientes", icon: Users, badge: null as number | null, moduleKey: "pacientes" },
+    { name: "Cefalometría", href: "/cefalometria", icon: ScanLine, badge: null as number | null, moduleKey: "pacientes" },
     { name: "Citas", href: "/citas", icon: CalendarDays, badge: null as number | null, moduleKey: "citas" },
     { name: "Horarios", href: "/horarios", icon: Clock, badge: null as number | null, moduleKey: "citas" },
     { name: "Presupuestos", href: "/presupuestos", icon: DollarSign, badge: null as number | null, moduleKey: "consultas" },

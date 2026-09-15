@@ -34,6 +34,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 const Pacientes = lazy(() => import('./pages/Pacientes'))
 const FichaPaciente = lazy(() => import('./pages/FichaPaciente'))
+const Cefalometria = lazy(() => import('./pages/Cefalometria'))
 const Citas = lazy(() => import('./pages/Citas'))
 const Horarios = lazy(() => import('./pages/Horarios'))
 const Presupuestos = lazy(() => import('./pages/Presupuestos'))
@@ -115,6 +116,7 @@ function App() {
           <Route path="/auth/reset-password" element={<AuthRedirect><ResetPassword /></AuthRedirect>} />
           <Route path="/pacientes" element={<ProtectedRoute moduleKey="pacientes"><Pacientes /></ProtectedRoute>} />
           <Route path="/pacientes/:id" element={<ProtectedRoute moduleKey="pacientes"><FichaPaciente /></ProtectedRoute>} />
+          <Route path="/cefalometria" element={<ProtectedRoute moduleKey="pacientes"><Cefalometria /></ProtectedRoute>} />
           <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
           <Route path="/horarios" element={<ProtectedRoute moduleKey="citas"><Horarios /></ProtectedRoute>} />
           <Route path="/presupuestos" element={<ProtectedRoute moduleKey="consultas"><Presupuestos /></ProtectedRoute>} />

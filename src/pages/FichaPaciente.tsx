@@ -67,6 +67,7 @@ import {
   Pill,
   Loader2,
   UserCheck,
+  ScanLine,
 } from 'lucide-react'
 import {
   imprimirPresupuesto,
@@ -641,6 +642,17 @@ export default function FichaPaciente() {
             >
               <Printer className="h-4 w-4" />
               Planilla del historial
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 bg-background border-primary/40 text-primary hover:bg-primary/10"
+              asChild
+            >
+              <Link to={`/cefalometria?paciente=${paciente.id}`}>
+                <ScanLine className="h-4 w-4" />
+                Cefalometría
+              </Link>
             </Button>
             {paciente.activo ? (
               <Badge className="border-0 bg-emerald-100 text-xs text-emerald-800 hover:bg-emerald-200">
