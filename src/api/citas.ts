@@ -63,6 +63,8 @@ export interface Cita {
     apellidos: string;
     documento: string;
     tipo: string;
+    telefono?: string | null;
+    telefono2?: string | null;
     grado?: string | null;
     unidad?: string | null;
   } | null;
@@ -95,7 +97,7 @@ export interface CreateCitaInput {
 }
 
 const CITA_SELECT =
-  "*, paciente:pacientes(id, nombres, apellidos, documento, tipo), medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color))";
+  "*, paciente:pacientes(id, nombres, apellidos, documento, tipo, telefono, telefono2), medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color))";
 
 /**
  * Una fecha en formato yyyy-mm-dd, tomando el día del CALENDARIO LOCAL.

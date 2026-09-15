@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   CalendarDays, CalendarRange, ClipboardCheck,
-  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Trash2, Activity,
+  Plus, Printer, CheckCircle2, Search, Stethoscope, UserCheck, UserX, XCircle, CalendarClock, Trash2, Activity, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { matchTexto } from "@/lib/utils";
+import { mensajeRecordatorioCita, enlaceWhatsApp, telefonoParaWhatsApp } from "@/lib/estado-cuenta";
+import { useEmpresa } from "@/api/empresa";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/context/auth-context";
 import { CitaForm } from "@/components/citas/cita-form";
@@ -86,6 +88,7 @@ export default function Citas() {
   const cambiarEstado = useCambiarEstadoCita();
   const admitir = useAdmitirCita();
   const borrar = useBorrarCita();
+  const empresa = useEmpresa();
 
   const handleBorrarCita = async (cita: Cita) => {
     const quien = cita.paciente ? `${cita.paciente.apellidos}, ${cita.paciente.nombres}` : "este paciente";
@@ -133,6 +136,25 @@ export default function Citas() {
     }
   };
 
+  const handleRecordatorio = (c: Cita) => {
+    const telefono = c.paciente?.telefono || c.paciente?.telefono2 || null;
+    const pacienteNombre = c.paciente
+      ? `${c.paciente.nombres} ${c.paciente.apellidos}`
+      : "paciente";
+    const mensaje = mensajeRecordatorioCita({
+      clinica: empresa.nombre,
+      pacienteNombre,
+      fecha: c.fecha,
+      hora: c.hora,
+      tratamiento: c.motivo,
+      medico: c.medico ? `${c.medico.nombres} ${c.medico.apellidos}` : null,
+    });
+    if (!telefonoParaWhatsApp(telefono)) {
+      toast.info("El paciente no tiene teléfono cargado. Se abrirá WhatsApp para elegir el contacto.");
+    }
+    window.open(enlaceWhatsApp(mensaje, telefono), "_blank", "noopener,noreferrer");
+  };
+
   const resumen = ESTADOS_CITA.map((e) => ({
     ...e,
     total: citas.filter((c) => c.estado === e.value).length,
@@ -173,6 +195,16 @@ export default function Citas() {
           onClick={() => handleBorrarCita(c)}
         >
           <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      )}
+      {(c.estado === "pendiente" || c.estado === "confirmada") && (
+        <Button
+          variant="ghost" size="icon"
+          className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/40"
+          title="Enviar recordatorio de cita por WhatsApp"
+          onClick={() => handleRecordatorio(c)}
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
         </Button>
       )}
       {canEdit && c.estado === "pendiente" && (

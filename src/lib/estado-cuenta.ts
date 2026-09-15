@@ -100,3 +100,43 @@ export function enlaceWhatsApp(mensaje: string, telefono?: string | null): strin
   const texto = encodeURIComponent(mensaje);
   return numero ? `https://wa.me/${numero}?text=${texto}` : `https://wa.me/?text=${texto}`;
 }
+
+export interface DatosRecordatorioCita {
+  clinica: string;
+  pacienteNombre: string;
+  fecha: string;         // yyyy-mm-dd, se formatea al locale del navegador
+  hora: string;          // HH:mm:ss, se muestra solo HH:mm
+  tratamiento?: string | null;
+  medico?: string | null;
+}
+
+/**
+ * Arma el mensaje de recordatorio de cita para mandar por WhatsApp.
+ * Usa negrita de WhatsApp (*texto*) y no incluye datos clínicos.
+ */
+export function mensajeRecordatorioCita(datos: DatosRecordatorioCita): string {
+  // Formatear fecha: "2026-09-15" → "lunes 15 de septiembre de 2026"
+  const [y, m, d] = datos.fecha.split("-").map(Number);
+  const fechaLegible = new Date(y, m - 1, d).toLocaleDateString("es-PY", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const hora = datos.hora.slice(0, 5); // HH:mm
+
+  const lineas: string[] = [];
+  lineas.push(`*${datos.clinica}*`);
+  lineas.push("");
+  lineas.push(`Hola *${datos.pacienteNombre}*, le recordamos su cita:`);
+  lineas.push("");
+  lineas.push(`📅 *Fecha:* ${fechaLegible}`);
+  lineas.push(`⏰ *Hora:* ${hora}`);
+  if (datos.tratamiento) lineas.push(`🦷 *Tratamiento:* ${datos.tratamiento}`);
+  if (datos.medico) lineas.push(`👨‍⚕️ *Profesional:* ${datos.medico}`);
+  lineas.push("");
+  lineas.push("Por favor confirme su asistencia. ¡Lo esperamos!");
+
+  return lineas.join("\n");
+}
