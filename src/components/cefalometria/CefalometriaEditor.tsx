@@ -58,6 +58,18 @@ export function CefalometriaEditor({
 
   // Estado de los puntos anatómicos
   const [puntos, setPuntos] = useState<PuntosCefalometricosMap>(estudio.puntos || {});
+
+  // Eliminar un punto individual por su id
+  const handleEliminarPunto = React.useCallback((id: string) => {
+    setPuntos((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    setGuardadoStatus('cambios');
+    toast.info(`Punto ${id} eliminado.`);
+  }, []);
+
   // Calibración
   const [calibracion, setCalibracion] = useState<CalibracionRegla>(
     estudio.calibracion || { distanciaRealMm: 10 }
@@ -707,6 +719,12 @@ export function CefalometriaEditor({
                   <g
                     key={def.id}
                     onMouseDown={(e) => handlePointMouseDown(def.id, e)}
+                    onContextMenu={(e) => {
+                      // Clic derecho: eliminar el punto
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleEliminarPunto(def.id);
+                    }}
                     className="cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
                     style={{ pointerEvents: 'all' }}
                   >
@@ -998,9 +1016,6 @@ export function CefalometriaEditor({
                           key={def.id}
                           onClick={() => {
                             setPuntoActivoId(def.id);
-                            if (pos) {
-                              // Centrar la vista en el punto
-                            }
                           }}
                           className={`p-2 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${
                             esActivo
@@ -1022,13 +1037,26 @@ export function CefalometriaEditor({
                             </div>
                           </div>
 
-                          <div className="text-right flex-shrink-0">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             {pos ? (
                               <span className="font-mono text-[10px] text-emerald-400">
                                 {pos.x}, {pos.y}
                               </span>
                             ) : (
                               <span className="text-[10px] text-slate-500 italic">Pendiente</span>
+                            )}
+                            {/* Botón eliminar punto individual */}
+                            {pos && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEliminarPunto(def.id);
+                                }}
+                                title={`Eliminar punto ${def.simbolo}`}
+                                className="w-5 h-5 rounded-full bg-red-900/40 hover:bg-red-600 text-red-400 hover:text-white flex items-center justify-center transition-all ml-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             )}
                           </div>
                         </div>
