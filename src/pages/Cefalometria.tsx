@@ -12,6 +12,7 @@ import {
 } from '@/api/cefalometria';
 import { usePacientes } from '@/api/pacientes';
 import { CefalometriaEditor } from '@/components/cefalometria/CefalometriaEditor';
+import { CasoDetalleView } from '@/components/cefalometria/CasoDetalleView';
 import { EstudioCefalometrico, TipoEstudioCefalometrico } from '@/types/cefalometria';
 import {
   Search,
@@ -56,7 +57,11 @@ export default function Cefalometria() {
   const guardarEstudioMutation = useGuardarEstudioCefalometria();
   const eliminarEstudioMutation = useEliminarEstudioCefalometria();
 
-  // Estudio actualmente abierto en el editor de digitalización (Segunda imagen de WebCeph)
+  // FLUJO DE TRES VISTAS:
+  // 1. Vista de Lista (pantalla 1 de WebCeph)
+  // 2. Vista Caso Detalle con sidebar de pestañas (pantalla 2 de WebCeph)  ← NUEVA
+  // 3. Editor de Digitalización Cefalométrica (pantalla 3 de WebCeph)
+  const [registroEnVista, setRegistroEnVista] = useState<EstudioCefalometrico | null>(null);
   const [estudioEnEdicion, setEstudioEnEdicion] = useState<EstudioCefalometrico | null>(null);
 
   // Selector de filtro de pacientes
@@ -86,10 +91,11 @@ export default function Cefalometria() {
   // Manejar cambio de paciente
   const handleSeleccionarPaciente = (id: string) => {
     setSearchParams({ paciente: id });
+    setRegistroEnVista(null);
     setEstudioEnEdicion(null);
   };
 
-  // Crear nuevo registro cefalométrico
+  // Crear nuevo registro cefalométrico → va directo al Caso Detalle
   const handleCrearNuevoRegistro = async (tipo: TipoEstudioCefalometrico = 'teleradiografia_lateral') => {
     if (!pacienteId) {
       toast.error('Seleccione un paciente primero');
@@ -114,14 +120,15 @@ export default function Cefalometria() {
 
     try {
       const guardado = await guardarEstudioMutation.mutateAsync(nuevo);
-      setEstudioEnEdicion(guardado);
-      toast.success('Nuevo registro cefalométrico creado. Abriendo digitalizador...');
+      // Al crear, ir a la vista Caso Detalle (segunda imagen)
+      setRegistroEnVista(guardado);
+      toast.success('Nuevo registro creado. Complete los datos clínicos del caso.');
     } catch {
       toast.error('Error al crear el registro cefalométrico.');
     }
   };
 
-  // Subir archivo radiográfico local
+  // Subir archivo radiográfico local → va directo al editor
   const handleSubirArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !pacienteId) return;
@@ -144,8 +151,9 @@ export default function Cefalometria() {
 
       try {
         const guardado = await guardarEstudioMutation.mutateAsync(nuevo);
+        // Subir radiografía va directo al editor
         setEstudioEnEdicion(guardado);
-        toast.success('Radiografía cargada con éxito.');
+        toast.success('Radiografía cargada. Abriendo digitalizador...');
       } catch {
         toast.error('Error al guardar el nuevo estudio.');
       }
@@ -153,28 +161,33 @@ export default function Cefalometria() {
     reader.readAsDataURL(file);
   };
 
-  // Guardar desde el editor
+  // Guardar desde el editor de digitalización
   const handleGuardarDesdeEditor = async (actualizado: EstudioCefalometrico) => {
     await guardarEstudioMutation.mutateAsync(actualizado);
     setEstudioEnEdicion(actualizado);
+    // También actualiza el estado de la vista caso (si estaba activa)
+    if (registroEnVista?.id === actualizado.id) {
+      setRegistroEnVista(actualizado);
+    }
   };
 
   // Eliminar estudio
-  const handleEliminarEstudio = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleEliminarEstudio = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!window.confirm('¿Está seguro de eliminar este registro cefalométrico?')) return;
     try {
       await eliminarEstudioMutation.mutateAsync({ id, pacienteId });
-      if (estudioEnEdicion?.id === id) {
-        setEstudioEnEdicion(null);
-      }
+      if (estudioEnEdicion?.id === id) setEstudioEnEdicion(null);
+      if (registroEnVista?.id === id) setRegistroEnVista(null);
       toast.success('Registro eliminado.');
     } catch {
       toast.error('Error al eliminar registro.');
     }
   };
 
-  // Si está activo el editor de digitalización (Segunda imagen), mostrarlo a pantalla completa
+  // ================================================================
+  // VISTA 3: Editor de Digitalización Cefalométrica (tercera imagen)
+  // ================================================================
   if (estudioEnEdicion) {
     return (
       <AppLayout>
@@ -187,13 +200,45 @@ export default function Cefalometria() {
           }
           pacienteDocumento={pacienteSeleccionado?.documento || ''}
           onGuardar={handleGuardarDesdeEditor}
-          onVolver={() => setEstudioEnEdicion(null)}
+          onVolver={() => {
+            setEstudioEnEdicion(null);
+            // Si venía de la vista caso, volver a ella
+            if (registroEnVista) {
+              // nada extra; registroEnVista sigue activo
+            }
+          }}
         />
       </AppLayout>
     );
   }
 
-  // VISTA PRINCIPAL (Primera imagen estilo WebCeph: barra de progreso, selector de paciente y grilla de registros)
+  // ================================================================
+  // VISTA 2: Caso Detalle con Sidebar de Pestañas (segunda imagen)
+  // ================================================================
+  if (registroEnVista) {
+    return (
+      <AppLayout>
+        <CasoDetalleView
+          estudio={registroEnVista}
+          pacienteNombre={
+            pacienteSeleccionado
+              ? `${pacienteSeleccionado.apellidos}, ${pacienteSeleccionado.nombres}`
+              : 'Paciente'
+          }
+          pacienteEdad={edadPaciente}
+          pacienteDocumento={pacienteSeleccionado?.documento || ''}
+          onVolver={() => setRegistroEnVista(null)}
+          onAbrirDigitalizacion={(est) => setEstudioEnEdicion(est)}
+          onGuardar={handleGuardarDesdeEditor}
+          onEliminar={() => handleEliminarEstudio(registroEnVista.id)}
+        />
+      </AppLayout>
+    );
+  }
+
+  // ================================================================
+  // VISTA 1: Lista de Registros y Casos (primera imagen de WebCeph)
+  // ================================================================
   return (
     <AppLayout>
       <div className="space-y-6 pb-12">
@@ -247,7 +292,7 @@ export default function Cefalometria() {
               disabled={!pacienteId}
               className="gap-2 bg-primary hover:bg-primary/90 text-white font-semibold text-xs h-9 shadow-sm"
             >
-              <Plus className="w-4 h-4" /> Añadir Registro
+              <Plus className="w-4 h-4" /> + Nuevo Registro
             </Button>
           </div>
         </div>
@@ -304,7 +349,7 @@ export default function Cefalometria() {
           </div>
         )}
 
-        {/* Sección: Lista de Registros Cefalométricos (Primera imagen de WebCeph) */}
+        {/* Sección: Lista de Registros Cefalométricos */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -341,7 +386,7 @@ export default function Cefalometria() {
                 onClick={() => handleCrearNuevoRegistro('teleradiografia_lateral')}
                 className="gap-1.5 text-xs h-8 bg-card"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Cargar Demo Radiografía
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Cargar Demo
               </Button>
             </div>
           </div>
@@ -374,15 +419,17 @@ export default function Cefalometria() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {estudios.map((est, index) => {
                 const numPuntos = Object.keys(est.puntos || {}).length;
                 return (
+                  /* Card del registro — al hacer clic va al Caso Detalle */
                   <div
                     key={est.id}
-                    className="bg-card border border-border rounded-2xl p-4 shadow-sm hover:border-primary/50 transition-all"
+                    onClick={() => setRegistroEnVista(est)}
+                    className="bg-card border border-border rounded-2xl p-4 shadow-sm hover:border-primary/60 hover:shadow-md cursor-pointer transition-all group"
                   >
-                    {/* Encabezado del registro con fecha */}
+                    {/* Encabezado del registro con fecha y progreso */}
                     <div className="flex items-center justify-between pb-3 border-b border-border/50 text-xs">
                       <div className="flex items-center gap-2">
                         <Badge className="bg-primary/10 text-primary border-primary/20 font-bold">
@@ -391,19 +438,52 @@ export default function Cefalometria() {
                         <span className="text-muted-foreground">• {est.titulo}</span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      {/* Barra de Progreso estilo WebCeph en línea */}
+                      <div className="flex items-center gap-2 mr-2">
+                        {/* Digitalización */}
+                        <div className="flex items-center gap-1">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[8px] font-bold ${numPuntos > 0 ? 'bg-primary border-primary text-white' : 'border-muted-foreground text-muted-foreground'}`}>
+                            D
+                          </div>
+                          <div className={`h-0.5 w-6 ${numPuntos > 0 ? 'bg-primary' : 'bg-border'}`} />
+                        </div>
+                        {/* Análisis */}
+                        <div className="flex items-center gap-1">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[8px] font-bold ${(est.mediciones?.length || 0) > 0 ? 'bg-primary border-primary text-white' : 'border-muted-foreground text-muted-foreground'}`}>
+                            A
+                          </div>
+                          <div className="h-0.5 w-6 bg-border" />
+                        </div>
+                        {/* Tratamiento */}
+                        <div className="flex items-center gap-1">
+                          <div className="w-5 h-5 rounded-full border-2 border-muted-foreground text-muted-foreground flex items-center justify-center text-[8px] font-bold">
+                            T
+                          </div>
+                          <div className="h-0.5 w-6 bg-border" />
+                        </div>
+                        {/* Terminado */}
+                        <div className="w-5 h-5 rounded-full border-2 border-muted-foreground text-muted-foreground flex items-center justify-center text-[8px] font-bold">
+                          ✓
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
-                          onClick={() => setEstudioEnEdicion(est)}
-                          className="gap-1.5 text-xs h-7.5 bg-primary hover:bg-primary/90 text-white font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRegistroEnVista(est);
+                          }}
+                          variant="outline"
+                          className="gap-1.5 text-xs h-7 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all font-medium"
                         >
-                          <ScanLine className="w-3.5 h-3.5" /> Digitalización / Trazar
+                          <ScanLine className="w-3.5 h-3.5" /> Abrir caso
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={(e) => handleEliminarEstudio(est.id, e)}
-                          className="h-7.5 w-7.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                           title="Eliminar registro"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -411,61 +491,45 @@ export default function Cefalometria() {
                       </div>
                     </div>
 
-                    {/* Grilla de miniaturas clínicas estilo WebCeph */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 pt-3">
+                    {/* Grilla de miniaturas clínicas (preview en la lista) */}
+                    <div className="grid grid-cols-8 gap-2 pt-3">
                       {/* Miniatura 1: Teleradiografía Lateral (Principal) */}
                       <div
-                        onClick={() => setEstudioEnEdicion(est)}
-                        className="group relative border rounded-xl overflow-hidden cursor-pointer hover:border-primary transition-all aspect-square bg-black flex flex-col items-center justify-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEstudioEnEdicion(est);
+                        }}
+                        className="relative border rounded-xl overflow-hidden cursor-pointer hover:border-primary transition-all aspect-square bg-black"
+                        title="Abrir digitalizador"
                       >
                         <img
                           src={est.imagen_url}
                           alt="Teleradiografía"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          className="w-full h-full object-cover opacity-90"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-white">
-                          <span className="text-[10px] font-bold truncate">Teleradiografía</span>
-                          <span className="text-[9px] text-emerald-400">
-                            {numPuntos > 0 ? `${numPuntos} puntos` : 'Sin trazar'}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5 text-white">
+                          <span className="text-[9px] font-bold truncate">Teleradiografía</span>
+                          <span className={`text-[8px] ${numPuntos > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                            {numPuntos > 0 ? `${numPuntos} pts` : 'Sin trazar'}
                           </span>
                         </div>
                       </div>
 
-                      {/* Miniaturas de referencia complementarias */}
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Frontal PA</span>
-                      </div>
-
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Panorámica</span>
-                      </div>
-
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Foto Reposo</span>
-                      </div>
-
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Foto Sonrisa</span>
-                      </div>
-
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Foto Perfil</span>
-                      </div>
-
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Oclusal Sup.</span>
-                      </div>
-
-                      <div className="border border-dashed rounded-xl flex flex-col items-center justify-center p-2 text-center text-muted-foreground hover:bg-accent/40 cursor-pointer transition-colors aspect-square">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        <span className="text-[10px] font-medium">Oclusal Inf.</span>
-                      </div>
+                      {/* Miniaturas vacías (slots de imágenes complementarias) */}
+                      {['Frontal PA', 'Panorámica', 'F. Reposo', 'F. Sonrisa', 'F. Perfil', 'Oclusal Sup.', 'Oclusal Inf.'].map((label) => (
+                        <div
+                          key={label}
+                          className="border border-dashed rounded-xl flex flex-col items-center justify-center p-1 text-center text-muted-foreground hover:bg-accent/30 transition-colors aspect-square cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRegistroEnVista(est);
+                          }}
+                          title={`Cargar ${label}`}
+                        >
+                          <ImageIcon className="w-4 h-4 mb-0.5 opacity-40" />
+                          <span className="text-[8px] font-medium leading-tight">{label}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
