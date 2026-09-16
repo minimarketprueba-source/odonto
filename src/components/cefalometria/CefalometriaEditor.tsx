@@ -30,6 +30,8 @@ import {
   FileCheck,
   ChevronRight,
   ChevronLeft,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -38,6 +40,7 @@ interface CefalometriaEditorProps {
   pacienteNombre?: string;
   pacienteDocumento?: string;
   onGuardar: (estudioActualizado: EstudioCefalometrico) => Promise<void> | void;
+  onEliminar?: () => void;
   onVolver?: () => void;
 }
 
@@ -46,8 +49,13 @@ export function CefalometriaEditor({
   pacienteNombre = 'Paciente',
   pacienteDocumento = '',
   onGuardar,
+  onEliminar,
   onVolver,
 }: CefalometriaEditorProps) {
+  // URL de imagen (local para poder reemplazarla sin recargar la página)
+  const [imagenUrl, setImagenUrl] = useState<string>(estudio.imagen_url);
+  const fileInputImagenRef = useRef<HTMLInputElement>(null);
+
   // Estado de los puntos anatómicos
   const [puntos, setPuntos] = useState<PuntosCefalometricosMap>(estudio.puntos || {});
   // Calibración
@@ -236,12 +244,40 @@ export function CefalometriaEditor({
     }
   };
 
+  // Cambiar imagen de radiografía desde disco
+  const handleCambiarImagen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      if (dataUrl) {
+        setImagenUrl(dataUrl);
+        setPuntos({});  // Resetear puntos al cambiar radiografía
+        setGuardadoStatus('cambios');
+        toast.success('Imagen cargada. Ajuste los puntos anatómicos y guarde.');
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Eliminar todos los puntos del trazado
+  const handleLimpiarTrazado = () => {
+    if (!window.confirm('¿Eliminar todos los puntos del trazado cefalométrico? Esta acción no se puede deshacer.')) return;
+    setPuntos({});
+    setCalibracion({ distanciaRealMm: 10 });
+    setGuardadoStatus('cambios');
+    toast.info('Trazado eliminado. Recuerde guardar.');
+  };
+
   // Guardar estudio
   const handleGuardar = async () => {
     setGuardadoStatus('guardando');
     try {
       const actualizado: EstudioCefalometrico = {
         ...estudio,
+        imagen_url: imagenUrl,
         puntos,
         calibracion,
         mediciones,
@@ -357,6 +393,15 @@ export function CefalometriaEditor({
 
   return (
     <div className="flex flex-col h-[calc(100vh-4.5rem)] bg-slate-950 text-slate-100 overflow-hidden select-none">
+      {/* Input oculto para reemplazar la imagen de radiografía */}
+      <input
+        ref={fileInputImagenRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleCambiarImagen}
+      />
+
       {/* Barra superior de herramientas estilo WebCeph */}
       <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-xs">
         <div className="flex items-center gap-3">
@@ -414,6 +459,50 @@ export function CefalometriaEditor({
           >
             <Printer className="w-3.5 h-3.5" /> Imprimir Informe
           </Button>
+
+          {/* Botones de cambio de imagen, limpieza y eliminación */}
+          <div className="h-4 w-px bg-slate-700" />
+
+          <label title="Cargar nueva radiografía (reemplaza la actual)">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleCambiarImagen}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 gap-1.5 cursor-pointer"
+              asChild
+            >
+              <span>
+                <Upload className="w-3.5 h-3.5" /> Cambiar imagen
+              </span>
+            </Button>
+          </label>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLimpiarTrazado}
+            className="text-amber-400 hover:text-amber-300 hover:bg-slate-800 h-8 gap-1.5"
+            title="Eliminar todos los puntos del trazado"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Limpiar trazado
+          </Button>
+
+          {onEliminar && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEliminar}
+              className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 gap-1.5"
+              title="Eliminar este registro cefalométrico permanentemente"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Eliminar registro
+            </Button>
+          )}
 
           <Button
             variant="ghost"
@@ -535,7 +624,7 @@ export function CefalometriaEditor({
             {/* Imagen Radiográfica con filtros CSS en tiempo real */}
             <img
               ref={imgRef}
-              src={estudio.imagen_url || '/placeholder-cefalometria.png'}
+              src={imagenUrl || '/placeholder-cefalometria.png'}
               alt="Teleradiografía lateral de cráneo"
               onLoad={handleImageLoad}
               style={{
