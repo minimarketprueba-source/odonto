@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EstudioCefalometrico } from '@/types/cefalometria'
@@ -17,7 +17,6 @@ import {
   MoreVertical,
   ScanLine,
   Smile,
-  Sparkles,
   Stethoscope,
   Timer,
   Trash2,
@@ -25,6 +24,8 @@ import {
   User,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { useUrlImagenCefalometria } from '@/api/cefalometria'
 
 type PestanaId =
   | 'digitalizacion'
@@ -155,9 +156,11 @@ interface CasoDetalleViewProps {
   pacienteNombre: string
   pacienteEdad?: string | null
   pacienteDocumento?: string
+  /** Número del registro contando desde el más antiguo. */
+  numeroRegistro: number
   onVolver: () => void
   onAbrirDigitalizacion: (estudio: EstudioCefalometrico) => void
-  onGuardar: (estudioActualizado: EstudioCefalometrico) => Promise<void> | void
+  onGuardar: (estudioActualizado: EstudioCefalometrico) => Promise<EstudioCefalometrico | void> | void
   onEliminar?: () => void
 }
 
@@ -178,22 +181,41 @@ function IconoMarcador({ tipo }: { tipo: TipoMarcador }) {
   return <ScanLine className={clase} />
 }
 
+/** Las imágenes guardadas están en un depósito privado: hay que pedir el enlace. */
+export function ImagenGuardada({ refImagen, alt, className }: { refImagen: string; alt: string; className?: string }) {
+  const { data: url, isError } = useUrlImagenCefalometria(refImagen)
+  if (isError) {
+    return <div className="flex h-full w-full items-center justify-center text-[10px] text-rose-500">Error al abrir</div>
+  }
+  if (!url) return <div className="h-full w-full animate-pulse bg-slate-200 dark:bg-slate-800" />
+  return <img src={url} alt={alt} className={className} />
+}
+
 export function CasoDetalleView({
   estudio,
   pacienteNombre,
   pacienteEdad,
   pacienteDocumento,
+  numeroRegistro,
   onVolver,
   onAbrirDigitalizacion,
+  onGuardar,
   onEliminar,
 }: CasoDetalleViewProps) {
   const [pestanaActiva, setPestanaActiva] = useState<PestanaId>('caso')
   const [menuAbierto, setMenuAbierto] = useState(false)
-  const [tipoRegistro, setTipoRegistro] = useState(estudio.tipo)
-  const [imagenesSlots, setImagenesSlots] = useState<Record<string, string>>({
-    tele_lat: estudio.imagen_url,
-  })
+  // Antes las fotos vivían solo en el estado de esta pantalla: al volver a la
+  // lista se perdían. Ahora salen del estudio guardado.
+  const imagenesSlots = useMemo<Record<string, string>>(
+    () => ({
+      ...(estudio.imagenes || {}),
+      ...(estudio.imagen_url ? { tele_lat: estudio.imagen_url } : {}),
+    }),
+    [estudio]
+  )
   const [slotParaSubir, setSlotParaSubir] = useState<string | null>(null)
+  const [slotSubiendo, setSlotSubiendo] = useState<string | null>(null)
+  const [slotEnVisor, setSlotEnVisor] = useState<SlotImagen | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const numPuntos = Object.keys(estudio.puntos || {}).length
@@ -209,24 +231,54 @@ export function CasoDetalleView({
   }
 
   const handleSlotClick = (slot: SlotImagen) => {
+    if (slotSubiendo) return
     if (slot.id === 'tele_lat' && imagenesSlots.tele_lat) {
       onAbrirDigitalizacion(estudio)
       return
     }
+    if (imagenesSlots[slot.id]) {
+      setSlotEnVisor(slot)
+      return
+    }
     abrirSelectorArchivo(slot.id)
+  }
+
+  const guardarImagenes = async (slotId: string, nuevas: Record<string, string>, teleradiografia?: string) => {
+    const complementarias = { ...nuevas }
+    delete complementarias.tele_lat
+    setSlotSubiendo(slotId)
+    try {
+      await onGuardar({
+        ...estudio,
+        imagen_url: teleradiografia ?? estudio.imagen_url,
+        imagenes: complementarias,
+      })
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la imagen.')
+      return false
+    } finally {
+      setSlotSubiendo(null)
+    }
   }
 
   const handleArchivoSeleccionado = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivo = e.target.files?.[0]
     if (!archivo || !slotParaSubir) return
 
+    const destino = slotParaSubir
     const reader = new FileReader()
-    reader.onload = (evento) => {
+    reader.onload = async (evento) => {
       const dataUrl = evento.target?.result as string
-      if (dataUrl) {
-        setImagenesSlots((previas) => ({ ...previas, [slotParaSubir]: dataUrl }))
-        const nombre = SLOTS_IMAGENES.find((slot) => slot.id === slotParaSubir)?.etiqueta
-        toast.success(`${nombre || 'Imagen'} cargada.`)
+      if (!dataUrl) return
+      const ok = await guardarImagenes(
+        destino,
+        { ...imagenesSlots, [destino]: dataUrl },
+        destino === 'tele_lat' ? dataUrl : undefined
+      )
+      if (ok) {
+        const nombre = SLOTS_IMAGENES.find((slot) => slot.id === destino)?.etiqueta
+        toast.success(`${nombre || 'Imagen'} guardada.`)
       }
     }
     reader.readAsDataURL(archivo)
@@ -234,17 +286,17 @@ export function CasoDetalleView({
     setSlotParaSubir(null)
   }
 
-  const eliminarImagen = (slotId: string, e: React.MouseEvent) => {
+  const eliminarImagen = async (slotId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (slotId === 'tele_lat') {
       toast.info('La teleradiografía principal se cambia desde el digitalizador.')
       return
     }
-    setImagenesSlots((previas) => {
-      const actualizadas = { ...previas }
-      delete actualizadas[slotId]
-      return actualizadas
-    })
+    const nombre = SLOTS_IMAGENES.find((slot) => slot.id === slotId)?.etiqueta || 'la imagen'
+    if (!window.confirm(`¿Quitar ${nombre} de este registro?`)) return
+    const actualizadas = { ...imagenesSlots }
+    delete actualizadas[slotId]
+    if (await guardarImagenes(slotId, actualizadas)) toast.success('Imagen quitada.')
   }
 
   const seleccionarPestana = (tab: PestanaConfig) => {
@@ -309,13 +361,40 @@ export function CasoDetalleView({
     }
 
     if (pestanaActiva === 'tejido_blando') {
+      const blandas = (estudio.mediciones || []).filter((m) => m.sigla.includes('-E'))
+      if (blandas.length) {
+        return (
+          <div className="mx-auto w-full max-w-3xl p-5 sm:p-8">
+            <h2 className="mb-1 text-lg font-semibold">Análisis de tejido blando</h2>
+            <p className="mb-5 text-sm text-muted-foreground">
+              Distancia de los labios a la línea estética de Ricketts (nariz–mentón). Negativo = por
+              detrás de la línea.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {blandas.map((m) => (
+                <div key={m.sigla} className="rounded-xl border bg-card p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{m.nombre}</span>
+                    <span className="font-mono text-lg font-bold text-primary">
+                      {m.valor} {m.unidad}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Norma {m.norma} · {m.interpretacion}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      }
       return (
         <div className="flex min-h-[34rem] flex-col items-center justify-center p-8 text-center">
           <Heart className="mb-3 h-11 w-11 text-pink-400" />
           <h2 className="text-lg font-semibold">Análisis de tejido blando</h2>
           <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-            Coloque los puntos Pn, Sn, UL, LL, Pog&apos; y Me&apos; en el digitalizador para activar
-            este análisis.
+            Coloque los puntos Pn (punta de la nariz), UL, LL y Pog&apos; en el digitalizador, y
+            calibre la escala con la regla, para activar este análisis.
           </p>
           <Button className="mt-5 gap-2" onClick={() => onAbrirDigitalizacion(estudio)}>
             <ScanLine className="h-4 w-4" /> Abrir digitalizador
@@ -344,7 +423,7 @@ export function CasoDetalleView({
             >
               {url ? (
                 <>
-                  <img src={url} alt={slot.etiqueta} className="h-full w-full object-cover" />
+                  <ImagenGuardada refImagen={url} alt={slot.etiqueta} className="h-full w-full object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/0 opacity-0 transition-all group-hover:bg-slate-950/45 group-hover:opacity-100">
                     <span className="rounded-full bg-white/95 p-2 text-slate-700 shadow">
                       <Eye className="h-4 w-4" />
@@ -374,6 +453,10 @@ export function CasoDetalleView({
                     </Badge>
                   )}
                 </>
+              ) : slotSubiendo === slot.id ? (
+                <div className="flex h-full w-full items-center justify-center text-xs font-medium text-primary">
+                  Subiendo…
+                </div>
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center">
                   <IconoMarcador tipo={slot.tipo} />
@@ -404,6 +487,19 @@ export function CasoDetalleView({
         onChange={handleArchivoSeleccionado}
       />
 
+      <Dialog open={!!slotEnVisor} onOpenChange={(abierto) => !abierto && setSlotEnVisor(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogTitle>{slotEnVisor?.etiqueta}</DialogTitle>
+          {slotEnVisor && imagenesSlots[slotEnVisor.id] && (
+            <ImagenGuardada
+              refImagen={imagenesSlots[slotEnVisor.id]}
+              alt={slotEnVisor.etiqueta}
+              className="max-h-[75vh] w-full rounded-md object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 bg-slate-600 px-3 py-2.5 text-white dark:bg-slate-800 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <Button
@@ -418,7 +514,7 @@ export function CasoDetalleView({
           </Button>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold sm:text-sm">
-              Registro 1 · {fechaVisible(estudio.fecha)}
+              Registro {numeroRegistro} · {fechaVisible(estudio.fecha)}
             </p>
             <p className="truncate text-[10px] text-white/70">
               {pacienteNombre}
@@ -426,17 +522,7 @@ export function CasoDetalleView({
               {pacienteDocumento ? ` · CI ${pacienteDocumento}` : ''}
             </p>
           </div>
-          <select
-            value={tipoRegistro}
-            onChange={(e) => setTipoRegistro(e.target.value as EstudioCefalometrico['tipo'])}
-            className="hidden h-8 rounded-full border-0 bg-white px-3 text-xs font-medium text-slate-700 outline-none ring-offset-2 focus:ring-2 focus:ring-white/70 sm:block"
-            aria-label="Tipo de registro"
-          >
-            <option value="teleradiografia_lateral">Registro cefalométrico</option>
-            <option value="radiografia_pa">Radiografía PA</option>
-            <option value="panoramica">Panorámica</option>
-            <option value="modelos">Registros fotográficos</option>
-          </select>
+
         </div>
 
         <div className="flex items-center gap-2">
@@ -448,8 +534,7 @@ export function CasoDetalleView({
             className="h-9 gap-2 bg-white text-xs text-slate-700 hover:bg-slate-100"
           >
             <Upload className="h-4 w-4 text-primary" />
-            <span className="hidden sm:inline">Carga inteligente</span>
-            <Sparkles className="h-3 w-3 text-rose-500" />
+            <span className="hidden sm:inline">Cargar imagen</span>
           </Button>
 
           <div className="relative">

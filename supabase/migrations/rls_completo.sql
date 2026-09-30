@@ -68,7 +68,8 @@ DECLARE
         'presupuestos',
         'presupuesto_detalles',
         'pagos_presupuesto',
-        'liquidaciones_odontologos'
+        'liquidaciones_odontologos',
+        'cefalometria_estudios'
     ];
 BEGIN
     FOREACH t IN ARRAY tablas LOOP
@@ -136,7 +137,7 @@ BEGIN
               'odontologia_precios', 'odontograma_registros', 'periodontogramas',
               'evoluciones_clinicas', 'paciente_anamnesis', 'paciente_imagenes',
               'consentimientos_paciente', 'presupuestos', 'presupuesto_detalles',
-              'pagos_presupuesto', 'liquidaciones_odontologos'
+              'pagos_presupuesto', 'liquidaciones_odontologos', 'cefalometria_estudios'
           )
     LOOP
         RAISE NOTICE 'Se quita la regla permisiva %.%', r.tabla, r.politica;

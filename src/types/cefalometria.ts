@@ -55,7 +55,10 @@ export interface EstudioCefalometrico {
   fecha: string;
   titulo: string;
   tipo: TipoEstudioCefalometrico;
+  /** Ruta en el depósito `cefalometria` (o data URL mientras no se guardó). */
   imagen_url: string;
+  /** Fotos y radiografías complementarias del caso, por casillero. */
+  imagenes?: Record<string, string>;
   puntos: PuntosCefalometricosMap;
   calibracion: CalibracionRegla;
   mediciones?: MedicionResultado[];

@@ -1021,3 +1021,92 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
 
   ejecutarImpresionIframe(tituloDoc, html, { tamano: "A5", margen: "8mm 9mm" });
 }
+
+// ============================================================================
+// Informe cefalométrico
+// ============================================================================
+// Reemplaza al `window.open` que tenía el editor: aquel salía sin el nombre ni
+// el logo del consultorio y lo bloqueaba el navegador si había bloqueo de
+// ventanas emergentes.
+
+export interface DatosInformeCefalometrico {
+  pacienteNombre: string;
+  pacienteDocumento?: string | null;
+  fecha: string;
+  /** Radiografía con el trazado ya dibujado encima, como data URL. */
+  imagenTrazado?: string | null;
+  calibrado: boolean;
+  puntosColocados: number;
+  mediciones: {
+    sigla: string;
+    nombre: string;
+    valor: number;
+    unidad: string;
+    norma: string;
+    desviacion?: number;
+    interpretacion?: string;
+  }[];
+}
+
+export function imprimirInformeCefalometrico(datos: DatosInformeCefalometrico) {
+  const tituloDoc = "INFORME CEFALOMÉTRICO";
+
+  const filas = datos.mediciones
+    .map((m) => {
+      const fuera = Math.abs(m.desviacion || 0) > 3;
+      return `
+        <tr>
+          <td style="border:1px solid #cbd5e1; padding:4px 6px; font-weight:bold;">${esc(m.sigla)}</td>
+          <td style="border:1px solid #cbd5e1; padding:4px 6px;">${esc(m.nombre)}</td>
+          <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:center; font-weight:bold; color:${fuera ? "#b91c1c" : "#15803d"};">${m.valor} ${esc(m.unidad)}${fuera ? " *" : ""}</td>
+          <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:center; color:#475569;">${esc(m.norma)}</td>
+          <td style="border:1px solid #cbd5e1; padding:4px 6px;">${esc(m.interpretacion || "—")}</td>
+        </tr>`;
+    })
+    .join("");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color:#0f172a;">
+      ${encabezadoDocumento(tituloDoc, { tamNombre: 16, margen: 12 })}
+
+      <div style="margin-bottom:10px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-size:11px;">
+        <p style="margin:2px 0;"><strong>Paciente:</strong> ${esc(datos.pacienteNombre)} &nbsp;·&nbsp; <strong>Documento:</strong> ${esc(datos.pacienteDocumento || "—")}</p>
+        <p style="margin:2px 0;"><strong>Fecha de la radiografía:</strong> ${esc(datos.fecha)} &nbsp;·&nbsp; <strong>Puntos marcados:</strong> ${datos.puntosColocados}
+          &nbsp;·&nbsp; <strong>Escala:</strong> ${datos.calibrado ? "calibrada con la regla" : "sin calibrar (no se informan milímetros)"}</p>
+      </div>
+
+      ${
+        datos.imagenTrazado
+          ? `<div style="text-align:center; margin-bottom:10px;">
+               <img src="${datos.imagenTrazado}" alt="" style="max-width:100%; max-height:120mm; border:1px solid #cbd5e1;">
+             </div>`
+          : ""
+      }
+
+      ${
+        filas
+          ? `<table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+               <thead>
+                 <tr style="background:#1e293b; color:#fff;">
+                   <th style="padding:4px 6px; text-align:left;">Medida</th>
+                   <th style="padding:4px 6px; text-align:left;">Descripción</th>
+                   <th style="padding:4px 6px;">Valor</th>
+                   <th style="padding:4px 6px;">Norma</th>
+                   <th style="padding:4px 6px; text-align:left;">Interpretación</th>
+                 </tr>
+               </thead>
+               <tbody>${filas}</tbody>
+             </table>
+             <p style="font-size:9px; color:#475569; margin:4px 0 0;">* Fuera de la norma por más de 3 unidades.</p>`
+          : `<p style="font-size:11px; color:#475569;">Todavía no hay puntos suficientes para calcular medidas.</p>`
+      }
+
+      <div style="margin-top:36px; text-align:center;">
+        <div style="width:220px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
+        <span style="font-size:10px;">Firma y Sello del Odontólogo</span>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}

@@ -68,6 +68,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `empresa.sql` | `ruc` y `logo_url` en `clinicas`, lectura pública, escritura solo admin | Aplicada 2026-08-06 |
 | `empresa_nombre_inicial.sql` | Corrige el nombre viejo que había quedado en la fila | Aplicada 2026-08-06 |
 | `medicos_vinculo_unico.sql` | Índice único: una cuenta, una sola ficha de odontólogo | Aplicada 2026-08-06 |
+| `cefalometria_setup.sql` | `cefalometria_estudios` + depósito PRIVADO `cefalometria` para radiografías y fotos | **Pendiente** (2026-09-30) |
 
 ---
 
@@ -185,6 +186,26 @@ pero la base no. Con dos fichas apuntando a la misma cuenta, `fetchMiMedico()`
 reventaba y el odontólogo quedaba sin recetas, sin firma y sin «Mi perfil».
 Se agregó un índice único y la consulta ya no usa `.maybeSingle()`.
 
+
+## Cefalometría (revisado el 2026-09-30)
+
+El módulo se publicó sin su tabla en la base y **fingía guardar** en el
+localStorage del navegador (trampa 4). Se quitó ese respaldo: si falta la
+tabla, la pantalla lo dice. Otras decisiones:
+
+- **Imágenes en el depósito privado `cefalometria`**, no como data URL en la
+  fila. En la tabla va la ruta; la pantalla pide un enlace firmado de una hora
+  (`useUrlImagenCefalometria`). Se achican a 2400 px antes de subir.
+- **Ningún punto se coloca solo.** Antes, al abrir una radiografía se ponían
+  los puntos de una plantilla genérica y aparecía un diagnóstico de algo que
+  nadie había trazado. La plantilla queda como botón opcional, con aviso.
+- **Sin calibrar no hay milímetros.** Venía un `pixelesPorMm` inventado.
+- **Ángulos con sentido** (`anguloEntreVectores`): el interincisivo, IMPA y
+  el eje facial pasan de 90°, y con el ángulo agudo salían siempre mal. Las
+  distancias a la línea E conservan el signo según hacia dónde mira el perfil.
+  Probado en `src/lib/__tests__/cefalometria-calculos.test.ts`.
+- `uploadImagenFile` de `src/api/odontologia.ts` (imágenes de la ficha) tiene
+  el MISMO respaldo falso: el depósito `radiografias` no existe. Sin tocar.
 
 ## Los logos
 

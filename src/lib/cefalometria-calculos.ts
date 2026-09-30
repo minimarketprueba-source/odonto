@@ -429,6 +429,43 @@ export function anguloEntreLineas(
 }
 
 /**
+ * Ángulo entre dos vectores CON SENTIDO (A→B y C→D), en grados [0..180].
+ *
+ * `anguloEntreLineas` devuelve siempre el ángulo agudo (0..90), que sirve para
+ * FMA o 1-NA pero NO para medidas que normalmente pasan de 90°: el
+ * interincisivo (norma 131°) salía siempre por debajo de 90 y el informe decía
+ * "biproinclinación" en todos los pacientes. Con el sentido de cada vector se
+ * obtiene el ángulo que se mide en el trazado de papel.
+ */
+export function anguloEntreVectores(
+  a: CoordenadaPunto,
+  b: CoordenadaPunto,
+  c: CoordenadaPunto,
+  d: CoordenadaPunto
+): number {
+  const v1 = { x: b.x - a.x, y: b.y - a.y };
+  const v2 = { x: d.x - c.x, y: d.y - c.y };
+  const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+  const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+  if (mag1 === 0 || mag2 === 0) return 0;
+  const cosTheta = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2)));
+  return (Math.acos(cosTheta) * 180) / Math.PI;
+}
+
+/**
+ * Hacia qué lado mira el paciente en la radiografía: +1 a la derecha, -1 a la
+ * izquierda. Nasion está siempre por delante de Sella. Hace falta para el signo
+ * de las distancias a la línea E: "delante" de la línea es un lado u otro
+ * según cómo se haya tomado la placa.
+ */
+export function sentidoPerfil(puntos: PuntosCefalometricosMap): 1 | -1 {
+  const S = puntos['S'];
+  const N = puntos['N'];
+  if (S && N && N.x < S.x) return -1;
+  return 1;
+}
+
+/**
  * Distancia perpendicular de un punto P a la recta definida por A y B
  * Signo: positivo si está por delante de la línea en sentido X, negativo si detrás.
  */
@@ -462,7 +499,8 @@ export function calcularAnalisisCefalometrico(
   calibracion: CalibracionRegla
 ): MedicionResultado[] {
   const resultados: MedicionResultado[] = [];
-  const pxPorMm = calibracion.pixelesPorMm || 1;
+  const pxPorMm = calibracion.pixelesPorMm;
+  const sentido = sentidoPerfil(puntos);
 
   const S = puntos['S'];
   const N = puntos['N'];
@@ -473,6 +511,7 @@ export function calcularAnalisisCefalometrico(
   const Go = puntos['Go'];
   const Me = puntos['Me'];
   const Pt = puntos['Pt'];
+  const Ba = puntos['Ba'];
   const Gn = puntos['Gn'];
   const U1A = puntos['U1A'];
   const U1I = puntos['U1I'];
@@ -567,9 +606,10 @@ export function calcularAnalisisCefalometrico(
     });
   }
 
-  // 5. Eje Facial (Pt-Gn respecto a Ba-N o Frankfurt)
-  if (Pt && Gn && Po && Or) {
-    const ejeFacial = anguloEntreLineas(Pt, Gn, Po, Or);
+  // 5. Eje Facial de Ricketts: Pt-Gn respecto a Ba-N. Es el ángulo posterior
+  // inferior (entre Pt→Gn y N→Ba): crece cuando el mentón va hacia adelante.
+  if (Pt && Gn && Ba && N) {
+    const ejeFacial = anguloEntreVectores(Pt, Gn, N, Ba);
     resultados.push({
       nombre: 'Eje Facial (Dirección de Crecimiento - Ricketts)',
       sigla: 'Eje Facial',
@@ -590,7 +630,10 @@ export function calcularAnalisisCefalometrico(
 
   // 6. IMPA (Incisivo Inferior a Plano Mandibular)
   if (L1A && L1I && Go && Me) {
-    const impa = anguloEntreLineas(L1A, L1I, Go, Me);
+    // Eje del incisivo (ápice → borde) contra el plano mandibular hacia atrás
+    // (Me → Go): es el ángulo posterior, que pasa de 90° cuando el incisivo
+    // está proinclinado.
+    const impa = anguloEntreVectores(L1A, L1I, Me, Go);
     const norma = 90;
     const desv = Number((impa - norma).toFixed(1));
     resultados.push({
@@ -609,7 +652,8 @@ export function calcularAnalisisCefalometrico(
 
   // 7. Ángulo Interincisivo (U1 a L1)
   if (U1A && U1I && L1A && L1I) {
-    const interinc = anguloEntreLineas(U1A, U1I, L1A, L1I);
+    // Ángulo entre los dos ejes, cada uno de ápice a borde incisal.
+    const interinc = anguloEntreVectores(U1A, U1I, L1A, L1I);
     const norma = 131;
     const desv = Number((interinc - norma).toFixed(1));
     resultados.push({
@@ -659,13 +703,15 @@ export function calcularAnalisisCefalometrico(
   }
 
   // 10. Labio Superior a Línea E de Ricketts
-  if (Pn && Pog_b && UL && calibracion.pixelesPorMm) {
-    const distUL = distanciaPuntoALinea(UL, Pn, Pog_b, pxPorMm);
+  // Positivo = labio por delante de la línea E; negativo = por detrás.
+  if (Pn && Pog_b && UL && pxPorMm) {
+    const distUL = sentido * distanciaPuntoALinea(UL, Pn, Pog_b, pxPorMm);
     resultados.push({
       nombre: 'Labio Superior a Línea E (Ricketts)',
       sigla: 'UL-E (mm)',
       tipo: 'distancia',
-      valor: Number(Math.abs(distUL).toFixed(1)),
+      valor: Number(distUL.toFixed(1)),
+      desviacion: Number((distUL + 4).toFixed(1)),
       unidad: 'mm',
       norma: '-4 mm (± 2 mm)',
       interpretacion: distUL > -2 ? 'Labio superior protrusivo' : distUL < -6 ? 'Labio superior retrusivo' : 'Perfil armónico',
@@ -674,13 +720,14 @@ export function calcularAnalisisCefalometrico(
   }
 
   // 11. Labio Inferior a Línea E de Ricketts
-  if (Pn && Pog_b && LL && calibracion.pixelesPorMm) {
-    const distLL = distanciaPuntoALinea(LL, Pn, Pog_b, pxPorMm);
+  if (Pn && Pog_b && LL && pxPorMm) {
+    const distLL = sentido * distanciaPuntoALinea(LL, Pn, Pog_b, pxPorMm);
     resultados.push({
       nombre: 'Labio Inferior a Línea E (Ricketts)',
       sigla: 'LL-E (mm)',
       tipo: 'distancia',
-      valor: Number(Math.abs(distLL).toFixed(1)),
+      valor: Number(distLL.toFixed(1)),
+      desviacion: Number((distLL + 2).toFixed(1)),
       unidad: 'mm',
       norma: '-2 mm (± 2 mm)',
       interpretacion: distLL > 0 ? 'Labio inferior protrusivo' : distLL < -4 ? 'Labio inferior retrusivo' : 'Perfil armónico',

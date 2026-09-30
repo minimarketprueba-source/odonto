@@ -34,12 +34,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { esRutaDeposito, useUrlImagenCefalometria } from '@/api/cefalometria';
+import { imprimirInformeCefalometrico } from '@/lib/imprimir';
 
 interface CefalometriaEditorProps {
   estudio: EstudioCefalometrico;
   pacienteNombre?: string;
   pacienteDocumento?: string;
-  onGuardar: (estudioActualizado: EstudioCefalometrico) => Promise<void> | void;
+  onGuardar: (estudioActualizado: EstudioCefalometrico) => Promise<EstudioCefalometrico | void> | void;
   onEliminar?: () => void;
   onVolver?: () => void;
 }
@@ -55,6 +57,12 @@ export function CefalometriaEditor({
   // URL de imagen (local para poder reemplazarla sin recargar la página)
   const [imagenUrl, setImagenUrl] = useState<string>(estudio.imagen_url);
   const fileInputImagenRef = useRef<HTMLInputElement>(null);
+  // Guardada: es una ruta del depósito privado y hay que pedir un enlace.
+  // Recién elegida del disco: es un data URL y se muestra tal cual.
+  const { data: urlFirmada, isError: errorImagen } = useUrlImagenCefalometria(
+    esRutaDeposito(imagenUrl) ? imagenUrl : null
+  );
+  const srcImagen = esRutaDeposito(imagenUrl) ? urlFirmada : imagenUrl;
 
   // Estado de los puntos anatómicos
   const [puntos, setPuntos] = useState<PuntosCefalometricosMap>(estudio.puntos || {});
@@ -117,21 +125,10 @@ export function CefalometriaEditor({
     const naturalW = e.currentTarget.naturalWidth || 800;
     const naturalH = e.currentTarget.naturalHeight || 800;
     setImgDimensions({ width: naturalW, height: naturalH });
-
-    // Si aún no hay puntos, autogenerar los puntos sugeridos normalizados
-    if (Object.keys(puntos).length === 0) {
-      const sugeridos: PuntosCefalometricosMap = {};
-      PUNTOS_CEFALOMETRICOS.forEach((p) => {
-        if (p.sugerido) {
-          sugeridos[p.id] = {
-            x: Math.round(p.sugerido.x * naturalW),
-            y: Math.round(p.sugerido.y * naturalH),
-          };
-        }
-      });
-      setPuntos(sugeridos);
-      setGuardadoStatus('cambios');
-    }
+    // Antes, si no había puntos, se colocaban solos en posiciones de una
+    // plantilla genérica, y con eso ya aparecía un diagnóstico (Clase II,
+    // hiperdivergente…) sin que nadie hubiera marcado nada en ESTA radiografía.
+    // Ahora cada punto lo coloca el profesional; la plantilla es opcional.
   };
 
   // Convertir coordenadas de pantalla (clientX, clientY) a coordenadas reales de la imagen
@@ -160,7 +157,7 @@ export function CefalometriaEditor({
 
   // Manejo de clic sobre el lienzo (colocar punto o calibración)
   const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isPanning) return;
+    if (isPanning || !srcImagen) return;
 
     const coords = getCoordenadaImagen(e.clientX, e.clientY);
     if (!coords) return;
@@ -266,6 +263,8 @@ export function CefalometriaEditor({
       if (dataUrl) {
         setImagenUrl(dataUrl);
         setPuntos({});  // Resetear puntos al cambiar radiografía
+        // La escala también: la regla de la radiografía vieja no mide la nueva.
+        setCalibracion((prev) => ({ distanciaRealMm: prev.distanciaRealMm || 10 }));
         setGuardadoStatus('cambios');
         toast.success('Imagen cargada. Ajuste los puntos anatómicos y guarde.');
       }
@@ -296,18 +295,26 @@ export function CefalometriaEditor({
         progreso: 'digitalizacion',
         updated_at: new Date().toISOString(),
       };
-      await onGuardar(actualizado);
+      const guardado = await onGuardar(actualizado);
+      // La imagen recién elegida ya se subió: de acá en más se usa su ruta.
+      if (guardado) setImagenUrl(guardado.imagen_url);
       setGuardadoStatus('guardado');
       toast.success('Trazado cefalométrico guardado con éxito.');
-    } catch {
+    } catch (error) {
       setGuardadoStatus('cambios');
-      toast.error('Error al guardar el trazado.');
+      toast.error(error instanceof Error ? error.message : 'Error al guardar el trazado.');
     }
   };
 
   // Restablecer puntos a valores sugeridos
   const handleRestablecerPuntos = () => {
-    if (!window.confirm('¿Desea restablecer todos los puntos anatómicos a las posiciones estimadas?')) return;
+    if (
+      !window.confirm(
+        'Se colocarán los puntos en posiciones promedio de una plantilla, NO de esta radiografía. ' +
+          'Sirven de guía: hay que arrastrar cada uno a su lugar antes de usar las medidas. ¿Continuar?'
+      )
+    )
+      return;
     const sugeridos: PuntosCefalometricosMap = {};
     PUNTOS_CEFALOMETRICOS.forEach((p) => {
       if (p.sugerido) {
@@ -319,82 +326,81 @@ export function CefalometriaEditor({
     });
     setPuntos(sugeridos);
     setGuardadoStatus('cambios');
-    toast.info('Puntos restablecidos a posiciones sugeridas.');
+    toast.info('Plantilla colocada. Ajuste cada punto sobre la radiografía.');
   };
 
-  // Imprimir reporte A4 de Cefalometría
-  const handleImprimir = () => {
-    const ventana = window.open('', '_blank');
-    if (!ventana) {
-      toast.error('Habilite las ventanas emergentes para imprimir.');
-      return;
+  // Radiografía con el trazado dibujado encima, para el informe impreso.
+  const componerImagenTrazado = async (): Promise<string | null> => {
+    if (!srcImagen) return null;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = srcImagen;
+    await img.decode();
+    const ancho = img.naturalWidth;
+    const alto = img.naturalHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = ancho;
+    canvas.height = alto;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    // Grosor proporcional al tamaño de la imagen, así se ve igual en papel.
+    const k = Math.max(1, ancho / 800);
+    SEGMENTOS_CEFALOMETRICOS.forEach((seg) => {
+      const p1 = puntos[seg.de];
+      const p2 = puntos[seg.a];
+      if (!p1 || !p2) return;
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = (seg.grosor || 1.5) * k;
+      ctx.setLineDash(seg.dash ? [4 * k, 4 * k] : []);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.font = `bold ${Math.round(10 * k)}px Arial`;
+    PUNTOS_CEFALOMETRICOS.forEach((def) => {
+      const p = puntos[def.id];
+      if (!p) return;
+      ctx.fillStyle = def.color || '#3b82f6';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5 * k;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(def.simbolo, p.x + 6 * k, p.y - 4 * k);
+    });
+    return canvas.toDataURL('image/jpeg', 0.85);
+  };
+
+  const handleImprimir = async () => {
+    let imagenTrazado: string | null = null;
+    try {
+      imagenTrazado = await componerImagenTrazado();
+    } catch {
+      toast.warning('No se pudo incluir la radiografía en el informe; se imprime solo la tabla.');
     }
+    imprimirInformeCefalometrico({
+      pacienteNombre,
+      pacienteDocumento,
+      fecha: estudio.fecha,
+      imagenTrazado,
+      calibrado: Boolean(calibracion.pixelesPorMm),
+      puntosColocados: Object.keys(puntos).length,
+      mediciones,
+    });
+  };
 
-    const fechaHoy = new Date().toLocaleDateString('es-PY');
-    const filasMediciones = mediciones
-      .map(
-        (m) => `
-        <tr style="border-bottom: 1px solid #e2e8f0;">
-          <td style="padding: 6px 8px; font-weight: bold;">${m.sigla}</td>
-          <td style="padding: 6px 8px;">${m.nombre}</td>
-          <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: ${
-            Math.abs(m.desviacion || 0) > 3 ? '#b91c1c' : '#15803d'
-          };">${m.valor} ${m.unidad}</td>
-          <td style="padding: 6px 8px; text-align: center; color: #64748b;">${m.norma}</td>
-          <td style="padding: 6px 8px; font-size: 11px;">${m.interpretacion || '—'}</td>
-        </tr>
-      `
-      )
-      .join('');
-
-    ventana.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Informe Cefalométrico - ${pacienteNombre}</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #1e293b; }
-            h1 { color: #0f172a; margin-bottom: 4px; }
-            .header { border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-bottom: 16px; }
-            .meta { display: flex; justify-content: space-between; font-size: 13px; color: #475569; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
-            th { background: #f8fafc; padding: 8px; text-align: left; border-bottom: 2px solid #cbd5e1; }
-            .footer { margin-top: 40px; text-align: right; font-size: 12px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>INFORME CEFALOMÉTRICO COMPUTARIZADO</h1>
-            <div class="meta">
-              <div><strong>Paciente:</strong> ${pacienteNombre} | <strong>C.I.:</strong> ${pacienteDocumento || 'Sin doc'}</div>
-              <div><strong>Fecha de Estudio:</strong> ${estudio.fecha || fechaHoy} | <strong>Impreso:</strong> ${fechaHoy}</div>
-            </div>
-          </div>
-          <h3>Valores Diagnósticos Cefalométricos (Steiner / Ricketts / Tweed)</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Sigla</th>
-                <th>Parámetro Clínico</th>
-                <th style="text-align: center;">Medición</th>
-                <th style="text-align: center;">Norma</th>
-                <th>Diagnóstico Clínico</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filasMediciones}
-            </tbody>
-          </table>
-          <div class="footer">
-            <p>Firma del Odontólogo / Especialista en Ortodoncia: ___________________________</p>
-          </div>
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `);
-    ventana.document.close();
+  const handleVolver = () => {
+    if (
+      guardadoStatus === 'cambios' &&
+      !window.confirm('Hay cambios en el trazado que no se guardaron. ¿Salir igual y perderlos?')
+    )
+      return;
+    onVolver?.();
   };
 
   // Puntos filtrados según la selección
@@ -421,7 +427,7 @@ export function CefalometriaEditor({
             <Button
               variant="ghost"
               size="sm"
-              onClick={onVolver}
+              onClick={handleVolver}
               className="text-slate-300 hover:text-white hover:bg-slate-800 h-8 gap-1.5"
             >
               <ChevronLeft className="w-4 h-4" /> Volver a Registros
@@ -475,24 +481,15 @@ export function CefalometriaEditor({
           {/* Botones de cambio de imagen, limpieza y eliminación */}
           <div className="h-4 w-px bg-slate-700" />
 
-          <label title="Cargar nueva radiografía (reemplaza la actual)">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleCambiarImagen}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 gap-1.5 cursor-pointer"
-              asChild
-            >
-              <span>
-                <Upload className="w-3.5 h-3.5" /> Cambiar imagen
-              </span>
-            </Button>
-          </label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fileInputImagenRef.current?.click()}
+            className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 gap-1.5"
+            title="Cargar nueva radiografía (reemplaza la actual)"
+          >
+            <Upload className="w-3.5 h-3.5" /> Cambiar imagen
+          </Button>
 
           <Button
             variant="ghost"
@@ -531,6 +528,9 @@ export function CefalometriaEditor({
       {/* Área central dividida: Lienzo (izq) y Panel de Herramientas (der) */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* LIENZO DE TRABAJO (VISOR DE RADIOGRAFÍA) */}
+        {/* Lienzo de dibujo: se maneja con el mouse por definición (colocar y
+            arrastrar puntos); no tiene equivalente de teclado. */}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
         <div
           ref={containerRef}
           onMouseDown={handlePanStart}
@@ -634,9 +634,19 @@ export function CefalometriaEditor({
             className="relative inline-block"
           >
             {/* Imagen Radiográfica con filtros CSS en tiempo real */}
+            {!srcImagen && (
+              <div className="w-[600px] max-w-full h-[400px] flex items-center justify-center text-slate-400 text-sm">
+                {errorImagen
+                  ? 'No se pudo abrir la radiografía. Revise la conexión.'
+                  : imagenUrl
+                  ? 'Cargando radiografía…'
+                  : 'Este registro todavía no tiene radiografía: use «Cambiar imagen» para cargarla.'}
+              </div>
+            )}
             <img
               ref={imgRef}
-              src={imagenUrl || '/placeholder-cefalometria.png'}
+              src={srcImagen || undefined}
+              crossOrigin="anonymous"
               alt="Teleradiografía lateral de cráneo"
               onLoad={handleImageLoad}
               style={{
@@ -645,7 +655,7 @@ export function CefalometriaEditor({
                 }`,
                 maxWidth: '850px',
                 height: 'auto',
-                display: 'block',
+                display: srcImagen ? 'block' : 'none',
                 userSelect: 'none',
                 pointerEvents: 'none',
               }}
@@ -832,7 +842,7 @@ export function CefalometriaEditor({
                       onClick={handleRestablecerPuntos}
                       className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1.5 h-9"
                     >
-                      <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Restablecer
+                      <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Plantilla guía
                     </Button>
                   </div>
 
@@ -1014,8 +1024,13 @@ export function CefalometriaEditor({
                       return (
                         <div
                           key={def.id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => {
                             setPuntoActivoId(def.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') setPuntoActivoId(def.id);
                           }}
                           className={`p-2 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${
                             esActivo
