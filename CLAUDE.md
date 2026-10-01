@@ -120,7 +120,7 @@ Arrancó con "no puedo iniciar sesión" y terminó con el sistema funcionando de
 **Acceso y despliegue**
 - La app apuntaba a la base de Sanidad, donde no existe ninguna tabla dental. Se la conectó a la propia.
 - Faltaban `profiles` y `user_roles`: sin ellas se entraba y aparecía "Sin acceso".
-- Vercel desplegaba desde otro repositorio y bloqueaba los commits porque el correo del autor (`dev@odonto.com`) no correspondía a ninguna cuenta de GitHub. Git local firma ahora con el `noreply` de `Hmoreno2023`.
+- Vercel desplegaba desde otro repositorio y bloqueaba los commits porque el correo del autor (`dev@odonto.com`) no correspondía a ninguna cuenta de GitHub. **Corrección 2026-09-30**: el plan Hobby de Vercel SOLO publica commits cuyo autor es la cuenta de GitHub vinculada a Vercel, que es `minimarketprueba-source` (Account Settings → Authentication). Firmando como `Hmoreno2023` quedaron bloqueadas todas las publicaciones del 15 al 30 de septiembre sin que nadie lo notara. Git local firma ahora con `312532996+minimarketprueba-source@users.noreply.github.com`. Después de cada push, confirmar con `gh api repos/Hmoreno2023/odonto/commits/<sha>/status` que diga `success`.
 
 **Odontograma** (`src/components/odontograma/`)
 - Barra de herramientas con estado activo: se elige una vez y se marca con un clic, como con el lápiz rojo en el papel.
