@@ -84,7 +84,7 @@ export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <FileText className="w-5 h-5 text-primary" /> Historial de Evolución
+          <FileText className="w-5 h-5 text-primary" /> Historial y evolución del paciente
         </h3>
         {!isAdding && (
           <Button onClick={() => setIsAdding(true)} size="sm" className="gap-2">
@@ -126,7 +126,9 @@ export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {
 
       <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8 mt-6 pb-6">
         {entradas.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic">No hay notas clínicas registradas.</p>
+          <p className="text-sm text-muted-foreground italic">
+            No hay procedimientos realizados ni evoluciones clínicas registradas.
+          </p>
         ) : (
           entradas.map((ev) => (
             <div key={ev.id} className="relative">

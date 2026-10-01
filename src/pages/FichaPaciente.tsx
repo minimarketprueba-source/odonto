@@ -749,7 +749,7 @@ export default function FichaPaciente() {
               value="evolucion"
               className="gap-1.5 rounded-lg py-2.5 text-xs font-semibold"
             >
-              <ListTodo className="h-4 w-4" /> Evolución
+              <ListTodo className="h-4 w-4" /> Historial
             </TabsTrigger>
             <TabsTrigger
               value="periodontograma"
@@ -794,7 +794,7 @@ export default function FichaPaciente() {
             <Odontograma pacienteId={pacienteId} />
           </TabsContent>
 
-          {/* Evolución Clínica */}
+          {/* Historial y evolución clínica */}
           <TabsContent value="evolucion" className="pt-3">
             <Card className="shadow-sm">
               <CardContent className="pt-6">
