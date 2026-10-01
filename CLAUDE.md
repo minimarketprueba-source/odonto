@@ -68,7 +68,8 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `empresa.sql` | `ruc` y `logo_url` en `clinicas`, lectura pública, escritura solo admin | Aplicada 2026-08-06 |
 | `empresa_nombre_inicial.sql` | Corrige el nombre viejo que había quedado en la fila | Aplicada 2026-08-06 |
 | `medicos_vinculo_unico.sql` | Índice único: una cuenta, una sola ficha de odontólogo | Aplicada 2026-08-06 |
-| `cefalometria_setup.sql` | `cefalometria_estudios` + depósito PRIVADO `cefalometria` para radiografías y fotos | **Pendiente** (2026-09-30) |
+| `cefalometria_setup.sql` | `cefalometria_estudios` + depósito PRIVADO `cefalometria` para radiografías y fotos | Aplicada 2026-09-30 |
+| `historial_procedimientos_y_archivos.sql` | `fecha_realizado` en tratamientos + depósito PRIVADO `radiografias` (imágenes y PDF de la ficha) | Aplicada 2026-09-30 |
 
 ---
 
@@ -204,8 +205,9 @@ tabla, la pantalla lo dice. Otras decisiones:
   el eje facial pasan de 90°, y con el ángulo agudo salían siempre mal. Las
   distancias a la línea E conservan el signo según hacia dónde mira el perfil.
   Probado en `src/lib/__tests__/cefalometria-calculos.test.ts`.
-- `uploadImagenFile` de `src/api/odontologia.ts` (imágenes de la ficha) tiene
-  el MISMO respaldo falso: el depósito `radiografias` no existe. Sin tocar.
+- **Fechas sin hora** (`2026-09-30`): mostrarlas con `formatDateDisplay` de
+  `src/lib/utils.ts`. `new Date("2026-09-30")` es medianoche UTC y en Paraguay
+  se ve como el día ANTERIOR: pagos e imágenes salían con un día menos.
 
 ## Los logos
 

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useEvoluciones, useCreateEvolucion } from "@/api/evoluciones";
+import { useProcedimientosRealizadosPaciente } from "@/api/odontologia";
 import { useAuth } from "@/context/auth-context";
 import { useMiMedico } from "@/api/citas";
 import { Loader2, Plus, FileText, User } from "lucide-react";
@@ -17,7 +18,34 @@ export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {
   const { user } = useAuth();
   const { data: miMedico } = useMiMedico(user?.id);
   const { data: evoluciones = [], isLoading } = useEvoluciones(pacienteId);
+  const { data: procedimientosRealizados = [], isLoading: cargandoProcedimientos } =
+    useProcedimientosRealizadosPaciente(pacienteId);
   const createEvolucion = useCreateEvolucion();
+
+  // El historial reúne tanto las notas de atención como los procedimientos de
+  // los planes que fueron marcados como realizados, siempre ordenados por la
+  // fecha real de atención y no por la fecha en que se cotizaron.
+  const entradas = [
+    ...evoluciones.map((evolucion) => ({ ...evolucion, tipoEntrada: "evolucion" as const })),
+    ...procedimientosRealizados.map((procedimiento) => ({
+      id: `procedimiento-${procedimiento.id}`,
+      paciente_id: pacienteId,
+      medico_id: null,
+      cita_id: null,
+      pieza: procedimiento.pieza ? String(procedimiento.pieza) : null,
+      procedimiento: procedimiento.nombre,
+      nota_clinica: procedimiento.plan
+        ? `Realizado dentro del plan: ${procedimiento.plan}.`
+        : "Procedimiento realizado.",
+      fecha_registro: `${procedimiento.fecha}T12:00:00`,
+      registrado_por: null,
+      medico: undefined,
+      tipoEntrada: "procedimiento" as const,
+    })),
+  ].sort(
+    (primero, segundo) =>
+      new Date(segundo.fecha_registro).getTime() - new Date(primero.fecha_registro).getTime()
+  );
 
   const [isAdding, setIsAdding] = useState(false);
   const [pieza, setPieza] = useState("");
@@ -48,7 +76,7 @@ export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || cargandoProcedimientos) {
     return <div className="p-8 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" /></div>;
   }
 
@@ -97,10 +125,10 @@ export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {
       )}
 
       <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8 mt-6 pb-6">
-        {evoluciones.length === 0 ? (
+        {entradas.length === 0 ? (
           <p className="text-sm text-muted-foreground italic">No hay notas clínicas registradas.</p>
         ) : (
-          evoluciones.map((ev) => (
+          entradas.map((ev) => (
             <div key={ev.id} className="relative">
               <div className="absolute -left-[35px] bg-primary rounded-full p-1 border-4 border-background">
                 <FileText className="w-3 h-3 text-white" />
@@ -109,9 +137,13 @@ export function EvolucionClinica({ pacienteId }: EvolucionClinicaProps) {
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-semibold text-sm">
+                      {/* Del procedimiento realizado solo se guarda el día: mostrar
+                          una hora sería inventarla. */}
                       {new Date(ev.fecha_registro).toLocaleDateString("es-ES", {
-                        year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
+                        year: "numeric", month: "long", day: "numeric",
+                        ...(ev.tipoEntrada === "procedimiento" ? {} : { hour: "2-digit", minute: "2-digit" }),
                       })}
+                      {ev.tipoEntrada === "procedimiento" && " · tratamiento realizado"}
                     </span>
                     {(ev.pieza || ev.procedimiento) && (
                       <div className="flex gap-1.5">

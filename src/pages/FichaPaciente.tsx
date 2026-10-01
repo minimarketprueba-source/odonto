@@ -27,6 +27,7 @@ import {
   useDeletePresupuesto,
   usePresupuestoDetalles,
   useAddPresupuestoDetalle,
+  useUpdatePresupuestoDetalle,
   useDeletePresupuestoDetalle,
   usePagosPresupuesto,
   usePagosPaciente,
@@ -37,6 +38,7 @@ import {
   useConsentimientos,
   useCreateConsentimiento,
   useOdontoPrecios,
+  useProcedimientosRealizadosPaciente,
   uploadImagenFile,
 } from '@/api/odontologia'
 import { Combobox } from '@/components/ui/combobox'
@@ -68,6 +70,7 @@ import {
   Loader2,
   UserCheck,
   ScanLine,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   imprimirPresupuesto,
@@ -75,6 +78,7 @@ import {
   imprimirComprobantePagos,
 } from '@/lib/imprimir'
 import { mensajeEstadoCuenta, enlaceWhatsApp, telefonoParaWhatsApp } from '@/lib/estado-cuenta'
+import { formatDateDisplay } from '@/lib/utils'
 import { useEvoluciones } from '@/api/evoluciones'
 import { toast } from 'sonner'
 import Swal from 'sweetalert2'
@@ -97,6 +101,7 @@ export default function FichaPaciente() {
   // Para la planilla del historial hacen falta los tratamientos y todos los
   // pagos del paciente, no solo los del plan que esté abierto.
   const { data: evoluciones = [] } = useEvoluciones(pacienteId)
+  const { data: procedimientosRealizados = [] } = useProcedimientosRealizadosPaciente(pacienteId)
   const { data: pagosPaciente = [] } = usePagosPaciente(pacienteId)
   const createPresupuesto = useCreatePresupuesto()
   const updatePresupuesto = useUpdatePresupuesto()
@@ -146,6 +151,7 @@ export default function FichaPaciente() {
   }, [presupuestos])
 
   const addDetalle = useAddPresupuestoDetalle()
+  const updateDetalle = useUpdatePresupuestoDetalle()
   const removeDetalle = useDeletePresupuestoDetalle()
   const addPago = useAddPagoPresupuesto()
   const deletePago = useDeletePagoPresupuesto()
@@ -387,16 +393,29 @@ export default function FichaPaciente() {
       pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
       pacienteDocumento: paciente.documento,
       pacienteTelefono: paciente.telefono,
-      tratamientos: evoluciones.map((e) => ({
-        fecha: new Date(e.fecha_registro).toLocaleDateString('es-PY'),
+      tratamientos: [
+        ...evoluciones.map((e) => ({
+          fecha: new Date(e.fecha_registro).toLocaleDateString('es-PY'),
+          fechaOrden: e.fecha_registro,
         pieza: e.pieza,
         procedimiento: e.procedimiento || '—',
         nota: e.nota_clinica,
         profesional: e.medico ? `${e.medico.apellidos}, ${e.medico.nombres}` : null,
-      })),
+        })),
+        ...procedimientosRealizados.map((p) => ({
+          fecha: new Date(`${p.fecha}T12:00:00`).toLocaleDateString('es-PY'),
+          fechaOrden: p.fecha,
+          pieza: p.pieza ? String(p.pieza) : null,
+          procedimiento: p.nombre,
+          nota: p.plan ? `Realizado dentro del plan: ${p.plan}.` : 'Procedimiento realizado.',
+          profesional: null,
+        })),
+      ]
+        .sort((a, b) => new Date(a.fechaOrden).getTime() - new Date(b.fechaOrden).getTime())
+        .map(({ fechaOrden: _fechaOrden, ...tratamiento }) => tratamiento),
       planes,
       pagos: pagosPaciente.map((p) => ({
-        fecha: new Date(p.fecha).toLocaleDateString('es-PY'),
+        fecha: formatDateDisplay(p.fecha, 'es-PY'),
         monto: Number(p.monto) || 0,
         metodo: p.tipo_pago ?? '—',
         plan: (p as any).plan ?? null,
@@ -416,7 +435,7 @@ export default function FichaPaciente() {
     totalAbonado,
     saldoPendiente,
     pagos: pagos.map((p) => ({
-      fecha: new Date(p.fecha).toLocaleDateString('es-PY'),
+      fecha: formatDateDisplay(p.fecha, 'es-PY'),
       monto: Number(p.monto) || 0,
       metodo: p.tipo_pago ?? '—',
       comentario: p.comentario ?? null,
@@ -472,7 +491,7 @@ export default function FichaPaciente() {
         descuento: Number(d.descuento) || 0,
       })),
       pagos: pagos.map((p) => ({
-        fecha: new Date(p.fecha).toLocaleDateString('es-PY'),
+        fecha: formatDateDisplay(p.fecha, 'es-PY'),
         monto: Number(p.monto) || 0,
         metodo: p.tipo_pago ?? '—',
       })),
@@ -547,12 +566,17 @@ export default function FichaPaciente() {
 
     try {
       // Subir archivo (Vía Supabase Storage o DataURL en local)
-      const url = await uploadImagenFile(file, pacienteId)
+      const archivo = await uploadImagenFile(file, pacienteId)
 
       // Guardar metadatos en Base de Datos
       await addImagenMetadata.mutateAsync({
         paciente_id: pacienteId,
-        url,
+        // La columna url se conserva por compatibilidad; la pantalla siempre
+        // abre el archivo desde archivo_path con un enlace privado temporal.
+        url: archivo.ruta,
+        archivo_path: archivo.ruta,
+        nombre_archivo: archivo.nombre,
+        mime_type: archivo.mimeType,
         tipo: imgTipo,
         descripcion: imgDesc || null,
         fecha: fechaHoyISO(),
@@ -1202,7 +1226,40 @@ export default function FichaPaciente() {
                                         {(d.costo - d.descuento).toLocaleString('es-PY')} ₲
                                       </td>
                                       <td className="p-2.5 text-center">
-                                        <div className="flex justify-center">
+                                        <div className="flex justify-center gap-1">
+                                          {d.estado === 'realizado' ? (
+                                            <Badge
+                                              variant="secondary"
+                                              className="h-6 gap-1 whitespace-nowrap text-[10px] text-emerald-700 dark:text-emerald-300"
+                                              title={d.fecha_realizado ? `Realizado el ${new Date(`${d.fecha_realizado}T12:00:00`).toLocaleDateString('es-PY')}` : 'Realizado'}
+                                            >
+                                              <CheckCircle2 className="h-3 w-3" /> Realizado
+                                            </Badge>
+                                          ) : (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-6 gap-1 px-2 text-[10px] text-emerald-700 hover:text-emerald-800"
+                                              onClick={async () => {
+                                                try {
+                                                  await updateDetalle.mutateAsync({
+                                                    id: d.id,
+                                                    cambios: {
+                                                      estado: 'realizado',
+                                                      fecha_realizado: fechaHoyISO(),
+                                                    },
+                                                  })
+                                                  toast.success('Procedimiento marcado como realizado.')
+                                                } catch (err) {
+                                                  toast.error((err as Error).message)
+                                                }
+                                              }}
+                                              disabled={updateDetalle.isPending}
+                                              title="Marcar como realizado hoy"
+                                            >
+                                              <CheckCircle2 className="h-3 w-3" /> Realizado
+                                            </Button>
+                                          )}
                                           <Button
                                             variant="ghost"
                                             size="icon"
@@ -1213,7 +1270,7 @@ export default function FichaPaciente() {
                                                 presupuestoId: d.presupuesto_id,
                                               })
                                             }
-                                            disabled={removeDetalle.isPending}
+                                            disabled={removeDetalle.isPending || d.estado === 'realizado'}
                                             title="Eliminar tratamiento"
                                           >
                                             <Trash2 className="h-3.5 w-3.5" />
@@ -1413,7 +1470,7 @@ export default function FichaPaciente() {
                                     className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
                                   >
                                     <td className="whitespace-nowrap p-2.5">
-                                      {new Date(pa.fecha).toLocaleDateString('es-PY')}
+                                      {formatDateDisplay(pa.fecha, 'es-PY')}
                                     </td>
                                     <td className="p-2.5 font-medium capitalize">{pa.tipo_pago}</td>
                                     <td className="p-2.5 italic text-muted-foreground">
@@ -1575,7 +1632,7 @@ export default function FichaPaciente() {
                   <div className="relative">
                     <Input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
                       id="img_upload"
                       className="hidden"
                       onChange={handleImageUpload}
@@ -1616,6 +1673,17 @@ export default function FichaPaciente() {
                           type="button"
                           className="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100 p-0 border-0 cursor-pointer dark:bg-slate-950"
                           onClick={() => {
+                            if (!img.url) {
+                              toast.error('No se pudo abrir este archivo. Recargue la página e intente de nuevo.')
+                              return
+                            }
+                            const esPdf =
+                              img.mime_type === 'application/pdf' ||
+                              img.nombre_archivo?.toLowerCase().endsWith('.pdf')
+                            if (esPdf) {
+                              window.open(img.url, '_blank', 'noopener,noreferrer')
+                              return
+                            }
                             Swal.fire({
                               imageUrl: img.url,
                               imageAlt: img.descripcion || 'Visualización de Radiografía',
@@ -1626,11 +1694,22 @@ export default function FichaPaciente() {
                             })
                           }}
                         >
-                          <img
-                            src={img.url}
-                            alt={img.descripcion || 'Imagen dental'}
-                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                          />
+                          {img.mime_type === 'application/pdf' ||
+                          img.nombre_archivo?.toLowerCase().endsWith('.pdf') ? (
+                            <div className="flex flex-col items-center gap-2 p-4 text-center text-red-700 dark:text-red-300">
+                              <FileText className="h-10 w-10" />
+                              <span className="line-clamp-2 text-xs font-semibold">
+                                {img.nombre_archivo || 'Documento PDF'}
+                              </span>
+                              <span className="text-[10px]">Abrir PDF</span>
+                            </div>
+                          ) : (
+                            <img
+                              src={img.url}
+                              alt={img.descripcion || 'Imagen dental'}
+                              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            />
+                          )}
                         </button>
                         <div className="space-y-1 p-3 text-xs">
                           <div className="flex items-center justify-between">
@@ -1641,7 +1720,7 @@ export default function FichaPaciente() {
                               {img.tipo}
                             </Badge>
                             <span className="text-[10px] text-muted-foreground">
-                              {new Date(img.fecha).toLocaleDateString('es-ES')}
+                              {formatDateDisplay(img.fecha, 'es-PY')}
                             </span>
                           </div>
                           {img.descripcion && (

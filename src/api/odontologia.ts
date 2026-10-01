@@ -67,8 +67,21 @@ export interface PresupuestoDetalle {
   costo: number;
   descuento: number;
   estado: "pendiente" | "realizado";
+  /** Fecha en que se realizó el tratamiento; no es la fecha de cotización. */
+  fecha_realizado?: string | null;
+  realizado_por?: string | null;
   created_at: string;
   odontologia_precios?: OdontoPrecio;
+}
+
+/** Procedimiento de un plan que ya fue marcado como realizado. */
+export interface ProcedimientoRealizado {
+  id: number;
+  fecha: string;
+  nombre: string;
+  pieza: number | null;
+  cara: string | null;
+  plan: string | null;
 }
 
 export interface PagoPresupuesto {
@@ -86,6 +99,10 @@ export interface PacienteImagen {
   id: number;
   paciente_id: string;
   url: string;
+  /** Ruta interna del depósito privado; `url` se convierte en enlace temporal. */
+  archivo_path?: string | null;
+  nombre_archivo?: string | null;
+  mime_type?: string | null;
   tipo: "panoramica" | "periapical" | "clinica" | "otra" | string;
   descripcion: string | null;
   fecha: string;
@@ -437,6 +454,7 @@ export function useAddPresupuestoDetalle() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestoDetalles(data.presupuesto_id) });
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos() });
+      queryClient.invalidateQueries({ queryKey: [...odontoKeys.all, "procedimientos-realizados"] });
     },
   });
 }
@@ -448,7 +466,44 @@ export function useUpdatePresupuestoDetalle() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestoDetalles(data.presupuesto_id) });
       queryClient.invalidateQueries({ queryKey: odontoKeys.presupuestos() });
+      queryClient.invalidateQueries({ queryKey: [...odontoKeys.all, "procedimientos-realizados"] });
     },
+  });
+}
+
+/**
+ * Tratamientos efectivamente realizados, separados de los que solamente fueron
+ * presupuestados. La fecha es la de realización y nunca la fecha del plan.
+ */
+export async function fetchProcedimientosRealizadosPaciente(
+  pacienteId: string
+): Promise<ProcedimientoRealizado[]> {
+  const { data, error } = await supabase
+    .from("presupuesto_detalles")
+    .select(
+      "id, pieza, cara, fecha_realizado, odontologia_precios(nombre), presupuesto:presupuestos!inner(paciente_id, titulo)"
+    )
+    .eq("estado", "realizado")
+    .eq("presupuesto.paciente_id", pacienteId)
+    .order("fecha_realizado", { ascending: false });
+
+  if (error) handleDbError(error, "presupuesto_detalles");
+
+  return (data ?? []).map((detalle: any) => ({
+    id: detalle.id,
+    fecha: detalle.fecha_realizado,
+    nombre: detalle.odontologia_precios?.nombre ?? "Procedimiento sin nombre",
+    pieza: detalle.pieza ?? null,
+    cara: detalle.cara ?? null,
+    plan: detalle.presupuesto?.titulo ?? null,
+  }));
+}
+
+export function useProcedimientosRealizadosPaciente(pacienteId: string) {
+  return useQuery({
+    queryKey: [...odontoKeys.all, "procedimientos-realizados", pacienteId],
+    queryFn: () => fetchProcedimientosRealizadosPaciente(pacienteId),
+    enabled: !!pacienteId,
   });
 }
 
@@ -566,7 +621,27 @@ export async function fetchPacienteImagenes(pacienteId: string): Promise<Pacient
     .eq("paciente_id", pacienteId)
     .order("fecha", { ascending: false });
   if (error) handleDbError(error, "paciente_imagenes");
-  return data || [];
+  const imagenes = (data || []) as PacienteImagen[];
+
+  // Los archivos nuevos viven en un depósito privado. Cada vez que se carga la
+  // ficha se genera un enlace temporal; no se expone una radiografía por URL
+  // pública. Los registros antiguos sin `archivo_path` siguen mostrándose tal
+  // como fueron guardados antes de esta mejora.
+  return Promise.all(
+    imagenes.map(async (imagen) => {
+      if (!imagen.archivo_path) return imagen;
+      const { data: enlace, error: errorEnlace } = await supabase.storage
+        .from("radiografias")
+        .createSignedUrl(imagen.archivo_path, 3600);
+      // Si UN archivo no se puede abrir, se marca ese solo: antes un error acá
+      // dejaba sin mostrar toda la galería del paciente.
+      if (errorEnlace || !enlace?.signedUrl) {
+        console.warn(`No se pudo abrir ${imagen.archivo_path}:`, errorEnlace?.message);
+        return { ...imagen, url: "" };
+      }
+      return { ...imagen, url: enlace.signedUrl };
+    })
+  );
 }
 
 export async function createPacienteImagen(imagen: Partial<PacienteImagen>): Promise<PacienteImagen> {
@@ -579,7 +654,9 @@ export async function createPacienteImagen(imagen: Partial<PacienteImagen>): Pro
   return data;
 }
 
-export async function uploadImagenFile(file: File, pacienteId: string): Promise<string> {
+/* Implementación anterior retirada: guardaba archivos en el navegador. */
+/*
+async function uploadImagenFileLegacy(file: File, pacienteId: string): Promise<string> {
   // Intentar subir al bucket 'radiografias' de Supabase
   const fileExt = file.name.split(".").pop();
   const fileName = `${pacienteId}/${Date.now()}.${fileExt}`;
@@ -608,6 +685,59 @@ export async function uploadImagenFile(file: File, pacienteId: string): Promise<
     .getPublicUrl(fileName);
 
   return publicUrlData.publicUrl;
+}
+*/
+
+const TIPOS_ARCHIVO_RADIOGRAFIA = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+const TAMANO_MAXIMO_ARCHIVO_RADIOGRAFIA = 15 * 1024 * 1024;
+
+export interface ArchivoRadiografiaSubido {
+  ruta: string;
+  nombre: string;
+  mimeType: string;
+}
+
+/** Sube una radiografía o documento clínico al depósito privado. */
+export async function uploadImagenFile(
+  file: File,
+  pacienteId: string
+): Promise<ArchivoRadiografiaSubido> {
+  if (!TIPOS_ARCHIVO_RADIOGRAFIA.has(file.type)) {
+    throw new Error("Seleccione una imagen JPG, PNG o WEBP, o un archivo PDF.");
+  }
+  if (file.size > TAMANO_MAXIMO_ARCHIVO_RADIOGRAFIA) {
+    throw new Error("El archivo supera el límite de 15 MB.");
+  }
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "archivo";
+  const nombreSeguro = file.name
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80) || "radiografia";
+  const ruta = `${pacienteId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+
+  const { error } = await supabase.storage.from("radiografias").upload(ruta, file, {
+    cacheControl: "3600",
+    contentType: file.type,
+    upsert: false,
+  });
+
+  if (error) {
+    if (/bucket not found/i.test(error.message)) {
+      throw new Error(
+        "Falta habilitar el depósito de radiografías. Aplique la migración «historial_procedimientos_y_archivos.sql» en Supabase."
+      );
+    }
+    throw new Error(`No se pudo subir el archivo: ${error.message}`);
+  }
+
+  return { ruta, nombre: `${nombreSeguro}.${extension}`, mimeType: file.type };
 }
 
 export function usePacienteImagenes(pacienteId: string) {
