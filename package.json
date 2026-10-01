@@ -18,7 +18,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "instalacion": "node scripts/armar-instalacion.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

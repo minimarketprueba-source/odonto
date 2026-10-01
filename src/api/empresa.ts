@@ -94,16 +94,43 @@ export async function actualizarEmpresa(input: ActualizarEmpresaInput): Promise<
  * De paso deja una copia en `src/lib/clinica.ts` para que los impresos, que no
  * son componentes de React, puedan leerla.
  */
+// Los últimos datos leídos quedan en el navegador. Como el valor de fábrica es
+// neutro ("Consultorio"), sin esto cada consultorio vería ese nombre genérico
+// durante el instante en que la base todavía no contestó. Es solo para esa
+// primera pantalla: la base siempre tiene la última palabra.
+const CLAVE_CACHE = "odonto-empresa-v1";
+
+function leerCache(): DatosEmpresa | undefined {
+  try {
+    const crudo = localStorage.getItem(CLAVE_CACHE);
+    return crudo ? (JSON.parse(crudo) as DatosEmpresa) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function guardarCache(datos: DatosEmpresa): void {
+  try {
+    localStorage.setItem(CLAVE_CACHE, JSON.stringify(datos));
+  } catch {
+    // Navegador sin espacio o en modo privado: no pasa nada, se lee de la base.
+  }
+}
+
 export function useEmpresa(): DatosEmpresa {
   const { data } = useQuery({
     queryKey: empresaKeys.detalle(),
     queryFn: fetchEmpresa,
     // Cambia una vez cada tanto: no tiene sentido volver a pedirla todo el rato.
     staleTime: 5 * 60 * 1000,
+    placeholderData: leerCache,
   });
 
   useEffect(() => {
-    if (data) setEmpresa(data);
+    if (data) {
+      setEmpresa(data);
+      guardarCache(data);
+    }
   }, [data]);
 
   return data ?? EMPRESA_PREDETERMINADA;

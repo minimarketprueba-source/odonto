@@ -4,8 +4,6 @@ import {
   normalizarColor, aclararColor,
 } from "@/lib/clinica";
 import { imprimirReceta, imprimirComprobantePagos, imprimirPresupuesto } from "@/lib/imprimir";
-import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
-import { LOGO_BANDA_PREDETERMINADO, MARCA_AGUA_DIENTE } from "@/lib/recetario-base64";
 
 const COMPLETA = {
   nombre: "CONSULTORIO ODONTOLÓGICO MOVA DENT",
@@ -45,17 +43,21 @@ describe("datos del consultorio", () => {
 
 describe("línea de contacto del encabezado", () => {
   it("arma dirección y teléfono separados por guiones", () => {
-    expect(lineaContacto(COMPLETA)).toBe(
-      "Av. Mcal. López 1234 - Tel: 0981 522 615 / 0971 934 679"
-    );
-  });
-
-  it("no deja separadores sueltos cuando faltan datos", () => {
-    expect(lineaContacto({ ...COMPLETA, direccion: null })).toBe("Tel: 0981 522 615 / 0971 934 679");
+    expect(lineaContacto(COMPLETA)).toBe("Av. Mcal. López 1234 - Tel: 0983 559 700");
   });
 
   it("si no se cargó dirección, queda solo el teléfono", () => {
-    expect(lineaContacto(EMPRESA_PREDETERMINADA)).toBe("Tel: 0981 522 615 / 0971 934 679");
+    expect(lineaContacto({ ...COMPLETA, direccion: null })).toBe("Tel: 0983 559 700");
+  });
+
+  it("usa el teléfono CARGADO, no uno escrito en el código", () => {
+    // Hasta el 2026-10-01 salía siempre el de Mova Dent, cargado o no.
+    expect(lineaContacto({ ...COMPLETA, telefono: "021 445 900" })).toContain("021 445 900");
+    expect(lineaContacto({ ...COMPLETA, telefono: "021 445 900" })).not.toContain("0981 522 615");
+  });
+
+  it("sin datos cargados no inventa ninguno", () => {
+    expect(lineaContacto(EMPRESA_PREDETERMINADA)).toBe("");
   });
 });
 
@@ -130,16 +132,16 @@ describe("encabezado compartido de los impresos", () => {
     expect(html).not.toContain('<img src="" ');
   });
 
-  it("sin logo cargado usa el de Mova Dent, para que el papel no salga pelado", async () => {
+  it("sin logo cargado no imprime ninguna imagen, y menos la de otra empresa", async () => {
     const html = await htmlDelComprobante();
-    expect(html).toContain(LOGO_IMPRESION_PREDETERMINADO.slice(0, 80));
+    expect(html).not.toContain("<img");
+    expect(html).not.toMatch(/mova/i);
   });
 
-  it("el logo que subió el administrador le gana al predeterminado", async () => {
+  it("con logo cargado imprime ese", async () => {
     setEmpresa(COMPLETA);
     const html = await htmlDelComprobante();
     expect(html).toContain(COMPLETA.logo_url);
-    expect(html).not.toContain(LOGO_IMPRESION_PREDETERMINADO.slice(0, 80));
   });
 
   it("escapa lo que escribió el usuario en el nombre del consultorio", async () => {
@@ -185,18 +187,24 @@ describe("la receta sigue el recetario A5 del consultorio", () => {
     expect(html).toContain("Mariscal Estigarribia y Pedro Melo de Portugal");
   });
 
-  it("lleva el RP/ y la marca de agua del diseño", async () => {
+  it("lleva el RP/ y, con logo cargado, la marca de agua", async () => {
+    setEmpresa(COMPLETA);
     const html = await htmlDeLaReceta();
     expect(html).toContain("RP/");
-    expect(html).toContain(MARCA_AGUA_DIENTE.slice(0, 60));
+    expect(html).toContain("opacity:0.08");
   });
 
-  it("sin logo propio usa el de la banda; con logo propio, el del administrador", async () => {
-    expect(await htmlDeLaReceta()).toContain(LOGO_BANDA_PREDETERMINADO.slice(0, 60));
+  it("sin logo propio la banda lleva el nombre; con logo propio, el logo", async () => {
+    const sinLogo = await htmlDeLaReceta();
+    expect(sinLogo).not.toContain("<img");
+    expect(sinLogo).toContain(EMPRESA_PREDETERMINADA.nombre_corto);
     setEmpresa(COMPLETA);
-    const propio = await htmlDeLaReceta();
-    expect(propio).toContain(COMPLETA.logo_url);
-    expect(propio).not.toContain(LOGO_BANDA_PREDETERMINADO.slice(0, 60));
+    expect(await htmlDeLaReceta()).toContain(COMPLETA.logo_url);
+  });
+
+  it("sin teléfono cargado no imprime uno ajeno", async () => {
+    setEmpresa({ ...COMPLETA, telefono: null });
+    expect(await htmlDeLaReceta()).not.toContain("0981 522 615");
   });
 
   it("una receta anulada se imprime marcada y avisando que no vale", async () => {
@@ -267,11 +275,12 @@ describe("la receta se adapta a otro consultorio", () => {
     expect(html).toContain("021 445 900");
   });
 
-  it("NO le imprime la marca de agua de Mova Dent", async () => {
+  it("NO le imprime nada de Mova Dent", async () => {
     // Sería la marca de otra empresa en un documento ajeno.
     setEmpresa(OTRO);
     const html = await htmlDeLaReceta();
-    expect(html).not.toContain(MARCA_AGUA_DIENTE.slice(0, 60));
+    expect(html).not.toMatch(/mova/i);
+    expect(html).not.toContain("0981 522 615");
   });
 
   it("de marca de agua usa el LOGO, no el ícono, aunque estén los dos", async () => {
@@ -283,15 +292,15 @@ describe("la receta se adapta a otro consultorio", () => {
     expect(html).toContain("data:image/png;base64,OTROLOGO");
   });
 
-  it("con ícono y sin logo, usa el ícono antes que filtrar la marca ajena", async () => {
+  it("con ícono y sin logo, usa el ícono de marca de agua", async () => {
     setEmpresa({ ...OTRO, logo_url: null, icono_url: "data:image/png;base64,SOLOICONO" });
     const html = await htmlDeLaReceta();
     expect(html).toContain("data:image/png;base64,SOLOICONO");
-    expect(html).not.toContain(MARCA_AGUA_DIENTE.slice(0, 60));
   });
 
-  it("sin nada personalizado sigue saliendo la marca de Mova Dent", async () => {
+  it("sin nada personalizado sale limpia: sin marca de agua ni logo ajeno", async () => {
     const html = await htmlDeLaReceta();
-    expect(html).toContain(MARCA_AGUA_DIENTE.slice(0, 60));
+    expect(html).not.toContain("<img");
+    expect(html).not.toMatch(/mova/i);
   });
 });

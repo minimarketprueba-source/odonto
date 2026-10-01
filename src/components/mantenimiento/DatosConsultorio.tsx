@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useEmpresa, useActualizarEmpresa, achicarLogo, achicarIcono } from "@/api/empresa";
 import { usePermissions } from "@/hooks/use-permissions";
 import { lineaContacto, aclararColor, EMPRESA_PREDETERMINADA } from "@/lib/clinica";
-import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
+import { ICONO_PREDETERMINADO } from "@/lib/clinica";
 
 /**
  * Los datos que salen impresos en todo lo que se le entrega al paciente:
@@ -125,7 +125,7 @@ export function DatosConsultorio() {
             id="emp-nombre"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="CONSULTORIO ODONTOLÓGICO MOVA DENT"
+            placeholder="CONSULTORIO ODONTOLÓGICO SONRISAS"
           />
         </div>
         <div className="space-y-1">
@@ -134,7 +134,7 @@ export function DatosConsultorio() {
             id="emp-corto"
             value={nombreCorto}
             onChange={(e) => setNombreCorto(e.target.value)}
-            placeholder="Mova Dent"
+            placeholder="Sonrisas"
           />
           <p className="text-xs text-muted-foreground">
             Para el menú lateral y la pestaña del navegador, donde el nombre completo no entra.
@@ -195,7 +195,7 @@ export function DatosConsultorio() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="contacto@movadent.com.py"
+            placeholder="contacto@consultorio.com.py"
           />
         </div>
       </div>
@@ -205,11 +205,11 @@ export function DatosConsultorio() {
         <div className="space-y-2">
           <Label>Logo (ancho)</Label>
           <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-lg border bg-slate-900 p-2">
-            <img
-              src={logo || LOGO_IMPRESION_PREDETERMINADO}
-              alt="Logo del consultorio"
-              className="max-h-full max-w-full object-contain"
-            />
+            {logo ? (
+              <img src={logo} alt="Logo del consultorio" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <span className="text-xs text-slate-400">Sin logo: los papeles salen solo con el nombre</span>
+            )}
           </div>
           <input
             ref={inputArchivo}
@@ -245,13 +245,13 @@ export function DatosConsultorio() {
           <div className="flex h-20 items-center gap-3">
             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-slate-900">
               <img
-                src={icono || "/mova-dent-icono.png"}
+                src={icono || ICONO_PREDETERMINADO}
                 alt="Ícono del consultorio"
                 className="h-full w-full object-cover"
               />
             </div>
             <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md border bg-slate-900">
-              <img src={icono || "/mova-dent-icono.png"} alt="" className="h-full w-full object-cover" />
+              <img src={icono || ICONO_PREDETERMINADO} alt="" className="h-full w-full object-cover" />
             </div>
           </div>
           <input
@@ -299,13 +299,13 @@ export function DatosConsultorio() {
               className="flex items-center justify-between gap-3 px-3 py-2"
               style={{ background: `linear-gradient(90deg, ${color} 0%, ${aclararColor(color)} 100%)` }}
             >
-              <span className="inline-block rounded bg-white px-1.5 py-1 leading-none">
-                <img
-                  src={logo || LOGO_IMPRESION_PREDETERMINADO}
-                  alt=""
-                  className="h-7 max-w-[150px] object-contain"
-                />
-              </span>
+              {logo ? (
+                <span className="inline-block rounded bg-white px-1.5 py-1 leading-none">
+                  <img src={logo} alt="" className="h-7 max-w-[150px] object-contain" />
+                </span>
+              ) : (
+                <span className="text-sm font-extrabold text-white">{nombreCorto || " "}</span>
+              )}
               <span className="text-[11px] font-bold tracking-wide text-white">
                 {telefono || " "}
               </span>
@@ -337,11 +337,9 @@ export function DatosConsultorio() {
             Presupuestos, comprobantes de pago y planillas
           </p>
           <div className="rounded-lg border bg-white p-4 text-center">
-            <img
-              src={logo || LOGO_IMPRESION_PREDETERMINADO}
-              alt=""
-              className="mx-auto mb-1.5 max-h-12 max-w-[200px] object-contain"
-            />
+            {logo && (
+              <img src={logo} alt="" className="mx-auto mb-1.5 max-h-12 max-w-[200px] object-contain" />
+            )}
             <p className="text-base font-bold" style={{ color }}>{nombre || "—"}</p>
             {vistaPrevia && <p className="mt-0.5 text-[11px] text-slate-500">{vistaPrevia}</p>}
             <p className="mt-1 text-sm font-semibold text-slate-800">COMPROBANTE DE PAGOS</p>

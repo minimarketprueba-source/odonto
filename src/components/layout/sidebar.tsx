@@ -7,13 +7,14 @@ import { useSidebar } from "@/context/sidebar-context"
 import { Menu, X, Home, LogOut, Users, ScanLine, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useEmpresa } from "@/api/empresa";
+import { ICONO_PREDETERMINADO } from "@/lib/clinica";
 
 // Helper para obtener la ruta correcta del logo
 const getLogoPath = () => {
-  // El ícono cuadrado (la muela sobre fondo oscuro), no el logo ancho: acá
-  // entra en un recuadro de 40x40 y el logo con el texto quedaría ilegible.
-  // Trae su propio fondo oscuro, así que se ve igual en modo claro y oscuro.
-  const archivo = 'mova-dent-icono.png';
+  // El ícono cuadrado de fábrica, no un logo ancho: acá entra en un recuadro
+  // de 40x40 y un logo con texto quedaría ilegible. Trae su propio fondo
+  // oscuro, así que se ve igual en modo claro y oscuro.
+  const archivo = ICONO_PREDETERMINADO.replace(/^\//, '');
   // En Electron, usar ruta relativa al index.html
   if (typeof window !== 'undefined' && (window as any).electron) {
     return `./${archivo}`;

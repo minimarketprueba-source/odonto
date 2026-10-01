@@ -83,14 +83,17 @@ export default function LoginPage() {
 
       <Card className="relative z-10 w-full max-w-lg border border-primary/20 bg-card/90 text-card-foreground shadow-2xl backdrop-blur-xl">
         <CardHeader className="pb-2 text-center">
-          {/* El logo va acá y no el nombre escrito: el fondo es oscuro, que es
-              para lo que está hecho, y ya trae "MOVA DENT" en su tipografía. */}
+          {/* El logo del consultorio si lo cargó; si no, su nombre escrito.
+              Antes, sin logo, aparecía el de Mova Dent en la puerta de
+              entrada de cualquier consultorio. */}
           <CardTitle className="mb-1">
-            <img
-              src={empresa.logo_url || '/mova-dent-logo-transparente.png'}
-              alt={empresa.nombre}
-              className="mx-auto h-14 w-auto sm:h-16"
-            />
+            {empresa.logo_url ? (
+              <img src={empresa.logo_url} alt={empresa.nombre} className="mx-auto h-14 w-auto sm:h-16" />
+            ) : (
+              <span className="block text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
+                {empresa.nombre_corto}
+              </span>
+            )}
           </CardTitle>
 
           <div className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">

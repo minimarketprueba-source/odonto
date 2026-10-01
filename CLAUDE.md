@@ -70,6 +70,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `medicos_vinculo_unico.sql` | Índice único: una cuenta, una sola ficha de odontólogo | Aplicada 2026-08-06 |
 | `cefalometria_setup.sql` | `cefalometria_estudios` + depósito PRIVADO `cefalometria` para radiografías y fotos | Aplicada 2026-09-30 |
 | `historial_procedimientos_y_archivos.sql` | `fecha_realizado` en tratamientos + depósito PRIVADO `radiografias` (imágenes y PDF de la ficha) | Aplicada 2026-09-30 |
+| `marca_mova_dent_icono.sql` | **Solo Mova Dent**: guarda su ícono en su base (el de fábrica pasó a ser genérico) | Pendiente (2026-10-01) |
 
 ---
 
@@ -188,6 +189,39 @@ reventaba y el odontólogo quedaba sin recetas, sin firma y sin «Mi perfil».
 Se agregó un índice único y la consulta ya no usa `.maybeSingle()`.
 
 
+## Varios consultorios: una copia por consultorio (2026-10-01)
+
+Decisión del usuario: **cada consultorio tiene su propio sitio en Vercel y su
+propia base en Supabase**, todos desde este mismo repositorio. NO es
+multiempresa en una sola base (se descartó: un error de permisos mostraría
+pacientes de un consultorio a otro). Guía para instalar uno nuevo:
+`docs/INSTALAR-NUEVO-CONSULTORIO.md`.
+
+- **Nada de Mova Dent en el código.** La marca de cada consultorio vive en SU
+  tabla `clinicas`. Los valores de fábrica (`EMPRESA_PREDETERMINADA`,
+  `ICONO_PREDETERMINADO` = `public/icono-consultorio.svg`) son neutros: sin
+  logo, los papeles salen solo con el nombre. Las pruebas de
+  `clinica.test.ts` controlan que no se cuele "mova" ni su teléfono, que
+  hasta el 2026-10-01 salía escrito a mano en el encabezado de TODOS los
+  impresos, ignorando el teléfono cargado.
+- **`CLINICA_ID` fijo sirve para todos**: cada copia tiene su base, así que
+  el mismo UUID no choca. No hace falta cambiarlo por consultorio.
+- **La base se elige con `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`** en
+  el proyecto de Vercel de cada copia. Sin ellas, `src/lib/supabase.ts` cae a
+  la base de Mova Dent; por eso `vite.config.ts` hace FALLAR la publicación
+  en Vercel si faltan, salvo en el dominio de Mova Dent.
+- **Instalador**: `supabase/instalacion_completa.sql`, GENERADO con
+  `npm run instalacion` (`scripts/armar-instalacion.mjs`). Al agregar una
+  migración, sumarla a ORDEN (o a SOLO_MOVA_DENT si es un dato de Mova Dent) y
+  regenerar; el script se niega a seguir si hay una sin clasificar. Probado el
+  2026-10-01 sobre un Postgres vacío (PGlite) con stubs de auth y storage:
+  corre dos veces sin error, 27 tablas, ninguna sin RLS ni sin reglas, un
+  admin carga pacientes y una cuenta sin rol no ve nada. `rls_completo.sql`
+  va dos veces: antes de `esquema_completo.sql` (que ya usa
+  `es_odonto_activo()`) y al final (para las tablas creadas después).
+- **Las migraciones NO llegan solas**: cada archivo nuevo de
+  `supabase/migrations/` hay que ejecutarlo en la base de CADA consultorio.
+
 ## Cefalometría (revisado el 2026-09-30)
 
 El módulo se publicó sin su tabla en la base y **fingía guardar** en el
@@ -244,6 +278,7 @@ npm run build        # tsc && vite build (el type-check bloquea el build)
 npm run test:run     # Vitest una corrida (154 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
+npm run instalacion  # regenera supabase/instalacion_completa.sql
 ```
 
 Publicar: `git push vercel main && git push origin main`. Vercel despliega solo desde `vercel`.

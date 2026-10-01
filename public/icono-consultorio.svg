@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícono de fábrica: se usa hasta que el consultorio sube el suyo en
+       Mantenimiento → Consultorio. Neutro a propósito (ver src/lib/clinica.ts). -->
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <path d="M256 150c-26-22-60-34-92-26-44 11-66 54-58 104 7 44 26 76 37 120 7 30 15 68 41 68 24 0 30-36 37-66 6-24 13-44 35-44s29 20 35 44c7 30 13 66 37 66 26 0 34-38 41-68 11-44 30-76 37-120 8-50-14-93-58-104-32-8-66 4-92 26z"
+        fill="none" stroke="#22d3ee" stroke-width="22" stroke-linejoin="round"/>
+</svg>

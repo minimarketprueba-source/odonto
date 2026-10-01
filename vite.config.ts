@@ -12,8 +12,29 @@ function removeCrossorigin() {
   };
 }
 
+// El mismo código se publica para varios consultorios, cada uno con su propia
+// base (docs/INSTALAR-NUEVO-CONSULTORIO.md). Si en una copia nueva se olvidan
+// las variables VITE_SUPABASE_*, `src/lib/supabase.ts` cae a la base de Mova
+// Dent, que es su valor por omisión: el sitio nuevo se conectaría en silencio
+// a la base de OTRO consultorio. Mejor que la publicación falle y lo diga.
+const DOMINIO_MOVA_DENT = 'odonto-pied.vercel.app'
+
+function exigirBasePropia(env: Record<string, string>) {
+  if (env.VERCEL !== '1') return // solo en las publicaciones de Vercel
+  if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) return
+  if (env.VERCEL_PROJECT_PRODUCTION_URL === DOMINIO_MOVA_DENT) return
+  throw new Error(
+    '\n\nFALTA INDICAR LA BASE DE DATOS DE ESTE CONSULTORIO.\n' +
+      'En Vercel: Settings → Environment Variables → agregar VITE_SUPABASE_URL y\n' +
+      'VITE_SUPABASE_ANON_KEY con los datos de SU proyecto de Supabase, y volver a\n' +
+      'publicar. Sin eso, este sitio usaría la base de Mova Dent.\n' +
+      'Ver docs/INSTALAR-NUEVO-CONSULTORIO.md, paso 6.\n'
+  )
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  exigirBasePropia({ ...env, ...process.env } as Record<string, string>)
   const devTunnelHost = env.DEV_TUNNEL_HOST ?? env.VITE_DEV_TUNNEL_HOST
   const useDevTunnel = Boolean(devTunnelHost)
 

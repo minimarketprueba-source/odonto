@@ -41,13 +41,15 @@ export interface DatosEmpresa {
  * Lo que se muestra hasta que la base contesta, y lo que queda si el
  * consultorio todavía no cargó sus datos.
  *
- * Es lo ÚNICO de Mova Dent que queda escrito en el código. Para entregarle el
- * sistema a otro consultorio no hace falta tocarlo: se cargan sus datos en
- * Mantenimiento → Consultorio y estos valores dejan de usarse.
+ * NEUTRO a propósito: el mismo código se instala en varios consultorios, cada
+ * uno con su base (ver docs/INSTALAR-NUEVO-CONSULTORIO.md). Si acá dijera
+ * "Mova Dent", un consultorio recién instalado imprimiría la marca de otra
+ * empresa en sus documentos. La marca de cada uno vive en SU base, en la
+ * tabla `clinicas`, y se carga en Mantenimiento → Consultorio.
  */
 export const EMPRESA_PREDETERMINADA: DatosEmpresa = {
-  nombre: "CONSULTORIO ODONTOLÓGICO MOVA DENT",
-  nombre_corto: "Mova Dent",
+  nombre: "CONSULTORIO ODONTOLÓGICO",
+  nombre_corto: "Consultorio",
   ruc: null,
   direccion: null,
   telefono: null,
@@ -56,6 +58,12 @@ export const EMPRESA_PREDETERMINADA: DatosEmpresa = {
   icono_url: null,
   color_primario: "#0e7490",
 };
+
+/**
+ * Ícono de fábrica (el diente genérico de `public/`), mientras el consultorio
+ * no suba el suyo. Lo usan el menú lateral, la pestaña y Mantenimiento.
+ */
+export const ICONO_PREDETERMINADO = "/icono-consultorio.svg";
 
 let empresaActual: DatosEmpresa = EMPRESA_PREDETERMINADA;
 
@@ -119,13 +127,17 @@ export function aclararColor(hex: string, proporcion = 0.55): string {
 
 /**
  * La línea de datos de contacto que va debajo del nombre en los impresos:
- * "Av. Mcal. López 123 · Tel: 0983 559 700 · RUC: 80012345-6".
- * Los campos vacíos no dejan separadores sueltos.
+ * "Av. Mcal. López 123 - Tel: 0983 559 700". El RUC no va (se sacó el
+ * 2026-08-10). Los campos vacíos no dejan separadores sueltos.
+ *
+ * Hasta el 2026-10-01 el teléfono estaba escrito a mano con el de Mova Dent e
+ * ignoraba el cargado: cualquier otro consultorio habría impreso en todos sus
+ * papeles el teléfono de Mova Dent.
  */
 export function lineaContacto(empresa: DatosEmpresa = getEmpresa()): string {
   const partes = [
     empresa.direccion,
-    "Tel: 0981 522 615 / 0971 934 679",
-  ].filter((p) => p && p.trim());
+    empresa.telefono?.trim() ? `Tel: ${empresa.telefono.trim()}` : null,
+  ].filter((p): p is string => !!p && !!p.trim());
   return partes.join(" - ");
 }

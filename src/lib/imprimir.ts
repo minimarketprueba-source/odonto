@@ -1,6 +1,4 @@
 import { getEmpresa, lineaContacto, aclararColor } from "@/lib/clinica";
-import { LOGO_IMPRESION_PREDETERMINADO } from "@/lib/logo-impresion-base64";
-import { LOGO_BANDA_PREDETERMINADO, MARCA_AGUA_DIENTE } from "@/lib/recetario-base64";
 
 /**
  * El encabezado que comparten todos los impresos: logo, nombre del
@@ -20,14 +18,13 @@ function encabezadoDocumento(
   const { sub = null, tamNombre = 18, margen = 16 } = opciones;
   const empresa = getEmpresa();
   const contacto = lineaContacto(empresa);
-  // Mientras el administrador no suba el suyo, va el de Mova Dent. Así los
-  // documentos salen con logo desde el primer día en lugar de esperar a que
-  // alguien entre a cargarlo.
-  const logo = empresa.logo_url || LOGO_IMPRESION_PREDETERMINADO;
+  // Sin logo cargado el papel sale sin logo. Antes iba el de Mova Dent de
+  // fábrica, que en otro consultorio es la marca de otra empresa.
+  const logo = empresa.logo_url;
 
   return `
       <div style="text-align:center; margin-bottom:${margen}px; border-bottom:2px solid #0f172a; padding-bottom:10px;">
-        <img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">
+        ${logo ? `<img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">` : ""}
         <h1 style="margin:0; font-size:${tamNombre}px; color:${empresa.color_primario};">${esc(empresa.nombre)}</h1>
         ${contacto ? `<p style="margin:3px 0 0; font-size:10px; color:#64748b;">${esc(contacto)}</p>` : ""}
         <h2 style="margin:5px 0 0; font-size:14px;">${esc(tituloDoc)}</h2>
@@ -263,7 +260,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
   const tituloDoc = tituloPrincipal;
   const empresa = getEmpresa();
   const contacto = lineaContacto(empresa);
-  const logo = empresa.logo_url || LOGO_IMPRESION_PREDETERMINADO;
+  const logo = empresa.logo_url;
 
   const trs = datos.filas.map((f) => `
     <tr>
@@ -280,7 +277,7 @@ export function imprimirPlanillaProductividad(datos: DatosImpresionProductividad
     <div style="font-family: Arial, sans-serif; padding: 15px; color: #0f172a; max-width: 900px; margin: 0 auto;">
       <!-- CABECERA DEL CONSULTORIO -->
       <div style="border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; text-align: center;">
-        <img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">
+        ${logo ? `<img src="${logo}" alt="" style="max-height:54px; max-width:230px; display:block; margin:0 auto 6px;">` : ""}
         <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: ${empresa.color_primario};">${esc(empresa.nombre)}</h2>
         ${contacto ? `<p style="margin:3px 0 0; font-size:10px; color:#64748b;">${esc(contacto)}</p>` : ""}
         <h1 style="margin: 7px 0 0; font-size: 15px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">${tituloPrincipal}</h1>
@@ -866,9 +863,9 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
   const tituloDoc = "RECETA ODONTOLÓGICA";
   const empresa = getEmpresa();
   const colorClaro = aclararColor(empresa.color_primario);
-  const logoBanda = empresa.logo_url || LOGO_BANDA_PREDETERMINADO;
-  // Marca de agua: primero el LOGO, si no el ícono, y recién si el consultorio
-  // no cargó ninguno de los dos, la muela de Mova Dent.
+  const logoBanda = empresa.logo_url;
+  // Marca de agua: primero el LOGO y si no el ícono. Si el consultorio no cargó
+  // ninguno, la receta sale sin marca de agua.
   //
   // El logo va primero a propósito, aunque el ícono llene mejor una hoja A5:
   // el ícono está pensado para el recuadro del menú y la pestaña del
@@ -876,14 +873,10 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
   // dibujo suave, es un CUADRADO GRIS en el medio de la receta. El logo, en
   // cambio, se hace transparente porque va sobre documentos.
   //
-  // La de Mova Dent solo sale si no se personalizó nada: en la receta de otro
-  // consultorio sería la marca de otra empresa impresa en un documento ajeno.
-  const propia = empresa.logo_url || empresa.icono_url;
-  const marcaAgua = propia || MARCA_AGUA_DIENTE;
-  // La de fábrica ya viene aclarada. La que sube el consultorio puede ser de
-  // cualquier color, así que a esa se la baja mucho más para que no compita
-  // con el texto de la receta.
-  const opacidadAgua = propia ? 0.08 : 0.5;
+  // La que sube el consultorio puede ser de cualquier color, así que se la
+  // baja mucho para que no compita con el texto de la receta.
+  const marcaAgua = empresa.logo_url || empresa.icono_url;
+  const opacidadAgua = 0.08;
   // Un logo ancho estirado al alto de la muela quedaría enorme: se le da el
   // ancho según la forma que tenga.
   const anchoAgua = empresa.logo_url ? "100mm" : "76mm";
@@ -943,11 +936,13 @@ export function imprimirReceta(datos: DatosImpresionReceta) {
               papel blanco: con trazos oscuros, sobre el color de la marca
               quedaba oscuro sobre oscuro y no se leía. El recetario de papel
               resuelve lo mismo poniéndolo sobre un recuadro. */""}
-        <span style="display:inline-block; background:#fff; border-radius:5px; padding:3px 7px; line-height:0;">
-          <img src="${logoBanda}" alt="" style="height:16mm; max-width:70mm; object-fit:contain; display:block;">
-        </span>
+        ${logoBanda
+          ? `<span style="display:inline-block; background:#fff; border-radius:5px; padding:3px 7px; line-height:0;">
+               <img src="${logoBanda}" alt="" style="height:16mm; max-width:70mm; object-fit:contain; display:block;">
+             </span>`
+          : `<span style="color:#fff; font-size:14px; font-weight:800; letter-spacing:0.5px;">${esc(empresa.nombre_corto)}</span>`}
         <div style="text-align:right; color:#fff; font-size:11px; font-weight:bold; line-height:1.5; letter-spacing:1px;">
-          ${esc(empresa.telefono || "0981 522 615 / 0971 934 679")}
+          ${esc(empresa.telefono || "")}
         </div>
       </div>
       ${
