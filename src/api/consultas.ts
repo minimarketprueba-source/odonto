@@ -8,7 +8,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
-import { CLINICA_ID } from "./pacientes";
 import { cambiarEstadoCita } from "./citas";
 import { insertarProcedimientos, type NuevoProcedimiento } from "./procedimientos";
 
@@ -143,7 +142,7 @@ export async function createConsulta(input: CreateConsultaInput): Promise<Consul
   const { procedimientos, ...consultaInput } = input;
   const { data, error } = await supabase
     .from("consultas")
-    .insert({ ...consultaInput, clinica_id: CLINICA_ID })
+    .insert({ ...consultaInput })
     .select(CONSULTA_SELECT)
     .single();
   if (error) throw new Error(`No se pudo registrar la consulta: ${error.message}`);

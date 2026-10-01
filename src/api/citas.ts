@@ -7,7 +7,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
-import { CLINICA_ID } from "./pacientes";
 
 export const ESTADOS_CITA = [
   { value: "pendiente", label: "Pendiente" },
@@ -155,7 +154,7 @@ export function useCitasRango(desde: string, hasta: string) {
 export async function createCita(input: CreateCitaInput): Promise<Cita> {
   const { data, error } = await supabase
     .from("citas")
-    .insert({ ...input, clinica_id: CLINICA_ID, estado: "Confirmada" })
+    .insert({ ...input, estado: "Confirmada" })
     .select(CITA_SELECT)
     .single();
   if (error) throw new Error(`No se pudo agendar la cita: ${error.message}`);

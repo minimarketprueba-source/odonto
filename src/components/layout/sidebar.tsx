@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { usePerfilProfesional } from '@/api/perfil'
 import { useAuth } from "@/context/auth-context"
 import { useSidebar } from "@/context/sidebar-context"
-import { Menu, X, Home, LogOut, Users, ScanLine, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt } from "lucide-react"
+import { Menu, X, Home, LogOut, Users, ScanLine, CalendarDays, Clock, BarChart2, Settings, Shield, ChevronLeft, ChevronRight, UserCircle2, DollarSign, Receipt, Building2 } from "lucide-react"
+import { useState } from "react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useEmpresa } from "@/api/empresa";
 import { ICONO_PREDETERMINADO } from "@/lib/clinica";
@@ -26,7 +27,9 @@ const getLogoPath = () => {
 export function Sidebar() {
   const location = useLocation()
   const pathname = location.pathname
-  const { user, logout } = useAuth()
+  const { user, logout, empresas, esDueno, cambiarEmpresa } = useAuth()
+  const [cambiando, setCambiando] = useState(false)
+  const empresaActiva = empresas.find((e) => e.activa)
   const empresa = useEmpresa()
   // Nombre real de la persona, si lo cargó en Mi perfil o tiene ficha de
   // odontólogo. Si no hay ninguno, se cae al correo.
@@ -47,9 +50,12 @@ export function Sidebar() {
     { name: "Mantenimiento", href: "/mantenimiento", icon: Settings, badge: null as number | null, moduleKey: "mantenimiento" },
     { name: "Usuarios", href: "/usuarios", icon: Shield, badge: null as number | null, moduleKey: "usuarios" },
     { name: "Mi perfil", href: "/perfil", icon: UserCircle2, badge: null as number | null },
+    // Solo el dueño del sistema: crear empresas y darles administrador.
+    ...(esDueno ? [{ name: "Empresas", href: "/empresas", icon: Building2, badge: null as number | null, soloDueno: true }] : []),
   ]
 
   const visibleNavigation = navigation.filter(item => {
+    if ('soloDueno' in item) return esDueno;
     if (!item.moduleKey) return true; // Dashboard y Notificaciones siempre visibles
     return canView(item.moduleKey);
   });
@@ -148,6 +154,37 @@ export function Sidebar() {
               )}
             </Button>
           </div>
+
+          {/* Selector de empresa: solo para quien trabaja en más de una. Al
+              cambiar se recarga todo, así no queda nada de la anterior. */}
+          {empresas.length > 1 && !isCollapsed && (
+            <div className="px-4 pt-3 relative z-10">
+              <label htmlFor="selector-empresa" className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Trabajando en
+              </label>
+              <select
+                id="selector-empresa"
+                value={empresaActiva?.clinica_id ?? ""}
+                disabled={cambiando}
+                onChange={async (e) => {
+                  setCambiando(true)
+                  try {
+                    await cambiarEmpresa(e.target.value)
+                  } catch (error) {
+                    setCambiando(false)
+                    alert(error instanceof Error ? error.message : "No se pudo cambiar de empresa")
+                  }
+                }}
+                className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm font-medium"
+              >
+                {empresas.map((e) => (
+                  <option key={e.clinica_id} value={e.clinica_id}>
+                    {e.nombre_corto}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 relative z-10 overflow-y-auto">

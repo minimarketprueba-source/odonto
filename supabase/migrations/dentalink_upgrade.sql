@@ -3,6 +3,21 @@
 -- ============================================================================
 
 -- 1. Tabla de Sillones Dentales (Boxes)
+-- ⛔ FRENO (agregado con multiempresa.sql, 2026-10-01) -------------------------
+-- Este archivo es de cuando había UNA sola empresa. En una base multiempresa
+-- volvería a crear reglas sin empresa y, como las reglas de Postgres se SUMAN,
+-- dejaría ver pacientes de un consultorio a otro. Por eso se niega a correr.
+-- El instalador (instalacion_completa.sql) lo puede correr: después aplica
+-- multiempresa.sql, que deja todo bien.
+DO $$
+BEGIN
+    IF to_regclass('public.sistema_duenos') IS NOT NULL
+       AND COALESCE(current_setting('odonto.instalador', true), '') <> 'si' THEN
+        RAISE EXCEPTION 'Migración anterior a multiempresa: NO ejecutarla en esta base (ver multiempresa.sql).';
+    END IF;
+END $$;
+-- -----------------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS public.sillones_dentales (
     id SERIAL PRIMARY KEY,
     clinica_id UUID REFERENCES public.clinicas(id) ON DELETE CASCADE,
@@ -18,11 +33,17 @@ DROP POLICY IF EXISTS sillones_dentales_all ON public.sillones_dentales;
 CREATE POLICY sillones_dentales_all ON public.sillones_dentales FOR ALL TO authenticated USING (true);
 
 -- Insertar algunos sillones por defecto
-INSERT INTO public.sillones_dentales (nombre, color) VALUES 
-('Sillón 1 (Principal)', '#0ea5e9'),
-('Sillón 2 (Higiene)', '#10b981'),
-('Box 3 (Cirugía)', '#f43f5e')
-ON CONFLICT DO NOTHING;
+-- Solo si no hay ninguno: antes cada ejecución agregaba 3 sillones más. En una
+-- base multiempresa no corre (las empresas nuevas reciben el suyo al crearse).
+INSERT INTO public.sillones_dentales (nombre, color)
+SELECT v.nombre, v.color
+FROM (VALUES
+    ('Sillón 1 (Principal)', '#0ea5e9'),
+    ('Sillón 2 (Higiene)', '#10b981'),
+    ('Box 3 (Cirugía)', '#f43f5e')
+) AS v(nombre, color)
+WHERE to_regclass('public.sistema_duenos') IS NULL
+  AND NOT EXISTS (SELECT 1 FROM public.sillones_dentales);
 
 -- 2. Actualizar Citas para soportar Sillones y Estados Dentalink
 ALTER TABLE public.citas ADD COLUMN IF NOT EXISTS sillon_id INTEGER REFERENCES public.sillones_dentales(id) ON DELETE SET NULL;

@@ -6,7 +6,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
-import { CLINICA_ID } from "./pacientes";
 
 // Los identificadores de la base son UUID (texto), no números. Decían `number`
 // por herencia del esquema anterior: el valor que llegaba en tiempo de
@@ -102,7 +101,7 @@ export async function fetchEspecialidades(): Promise<Especialidad[]> {
 export async function createEspecialidad(nombre: string, color: string): Promise<void> {
   const { error } = await supabase
     .from("especialidades")
-    .insert({ nombre, color, activo: true, clinica_id: CLINICA_ID });
+    .insert({ nombre, color, activo: true });
   if (error) throw new Error(`No se pudo crear la especialidad: ${error.message}`);
 }
 
@@ -125,7 +124,7 @@ export async function fetchMedicosAdmin(): Promise<MedicoAdmin[]> {
 export async function createMedico(input: CreateMedicoInput): Promise<void> {
   const { error } = await supabase
     .from("medicos")
-    .insert({ ...input, activo: input.activo ?? true, clinica_id: CLINICA_ID });
+    .insert({ ...input, activo: input.activo ?? true });
   if (error) throw new Error(`No se pudo registrar el médico: ${error.message}`);
 }
 
@@ -139,7 +138,7 @@ export async function updateMedico(id: string, cambios: Partial<CreateMedicoInpu
 export async function createCie10(codigo: string, descripcion: string, categoria: string | null): Promise<void> {
   const { error } = await supabase
     .from("cie10")
-    .insert({ codigo, descripcion, categoria, activo: true, clinica_id: CLINICA_ID });
+    .insert({ codigo, descripcion, categoria, activo: true });
   if (error) throw new Error(`No se pudo agregar el código: ${error.message}`);
 }
 

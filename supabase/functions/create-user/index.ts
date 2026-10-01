@@ -6,8 +6,14 @@
 // ============================================================================
 // Alta de cuentas de usuario
 // ============================================================================
-// La llama la pantalla Usuarios ("Crear usuario"). Corre en el servidor de
-// Supabase (Edge Function), NO en el navegador.
+// La llaman la pantalla Usuarios ("Crear usuario") y la pantalla Empresas (el
+// dueño del sistema le crea el administrador a una empresa nueva). Corre en el
+// servidor de Supabase (Edge Function), NO en el navegador.
+//
+// MULTIEMPRESA (2026-10-01): la persona queda en la empresa ACTIVA de quien la
+// crea, o en la que indique `clinica_id` si quien llama es dueño del sistema.
+// Si el correo ya tiene cuenta (trabaja en otra empresa), NO se crea otra ni se
+// le cambia la contraseña: solo se la suma a esta empresa con el rol elegido.
 //
 // Por qué tiene que estar acá y no en la app: crear una cuenta necesita la
 // `service_role key`, que puede TODO sobre la base — leer cualquier ficha,
@@ -96,26 +102,39 @@ Deno.serve(async (req: Request) => {
       return responder({ error: "Sesión no válida. Volvé a iniciar sesión." }, 401);
     }
 
-    // --- 2. ¿Es administrador? ----------------------------------------------
-    // Se comprueba en el servidor y no se confía en lo que diga la pantalla:
-    // cualquiera puede llamar a esta dirección con su propio token.
-    const { data: rolFila } = await admin
-      .from("user_roles")
-      .select("role, status")
-      .eq("user_id", authData.user.id)
-      .maybeSingle();
+    // --- 2. ¿Puede crear gente, y en qué empresa? ----------------------------
+    // Se pregunta a la base CON LA SESIÓN de quien llama: son las mismas
+    // funciones que usan los permisos, así que acá no puede valer otra regla.
+    // No se confía en lo que diga la pantalla: cualquiera puede llamar a esta
+    // dirección con su propio token.
+    const cuerpo = await req.json().catch(() => null);
+    if (!cuerpo) return responder({ error: "No se recibieron los datos." }, 400);
 
-    const rol = (rolFila?.role ?? "").toLowerCase();
-    const estado = (rolFila?.status ?? "activo").toLowerCase();
-    const esAdmin = ["admin", "superadmin", "super_admin"].includes(rol);
-    const activo = ["activo", "active", "habilitado", "enabled"].includes(estado);
-    if (!esAdmin || !activo) {
-      return responder({ error: "Solo un administrador activo puede crear usuarios." }, 403);
+    const anonKey = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SB_PUBLISHABLE_KEY");
+    const comoQuienLlama = createClient(url, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const [{ data: empresaActiva }, { data: esAdminActivo }, { data: esDueno }] = await Promise.all([
+      comoQuienLlama.rpc("mi_clinica_id"),
+      comoQuienLlama.rpc("es_odonto_admin"),
+      comoQuienLlama.rpc("es_dueno_sistema"),
+    ]);
+
+    const pedida = cuerpo.clinica_id ? String(cuerpo.clinica_id) : null;
+    let clinicaId: string | null = null;
+    if (pedida && esDueno) {
+      clinicaId = pedida; // el dueño da de alta gente en cualquier empresa
+    } else if (!pedida || pedida === empresaActiva) {
+      if (!esAdminActivo || !empresaActiva) {
+        return responder({ error: "Solo un administrador activo puede crear usuarios." }, 403);
+      }
+      clinicaId = empresaActiva;
+    } else {
+      return responder({ error: "No puede crear usuarios en otra empresa." }, 403);
     }
 
     // --- 3. Los datos que llegaron ------------------------------------------
-    const cuerpo = await req.json().catch(() => null);
-    if (!cuerpo) return responder({ error: "No se recibieron los datos." }, 400);
 
     const email = String(cuerpo.email ?? "").trim().toLowerCase();
     const password = String(cuerpo.password ?? "");
@@ -129,7 +148,21 @@ Deno.serve(async (req: Request) => {
       return responder({ error: `Rol no válido: ${role}` }, 400);
     }
 
-    // --- 4. Crear la cuenta --------------------------------------------------
+    // --- 4. ¿Ya tiene cuenta? Entonces solo se la suma a esta empresa ---------
+    // Sin tocar su contraseña: si no, el admin de un consultorio podría tomar
+    // la cuenta de alguien que también trabaja en otro.
+    const { data: existente } = await admin
+      .from("profiles").select("id").eq("email", email).maybeSingle();
+    if (existente?.id) {
+      const { error: errSumar } = await admin.from("user_roles").upsert(
+        { user_id: existente.id, clinica_id: clinicaId, role, status: "Activo" },
+        { onConflict: "user_id,clinica_id" }
+      );
+      if (errSumar) return responder({ error: errSumar.message }, 500);
+      return responder({ user_id: existente.id, email, existente: true });
+    }
+
+    // --- 5. Crear la cuenta --------------------------------------------------
     const { data: creado, error: errCrear } = await admin.auth.admin.createUser({
       email,
       password,
@@ -152,7 +185,7 @@ Deno.serve(async (req: Request) => {
 
     const userId = creado.user.id;
 
-    // --- 5. Ficha y rol ------------------------------------------------------
+    // --- 6. Ficha y rol en la empresa ---------------------------------------
     // Si algo de esto falla, la cuenta YA existe: se borra para no dejar a
     // alguien pudiendo entrar sin rol ni permisos, que es un estado raro y
     // difícil de detectar después.
@@ -169,8 +202,8 @@ Deno.serve(async (req: Request) => {
     );
 
     const { error: errRol } = await admin.from("user_roles").upsert(
-      { user_id: userId, role, status: "Activo" },
-      { onConflict: "user_id" }
+      { user_id: userId, clinica_id: clinicaId, role, status: "Activo" },
+      { onConflict: "user_id,clinica_id" }
     );
 
     if (errPerfil || errRol) {

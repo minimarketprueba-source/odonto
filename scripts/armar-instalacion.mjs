@@ -36,9 +36,10 @@ const ORDEN = [
   'medicos_vinculo_unico.sql',
   'cefalometria_setup.sql',
   'historial_procedimientos_y_archivos.sql',
-  // Otra vez al final: la primera pasada saltea las tablas que todavía no
-  // existían y estas quedarían SIN permisos (RLS sin reglas = cerrado).
-  'rls_completo.sql',
+  // SIEMPRE el último: ata cada tabla a una empresa y REEMPLAZA todas las
+  // reglas de acceso y funciones de permisos que dejaron los anteriores (que
+  // son de cuando había una sola empresa).
+  'multiempresa.sql',
 ];
 
 // Datos de Mova Dent: sus precios y su nombre. Un consultorio nuevo arranca
@@ -78,9 +79,20 @@ const encabezado = `-- =========================================================
 -- ============================================================================
 `;
 
-const partes = [encabezado];
+// Todo en UNA transacción: si algo falla, no queda nada a medias. Las
+// migraciones que traen su propio BEGIN/COMMIT (multiempresa.sql) los pierden
+// acá, porque un COMMIT en el medio cerraría la transacción antes de tiempo.
+// La marca odonto.instalador deja pasar los FRENOS de las migraciones viejas:
+// el instalador sí puede correrlas, porque multiempresa.sql va después.
+const partes = [
+  encabezado,
+  "\nBEGIN;\nSELECT set_config('odonto.instalador', 'si', true);\n",
+];
 ORDEN.forEach((archivo, i) => {
-  const sql = readFileSync(join(carpeta, archivo), 'utf8').replace(/^﻿/, '');
+  const sql = readFileSync(join(carpeta, archivo), 'utf8')
+    .replace(/^﻿/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/^(BEGIN|COMMIT);$/gm, '-- ($1 propio del archivo: lo maneja el instalador)');
   partes.push(
     `\n\n-- ############################################################################\n` +
       `-- ${String(i + 1).padStart(2, '0')}. ${archivo}\n` +
@@ -105,6 +117,8 @@ SET nombre = 'CONSULTORIO ODONTOLÓGICO',
 WHERE id = '00000000-0000-4000-a000-000000000001'
   AND nombre_corto = 'Mova Dent'
   AND nombre IS DISTINCT FROM 'CONSULTORIO ODONTOLÓGICO MOVA DENT';
+
+COMMIT;
 
 NOTIFY pgrst, 'reload schema';
 

@@ -12,7 +12,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
-import { CLINICA_ID } from "./pacientes";
 import { emitirConNumero, esConflictoDeNumero } from "./numeracion";
 import { esTablaInexistente } from "@/lib/esquema";
 
@@ -119,7 +118,7 @@ export async function createReceta(input: CreateRecetaInput): Promise<Receta> {
   const data = await emitirConNumero("recetas", "R", async (numero) => {
     const { data, error } = await supabase
       .from("recetas")
-      .insert({ ...cabecera, numero, clinica_id: CLINICA_ID })
+      .insert({ ...cabecera, numero })
       .select()
       .single();
     if (error) {

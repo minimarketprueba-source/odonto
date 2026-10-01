@@ -1,9 +1,9 @@
 // ============================================================================
 // Capa de datos: el consultorio (tabla `clinicas`)
 // ============================================================================
-// Una sola fila, la de CLINICA_ID. No se creó una tabla `empresa` aparte
-// porque `clinicas` ya existía y todas las tablas del sistema apuntan a ella
-// por `clinica_id`; ver el encabezado de `supabase/migrations/empresa.sql`.
+// La fila de la empresa ACTIVA de quien inició sesión (multiempresa.sql). Sin
+// sesión —la pantalla de ingreso— no se sabe de qué empresa es la persona: se
+// muestra la última marca usada en esta computadora, o la del sistema.
 
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,11 +12,12 @@ import { esColumnaInexistente, esTablaInexistente } from "@/lib/esquema";
 import {
   EMPRESA_PREDETERMINADA, setEmpresa, normalizarColor, type DatosEmpresa,
 } from "@/lib/clinica";
-import { CLINICA_ID } from "./pacientes";
+import { CLINICA_ID_UNICA_LEGADO } from "./pacientes";
+import { useAuth } from "@/context/auth-context";
 
 export const empresaKeys = {
   all: ["empresa"] as const,
-  detalle: () => [...empresaKeys.all, CLINICA_ID] as const,
+  detalle: (userId: string | null) => [...empresaKeys.all, userId ?? "sin-sesion"] as const,
 };
 
 export type ActualizarEmpresaInput = Partial<Omit<DatosEmpresa, "nombre">> & {
@@ -26,11 +27,30 @@ export type ActualizarEmpresaInput = Partial<Omit<DatosEmpresa, "nombre">> & {
 const COLUMNAS =
   "nombre, nombre_corto, ruc, direccion, telefono, email, logo_url, icono_url, color_primario";
 
+/**
+ * La empresa en la que está trabajando quien inició sesión, o null sin sesión.
+ * La decide la base (mi_clinica_id), la misma función que usan los permisos:
+ * así lo que se muestra y lo que se deja tocar nunca pueden ser distintos.
+ */
+async function idEmpresaActiva(): Promise<string | null> {
+  const { data: sesion } = await supabase.auth.getSession();
+  if (!sesion.session) return null;
+  const { data, error } = await supabase.rpc("mi_clinica_id");
+  // Base todavía sin multiempresa.sql: la función no existe y hay una sola
+  // empresa.
+  if (error?.code === "PGRST202" || error?.code === "42883") return CLINICA_ID_UNICA_LEGADO;
+  if (error) throw new Error(`No se pudo saber la empresa activa: ${error.message}`);
+  return (data as string | null) ?? null;
+}
+
 export async function fetchEmpresa(): Promise<DatosEmpresa> {
+  const id = await idEmpresaActiva();
+  if (!id) return leerCache() ?? EMPRESA_PREDETERMINADA;
+
   const { data, error } = await supabase
     .from("clinicas")
     .select(COLUMNAS)
-    .eq("id", CLINICA_ID)
+    .eq("id", id)
     .maybeSingle();
 
   // Sin la migración aplicada faltan `ruc` y `logo_url`. Acá SÍ se degrada a
@@ -61,6 +81,8 @@ export async function actualizarEmpresa(input: ActualizarEmpresaInput): Promise<
   if (!input.nombre.trim()) {
     throw new Error("El nombre del consultorio no puede quedar vacío.");
   }
+  const id = await idEmpresaActiva();
+  if (!id) throw new Error("Hay que iniciar sesión para cambiar los datos del consultorio.");
   const { error } = await supabase
     .from("clinicas")
     .update({
@@ -75,7 +97,7 @@ export async function actualizarEmpresa(input: ActualizarEmpresaInput): Promise<
       logo_url: input.logo_url || null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", CLINICA_ID);
+    .eq("id", id);
 
   if (esColumnaInexistente(error) || esTablaInexistente(error)) {
     throw new Error(
@@ -118,8 +140,11 @@ function guardarCache(datos: DatosEmpresa): void {
 }
 
 export function useEmpresa(): DatosEmpresa {
+  // La clave lleva a la persona: al salir y entrar con otra cuenta (de otra
+  // empresa) no se reutiliza la marca de la anterior.
+  const { user } = useAuth();
   const { data } = useQuery({
-    queryKey: empresaKeys.detalle(),
+    queryKey: empresaKeys.detalle(user?.id ?? null),
     queryFn: fetchEmpresa,
     // Cambia una vez cada tanto: no tiene sentido volver a pedirla todo el rato.
     staleTime: 5 * 60 * 1000,

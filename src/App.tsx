@@ -43,6 +43,7 @@ const PerfilUsuario = lazy(() => import('./pages/PerfilUsuario'))
 const Reportes = lazy(() => import('./pages/Reportes'))
 const Mantenimiento = lazy(() => import('./pages/Mantenimiento'))
 const Usuarios = lazy(() => import('./pages/Usuarios'))
+const Empresas = lazy(() => import('./pages/Empresas'))
 const ConfirmarCorreo = lazy(() => import('./pages/ConfirmarCorreo'))
 const ConfigurarSupabase = lazy(() => import('./pages/ConfigurarSupabase'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
@@ -125,6 +126,7 @@ function App() {
           <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
           <Route path="/mantenimiento" element={<ProtectedRoute moduleKey="mantenimiento"><Mantenimiento /></ProtectedRoute>} />
           <Route path="/usuarios" element={<ProtectedRoute moduleKey="usuarios"><Usuarios /></ProtectedRoute>} />
+          <Route path="/empresas" element={<ProtectedRoute soloDueno><Empresas /></ProtectedRoute>} />
           <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="*" element={<Navigate to="/" replace />} />

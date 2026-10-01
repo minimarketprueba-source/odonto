@@ -1,5 +1,14 @@
 # Instalar el sistema para un consultorio nuevo
 
+> **Lo normal NO es esta guía.** Desde el 2026-10-01 el sistema es
+> multiempresa: para sumar un consultorio, el dueño del sistema entra a
+> **Empresas**, lo crea y le da su administrador. Listo en un minuto, con el
+> mismo sitio y la misma base, y cada consultorio ve solo lo suyo.
+>
+> Esta guía es para una instalación **totalmente aparte** (otro sitio y otra
+> base), por ejemplo si un consultorio exige tener sus datos en su propia
+> cuenta.
+
 Cada consultorio tiene **su propio sitio y su propia base de datos**, totalmente
 separados. Ningún consultorio puede ver los pacientes de otro, porque sus datos
 ni siquiera están en el mismo lugar.

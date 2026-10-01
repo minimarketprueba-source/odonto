@@ -547,7 +547,7 @@ export default function Usuarios() {
             status: "Activo",
             permissions: DEFAULT_PERMISSIONS[newUserForm.role] ?? {},
           },
-          { onConflict: "user_id" }
+          { onConflict: "user_id,clinica_id" }
         );
         if (errRol) {
           toast({
@@ -572,11 +572,15 @@ export default function Usuarios() {
         telefono: newUserForm.telefono || null,
         raw: { id: data?.user_id ?? "unknown" } as RawProfile,
       };
-      setUsers((prev) => [newUser, ...prev]);
+      setUsers((prev) => [newUser, ...prev.filter((u) => u.id !== newUser.id)]);
 
+      // Si el correo ya tenía cuenta (trabaja en otra empresa), no se creó otra:
+      // se la sumó a esta con el rol elegido y su contraseña sigue siendo la suya.
       toast({
-        title: "Usuario creado",
-        description: `${newUserForm.email} ha sido creado con rol ${getRoleLabel(newUserForm.role)}.`,
+        title: data?.existente ? "Persona sumada a esta empresa" : "Usuario creado",
+        description: data?.existente
+          ? `${newUserForm.email} ya tenía cuenta: entra con su contraseña de siempre, ahora también en esta empresa, con rol ${getRoleLabel(newUserForm.role)}.`
+          : `${newUserForm.email} ha sido creado con rol ${getRoleLabel(newUserForm.role)}.`,
       });
 
       resetNewUserForm();
@@ -654,7 +658,7 @@ export default function Usuarios() {
       };
       const { error } = await supabase
         .from("user_roles")
-        .upsert(payload, { onConflict: "user_id" });
+        .upsert(payload, { onConflict: "user_id,clinica_id" });
 
       if (error) throw error;
 
@@ -751,7 +755,7 @@ export default function Usuarios() {
       };
       const { error } = await supabase
         .from("user_roles")
-        .upsert(payload, { onConflict: "user_id" })
+        .upsert(payload, { onConflict: "user_id,clinica_id" })
         .select("user_id, status, role");
       if (error) {
         console.error("Supabase user_roles upsert error:", error);

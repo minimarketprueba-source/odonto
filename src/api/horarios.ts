@@ -9,7 +9,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
-import { CLINICA_ID } from "./pacientes";
 
 // Coincide con Date.getDay(): 0 = domingo ... 6 = sábado.
 export const DIAS_SEMANA = [
@@ -67,7 +66,7 @@ export async function fetchHorarios(): Promise<Horario[]> {
 export async function createHorario(input: CreateHorarioInput): Promise<void> {
   const { error } = await supabase
     .from("horarios_medicos")
-    .insert({ ...input, clinica_id: CLINICA_ID });
+    .insert({ ...input });
   if (error) throw new Error(`No se pudo guardar el horario: ${error.message}`);
 }
 
@@ -91,7 +90,7 @@ export async function fetchAusencias(): Promise<Ausencia[]> {
 export async function createAusencia(input: CreateAusenciaInput): Promise<void> {
   const { error } = await supabase
     .from("ausencias_medicos")
-    .insert({ ...input, clinica_id: CLINICA_ID });
+    .insert({ ...input });
   if (error) throw new Error(`No se pudo guardar la ausencia: ${error.message}`);
 }
 

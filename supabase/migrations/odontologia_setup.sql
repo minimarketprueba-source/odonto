@@ -6,6 +6,21 @@
 -- de Row Level Security (RLS) queden configuradas correctamente.
 
 -- 1. Catálogo de Precios de Procedimientos Odontológicos
+-- ⛔ FRENO (agregado con multiempresa.sql, 2026-10-01) -------------------------
+-- Este archivo es de cuando había UNA sola empresa. En una base multiempresa
+-- volvería a crear reglas sin empresa y, como las reglas de Postgres se SUMAN,
+-- dejaría ver pacientes de un consultorio a otro. Por eso se niega a correr.
+-- El instalador (instalacion_completa.sql) lo puede correr: después aplica
+-- multiempresa.sql, que deja todo bien.
+DO $$
+BEGIN
+    IF to_regclass('public.sistema_duenos') IS NOT NULL
+       AND COALESCE(current_setting('odonto.instalador', true), '') <> 'si' THEN
+        RAISE EXCEPTION 'Migración anterior a multiempresa: NO ejecutarla en esta base (ver multiempresa.sql).';
+    END IF;
+END $$;
+-- -----------------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS public.odontologia_precios (
     id SERIAL PRIMARY KEY,
     codigo VARCHAR(20) UNIQUE NOT NULL,
@@ -143,7 +158,13 @@ DROP POLICY IF EXISTS consentimientos_paciente_all ON public.consentimientos_pac
 CREATE POLICY consentimientos_paciente_all ON public.consentimientos_paciente FOR ALL TO authenticated USING (true);
 
 -- Insertar procedimientos dentales iniciales por defecto si no existen
-INSERT INTO public.odontologia_precios (codigo, nombre, costo) VALUES
+-- Solo en una base nueva: si ya hay aranceles no se toca nada. Antes esto era
+-- ON CONFLICT ... DO UPDATE, y volver a correr el archivo PISABA los precios
+-- del consultorio con los de ejemplo. En una base multiempresa no corre: cada
+-- empresa carga sus propios precios.
+INSERT INTO public.odontologia_precios (codigo, nombre, costo)
+SELECT v.codigo, v.nombre, v.costo
+FROM (VALUES
 ('CONS-01', 'Consulta Diagnóstica y Presupuesto', 50000.00),
 ('LIM-02', 'Limpieza Dental (Profilaxis)', 300000.00),
 ('EMP-03', 'Empaste Simple (Resina)', 250000.00),
@@ -168,7 +189,9 @@ INSERT INTO public.odontologia_precios (codigo, nombre, costo) VALUES
 ('RES-22', 'Resina Compuesta Temporario', 250000.00),
 ('RES-23', 'Resina Clase 2', 400000.00),
 ('LEV-24', 'Levantamiento de Margen', 200000.00)
-ON CONFLICT (codigo) DO UPDATE SET costo = EXCLUDED.costo, nombre = EXCLUDED.nombre;
+) AS v(codigo, nombre, costo)
+WHERE to_regclass('public.sistema_duenos') IS NULL
+  AND NOT EXISTS (SELECT 1 FROM public.odontologia_precios p WHERE p.codigo = v.codigo);
 
 -- Trigger y Función para actualizar el saldo pendiente del presupuesto cuando hay pagos
 CREATE OR REPLACE FUNCTION public.fn_actualizar_saldo_presupuesto()

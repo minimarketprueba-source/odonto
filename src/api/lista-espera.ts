@@ -5,7 +5,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
-import { CLINICA_ID } from "./pacientes";
 
 export const PRIORIDADES = [
   { value: "urgente", label: "Urgente" },
@@ -87,7 +86,7 @@ export async function fetchListaEspera(filtro = "activos"): Promise<RegistroEspe
 export async function createRegistroEspera(input: CreateEsperaInput): Promise<void> {
   const { error } = await supabase
     .from("lista_espera")
-    .insert({ ...input, clinica_id: CLINICA_ID, estado: "esperando" });
+    .insert({ ...input, estado: "esperando" });
   if (error) throw new Error(`No se pudo agregar a la lista de espera: ${error.message}`);
 }
 

@@ -86,18 +86,19 @@ Deno.serve(async (req: Request) => {
       return responder({ error: "Sesión no válida. Volvé a iniciar sesión." }, 401);
     }
 
-    // --- 2. ¿Es administrador activo? ---------------------------------------
-    const { data: rolFila } = await admin
-      .from("user_roles")
-      .select("role, status")
-      .eq("user_id", authData.user.id)
-      .maybeSingle();
-
-    const rol = (rolFila?.role ?? "").toLowerCase();
-    const estado = (rolFila?.status ?? "activo").toLowerCase();
-    const esAdmin = ["admin", "superadmin", "super_admin"].includes(rol);
-    const activo = ["activo", "active", "habilitado", "enabled"].includes(estado);
-    if (!esAdmin || !activo) {
+    // --- 2. ¿Es administrador activo de su empresa? -------------------------
+    // Se pregunta a la base con la sesión de quien llama (las mismas funciones
+    // que usan los permisos).
+    const anonKey = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SB_PUBLISHABLE_KEY");
+    const comoQuienLlama = createClient(url, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const [{ data: empresaActiva }, { data: esAdminActivo }] = await Promise.all([
+      comoQuienLlama.rpc("mi_clinica_id"),
+      comoQuienLlama.rpc("es_odonto_admin"),
+    ]);
+    if (!esAdminActivo || !empresaActiva) {
       return responder(
         { error: "Solo un administrador activo puede cambiar la contraseña de otra cuenta." },
         403
@@ -112,6 +113,28 @@ Deno.serve(async (req: Request) => {
     if (!userId) return responder({ error: "Falta indicar de qué cuenta." }, 400);
     if (password.length < 6) {
       return responder({ error: "La contraseña debe tener al menos 6 caracteres." }, 400);
+    }
+
+    // --- 3b. ¿Es una persona de SU empresa, y solo de su empresa? -------------
+    // Antes un admin podía cambiarle la contraseña a CUALQUIER cuenta de la
+    // base. Con varias empresas, eso dejaba al admin de un consultorio tomar la
+    // cuenta de alguien de otro y entrar a sus pacientes. Y si la persona
+    // trabaja también en otra empresa, su contraseña no es solo de esta.
+    const { data: membresias } = await admin
+      .from("user_roles").select("clinica_id").eq("user_id", userId);
+    const empresas = new Set((membresias ?? []).map((m) => m.clinica_id));
+    if (!empresas.has(empresaActiva)) {
+      return responder({ error: "Esa persona no trabaja en su empresa." }, 403);
+    }
+    if (empresas.size > 1) {
+      return responder(
+        {
+          error:
+            "Esta persona trabaja también en otra empresa: su contraseña no se puede " +
+            "cambiar desde acá. Que la cambie ella desde «Olvidé mi contraseña».",
+        },
+        403
+      );
     }
 
     // --- 4. Cambiarla --------------------------------------------------------

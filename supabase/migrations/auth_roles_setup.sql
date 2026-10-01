@@ -13,6 +13,21 @@
 -- ============================================================================
 
 -- 1. Perfil de cada cuenta -----------------------------------------------------
+-- ⛔ FRENO (agregado con multiempresa.sql, 2026-10-01) -------------------------
+-- Este archivo es de cuando había UNA sola empresa. En una base multiempresa
+-- volvería a crear reglas sin empresa y, como las reglas de Postgres se SUMAN,
+-- dejaría ver pacientes de un consultorio a otro. Por eso se niega a correr.
+-- El instalador (instalacion_completa.sql) lo puede correr: después aplica
+-- multiempresa.sql, que deja todo bien.
+DO $$
+BEGIN
+    IF to_regclass('public.sistema_duenos') IS NOT NULL
+       AND COALESCE(current_setting('odonto.instalador', true), '') <> 'si' THEN
+        RAISE EXCEPTION 'Migración anterior a multiempresa: NO ejecutarla en esta base (ver multiempresa.sql).';
+    END IF;
+END $$;
+-- -----------------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT,
@@ -146,6 +161,13 @@ SELECT u.id, u.email, split_part(u.email, '@', 1), u.raw_user_meta_data ->> 'ful
 FROM auth.users u
 ON CONFLICT (id) DO NOTHING;
 
+-- Solo antes de multiempresa (después, cada empresa da de alta a su gente, y la
+-- clave de user_roles pasa a ser persona + empresa: este ON CONFLICT ya no
+-- valdría). Va en EXECUTE para que ni se analice en una base multiempresa.
+DO $roles$
+BEGIN
+    IF to_regclass('public.sistema_duenos') IS NULL THEN
+        EXECUTE $sql$
 INSERT INTO public.user_roles (user_id, role, status, permissions)
 SELECT u.id, r.rol, 'Activo', '{}'::jsonb
 FROM auth.users u
@@ -158,7 +180,10 @@ JOIN (VALUES
 ON CONFLICT (user_id) DO UPDATE
     SET role = EXCLUDED.role,
         status = 'Activo',
-        updated_at = NOW();
+        updated_at = NOW()
+        $sql$;
+    END IF;
+END $roles$;
 
 -- 7. Verificación --------------------------------------------------------------
 SELECT p.email, ur.role, ur.status

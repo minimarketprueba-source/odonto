@@ -22,6 +22,21 @@
 -- Es idempotente: se puede volver a ejecutar sin romper nada.
 -- ============================================================================
 
+-- ⛔ FRENO (agregado con multiempresa.sql, 2026-10-01) -------------------------
+-- Este archivo es de cuando había UNA sola empresa. En una base multiempresa
+-- volvería a crear reglas sin empresa y, como las reglas de Postgres se SUMAN,
+-- dejaría ver pacientes de un consultorio a otro. Por eso se niega a correr.
+-- El instalador (instalacion_completa.sql) lo puede correr: después aplica
+-- multiempresa.sql, que deja todo bien.
+DO $$
+BEGIN
+    IF to_regclass('public.sistema_duenos') IS NOT NULL
+       AND COALESCE(current_setting('odonto.instalador', true), '') <> 'si' THEN
+        RAISE EXCEPTION 'Migración anterior a multiempresa: NO ejecutarla en esta base (ver multiempresa.sql).';
+    END IF;
+END $$;
+-- -----------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION public.es_odonto_prescriptor()
 RETURNS BOOLEAN
 LANGUAGE SQL

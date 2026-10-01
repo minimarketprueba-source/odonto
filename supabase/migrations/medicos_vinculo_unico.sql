@@ -22,6 +22,21 @@
 -- Si esto devuelve alguna fila, el índice de abajo va a fallar. Hay que decidir
 -- a mano cuál ficha se queda con la cuenta y desvincular la otra
 -- (UPDATE public.medicos SET user_id = NULL WHERE id = '<el id que sobra>').
+-- ⛔ FRENO (agregado con multiempresa.sql, 2026-10-01) -------------------------
+-- Este archivo es de cuando había UNA sola empresa. En una base multiempresa
+-- volvería a crear reglas sin empresa y, como las reglas de Postgres se SUMAN,
+-- dejaría ver pacientes de un consultorio a otro. Por eso se niega a correr.
+-- El instalador (instalacion_completa.sql) lo puede correr: después aplica
+-- multiempresa.sql, que deja todo bien.
+DO $$
+BEGIN
+    IF to_regclass('public.sistema_duenos') IS NOT NULL
+       AND COALESCE(current_setting('odonto.instalador', true), '') <> 'si' THEN
+        RAISE EXCEPTION 'Migración anterior a multiempresa: NO ejecutarla en esta base (ver multiempresa.sql).';
+    END IF;
+END $$;
+-- -----------------------------------------------------------------------------
+
 SELECT user_id, count(*) AS fichas, string_agg(apellidos || ', ' || nombres, ' | ') AS quienes
 FROM public.medicos
 WHERE user_id IS NOT NULL

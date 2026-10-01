@@ -12,10 +12,25 @@ import type { User, Session } from '@supabase/supabase-js'
 import { logger } from '@/lib/logger'
 import { esTablaInexistente } from '@/lib/esquema'
 
+/** Una empresa (consultorio) en la que trabaja la persona. */
+export interface EmpresaDeUsuario {
+  clinica_id: string
+  nombre: string
+  nombre_corto: string
+  rol: string
+  activa: boolean
+}
+
 interface AuthContextType {
   user: User | null
+  /** Rol en la empresa ACTIVA (la base solo devuelve esa fila). */
   role: string | null
   permissions: Record<string, string[]> | null
+  /** Empresas donde trabaja; con más de una aparece el selector en el menú. */
+  empresas: EmpresaDeUsuario[]
+  /** Dueño del sistema: crea empresas. NO le da acceso a pacientes. */
+  esDueno: boolean
+  cambiarEmpresa: (clinicaId: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   clearStorage: () => void
@@ -166,6 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [permissions, setPermissions] = useState<Record<string, string[]> | null>(null)
+  const [empresas, setEmpresas] = useState<EmpresaDeUsuario[]>([])
+  const [esDueno, setEsDueno] = useState(false)
   // true una vez que rol/permisos se resolvieron para el usuario actual.
   // Evita que ProtectedRoute redirija al Dashboard durante la ventana en que
   // la sesión ya cargó pero los permisos todavía no (p.ej. al recargar con F5).
@@ -301,6 +318,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setRole(null)
         setPermissions(null)
+        setEmpresas([])
+        setEsDueno(false)
         setIsLoading(false)
         return
       }
@@ -435,10 +454,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             resolverPermisosClinica(rol, roleData.permissions as Record<string, string[]> | null)
           )
         } else {
-          // Si aún no tiene rol explícito en DB, asignar por defecto segun email o admin para desarrollo
-          const rolFallback = rolPorCorreo(user.email)
-          setRole(rolFallback)
-          setPermissions(resolverPermisosClinica(rolFallback, null))
+          // Sin fila de rol en la empresa activa = no trabaja en ninguna
+          // empresa. Antes se inventaba un rol mirando el correo ("admin@…" →
+          // admin); con varias empresas eso dejaba entrar a pantallas vacías.
+          setRole(null)
+          setPermissions(null)
+        }
+
+        // Empresas donde trabaja y si es dueño del sistema. Si la base todavía
+        // no tiene multiempresa.sql, las funciones no existen: se sigue como
+        // una sola empresa, sin selector.
+        const [{ data: listaEmpresas }, { data: filaDueno }] = await Promise.all([
+          supabase.rpc('mis_empresas'),
+          supabase.from('sistema_duenos').select('user_id').eq('user_id', user.id).maybeSingle(),
+        ])
+        if (isActive) {
+          setEmpresas(Array.isArray(listaEmpresas) ? (listaEmpresas as EmpresaDeUsuario[]) : [])
+          setEsDueno(!!filaDueno)
         }
 
         if (isActive) {
@@ -502,13 +534,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearProjectStorage()
   }
 
+  // Cambiar de empresa recarga la app entera: así no queda en pantalla ni en
+  // memoria ningún dato de la empresa anterior.
+  const cambiarEmpresa = async (clinicaId: string) => {
+    const { error } = await supabase.rpc('cambiar_empresa', { p_clinica: clinicaId })
+    if (error) throw new Error(error.message)
+    window.location.assign('/')
+  }
+
   // El loader debe mantenerse mientras haya sesión pero los permisos no se hayan
   // resuelto, para que ProtectedRoute no redirija prematuramente al Dashboard.
   const effectiveLoading = isLoading || (!!user && !permissionsResolved)
 
   return (
     <AuthContext.Provider
-      value={{ user, role, permissions, login, logout, clearStorage, isLoading: effectiveLoading }}
+      value={{
+        user, role, permissions, empresas, esDueno, cambiarEmpresa,
+        login, logout, clearStorage, isLoading: effectiveLoading,
+      }}
     >
       {children}
     </AuthContext.Provider>

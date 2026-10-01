@@ -71,6 +71,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `cefalometria_setup.sql` | `cefalometria_estudios` + depósito PRIVADO `cefalometria` para radiografías y fotos | Aplicada 2026-09-30 |
 | `historial_procedimientos_y_archivos.sql` | `fecha_realizado` en tratamientos + depósito PRIVADO `radiografias` (imágenes y PDF de la ficha) | Aplicada 2026-09-30 |
 | `marca_mova_dent_icono.sql` | **Solo Mova Dent**: guarda su ícono en su base (el de fábrica pasó a ser genérico) | Pendiente (2026-10-01) |
+| `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Pendiente (2026-10-01) |
 
 ---
 
@@ -189,13 +190,69 @@ reventaba y el odontólogo quedaba sin recetas, sin firma y sin «Mi perfil».
 Se agregó un índice único y la consulta ya no usa `.maybeSingle()`.
 
 
-## Varios consultorios: una copia por consultorio (2026-10-01)
+## MULTIEMPRESA en una sola base (2026-10-01) — LEER ANTES DE TOCAR PERMISOS
 
-Decisión del usuario: **cada consultorio tiene su propio sitio en Vercel y su
-propia base en Supabase**, todos desde este mismo repositorio. NO es
-multiempresa en una sola base (se descartó: un error de permisos mostraría
-pacientes de un consultorio a otro). Guía para instalar uno nuevo:
-`docs/INSTALAR-NUEVO-CONSULTORIO.md`.
+El mismo día el usuario primero eligió "una copia por consultorio" y después lo
+cambió: **varias empresas en la MISMA base**, con todo atado a la empresa
+(usuarios, pacientes, todo). Lo de las copias separadas (instalador, guía) sigue
+sirviendo para una instalación aparte, pero lo normal es sumar empresas desde la
+pantalla **Empresas**. Decisiones del usuario:
+
+- **Las empresas las crea solo el dueño del sistema** (`sistema_duenos`,
+  pantalla `/empresas`). Los dueños iniciales son las cuentas que eran
+  `superadmin`.
+- **El dueño NO ve pacientes.** Ser dueño solo permite crear empresas y darles
+  administrador. Ver fichas exige ser miembro de la empresa.
+- **Una persona puede trabajar en varias empresas** con un rol en cada una:
+  `user_roles` tiene una fila por persona Y empresa (clave
+  `(user_id, clinica_id)`). La empresa activa está en
+  `profiles.clinica_activa`; se cambia con `cambiar_empresa()` y la app se
+  recarga entera.
+- **Login genérico**: `clinicas` ya no se lee sin sesión; el login muestra la
+  última marca guardada en esa computadora (`odonto-empresa-v1`) o la neutra.
+
+Cómo funciona (`supabase/migrations/multiempresa.sql`):
+
+- **`mi_clinica_id()`** es la empresa activa. Todas las reglas son
+  `clinica_id = (SELECT mi_clinica_id()) AND es_odonto_activo()` (borrar:
+  `es_odonto_admin()`). `es_odonto_activo/admin/prescriptor` miran el rol EN
+  LA EMPRESA ACTIVA. La regla de `user_roles` deja ver solo la fila de la
+  empresa activa: por eso la app sigue leyendo "mi rol" con `.maybeSingle()`.
+- **`clinica_id` lo pone la BASE** (`DEFAULT mi_clinica_id()`). La app NO lo
+  manda en ningún insert. `CLINICA_ID_UNICA_LEGADO` existe solo como respaldo
+  de lectura para una base sin multiempresa: NUNCA usarlo en un insert.
+- **`fn_misma_empresa`** (trigger): un registro no puede apuntar a otro de
+  otra empresa (un pago a un presupuesto ajeno, etc.). Las FK de Postgres no
+  miran empresas.
+- **Únicos por empresa**: cédula del paciente, número de receta (cada empresa
+  su talonario), código de arancel, ficha de odontólogo por cuenta.
+- **Archivos**: `ruta_de_mi_empresa(name)`: la primera carpeta es un paciente
+  de mi empresa o el id de mi empresa.
+- **Al crear una empresa** (`crear_empresa()` → trigger) se cargan las 8
+  especialidades y un sillón. Los aranceles no.
+- **Edge Functions**: `create-user` crea en la empresa activa (o en la que
+  diga `clinica_id` si llama un dueño); si el correo ya tiene cuenta, la SUMA
+  sin tocar su contraseña. `update-user-password` solo cambia contraseñas de
+  gente de la empresa del admin y que NO trabaje en otra (si no, el admin de un
+  consultorio podría tomar una cuenta de otro).
+
+⚠️ **Las migraciones anteriores a esta tienen un FRENO** al principio: se niegan
+a correr si existe `sistema_duenos`, porque recrearían reglas sin empresa
+(`USING (true)` en `odontologia_setup.sql`, `es_odonto_activo()` vieja en
+`rls_completo.sql`…) y, como las reglas se SUMAN, abrirían los pacientes de
+todas las empresas. Un cambio de permisos nuevo va en una migración NUEVA que
+respete `mi_clinica_id()`, nunca reeditando las viejas.
+
+**Probado** el 2026-10-01 con PGlite (Postgres en memoria): actualización de
+una base con datos como la de Mova Dent (no se pierde nada, todos siguen
+entrando), ~40 intentos de una empresa de ver o tocar lo de otra (todos
+rechazados) e instalador desde cero dos veces. El script está en el scratchpad
+de esa sesión; lo esencial: crear dos empresas, gente en cada una y una persona
+en ambas, y probar ver/insertar/modificar/borrar cruzado como cada una.
+
+### Copias separadas (instalación aparte)
+
+Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
 
 - **Nada de Mova Dent en el código.** La marca de cada consultorio vive en SU
   tabla `clinicas`. Los valores de fábrica (`EMPRESA_PREDETERMINADA`,

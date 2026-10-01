@@ -18,7 +18,13 @@ import { queryKeys } from "@/lib/query-client";
 // agendar una cita ni cargar un horario. El UUID de abajo es el de la clínica
 // que crea `supabase/migrations/esquema_completo.sql`; si se cambia allá, hay
 // que cambiarlo acá.
-export const CLINICA_ID = "00000000-0000-4000-a000-000000000001";
+/**
+ * La empresa de una base que todavía NO tiene multiempresa.sql: la única que
+ * había. Con multiempresa la empresa sale de la sesión (mi_clinica_id() en la
+ * base) y la completa la base al guardar: NO usar esto en un insert, que
+ * mandaría todo a esta empresa sin importar quién está trabajando.
+ */
+export const CLINICA_ID_UNICA_LEGADO = "00000000-0000-4000-a000-000000000001";
 
 export const TIPOS_PACIENTE = [
   { value: "cadete", label: "Cadete" },
@@ -137,7 +143,7 @@ export async function fetchPaciente(id: string): Promise<Paciente> {
 export async function createPaciente(input: CreatePacienteInput): Promise<Paciente> {
   const { data, error } = await supabase
     .from("pacientes")
-    .insert({ ...input, clinica_id: CLINICA_ID, activo: input.activo ?? true })
+    .insert({ ...input, activo: input.activo ?? true })
     .select()
     .single();
   if (error) throw mensajeError(error, "No se pudo registrar el paciente");
