@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Ruler,
   Printer,
+  PenLine,
   Eye,
   Move,
   FileCheck,
@@ -173,7 +174,7 @@ export function CefalometriaEditor({
   }, [puntos, calibracion]);
 
   // Manejo de clic sobre el lienzo (colocar punto o calibración)
-  const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handleCanvasClick = (e: React.MouseEvent<SVGElement>) => {
     if (isPanning || !srcImagen) return;
 
     const coords = getCoordenadaImagen(e.clientX, e.clientY);
@@ -300,6 +301,21 @@ export function CefalometriaEditor({
     setCalibracion({ distanciaRealMm: 10 });
     setGuardadoStatus('cambios');
     toast.info('Trazado eliminado. Recuerde guardar.');
+  };
+
+  const handleIniciarDigitalizacion = () => {
+    setModoCalibracion(false);
+    setGuiaRicketts(true);
+    setPuntoActivoId(SECUENCIA_RICKETTS.find((id) => !puntos[id]) ?? '');
+    setTabDerecho('puntos');
+
+    const faltantes = SECUENCIA_RICKETTS.filter((id) => !puntos[id]).length;
+    if (faltantes) {
+      toast.info(`Digitalización Ricketts iniciada: faltan ${faltantes} puntos.`);
+    } else {
+      toast.success('Los puntos de Ricketts ya están completos. Revise el diagnóstico.');
+      setTabDerecho('analisis');
+    }
   };
 
   // Guardar estudio
@@ -487,6 +503,16 @@ export function CefalometriaEditor({
             className="bg-primary hover:bg-primary/90 text-white gap-1.5 h-8 font-medium shadow-md"
           >
             <Save className="w-3.5 h-3.5" /> Guardar Trazado
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleIniciarDigitalizacion}
+            className="border-cyan-600/80 bg-cyan-950/50 text-cyan-200 hover:bg-cyan-900/70 hover:text-white gap-1.5 h-8 font-medium"
+            title="Iniciar o retomar el trazado cefalométrico guiado"
+          >
+            <PenLine className="w-3.5 h-3.5" /> Digitalización
           </Button>
 
           <Button
@@ -739,11 +765,23 @@ export function CefalometriaEditor({
 
             {/* Capa SVG sobrepuesta para trazar líneas y puntos anatómicos */}
             <svg
-              onClick={handleCanvasClick}
               viewBox={`0 0 ${imgDimensions.width} ${imgDimensions.height}`}
               className="absolute inset-0 w-full h-full cursor-crosshair"
-              style={{ overflow: 'visible' }}
+              style={{ overflow: 'visible', pointerEvents: 'all' }}
             >
+              {/* Superficie de captura: responde al primer clic sobre cualquier
+                  parte de la radiografía, aun sin puntos. */}
+              <rect
+                x="0"
+                y="0"
+                width={imgDimensions.width}
+                height={imgDimensions.height}
+                fill="#000000"
+                fillOpacity="0.001"
+                pointerEvents="all"
+                onMouseDown={handleCanvasClick}
+              />
+
               {/* Líneas y Planos Cefalométricos */}
               {mostrarLineas &&
                 SEGMENTOS_CEFALOMETRICOS.map((seg) => {
@@ -804,6 +842,7 @@ export function CefalometriaEditor({
                   <g
                     key={def.id}
                     onMouseDown={(e) => handlePointMouseDown(def.id, e)}
+                    onClick={(e) => e.stopPropagation()}
                     onContextMenu={(e) => {
                       // Clic derecho: eliminar el punto
                       e.preventDefault();
