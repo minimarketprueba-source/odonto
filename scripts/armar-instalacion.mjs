@@ -48,6 +48,7 @@ const SOLO_MOVA_DENT = [
   'actualizar_aranceles_2026_08_05.sql',
   'empresa_nombre_inicial.sql',
   'marca_mova_dent_icono.sql',
+  'reparar_cuentas_rotas.sql',
 ];
 
 const existentes = readdirSync(carpeta).filter((f) => f.endsWith('.sql'));
