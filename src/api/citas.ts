@@ -96,8 +96,13 @@ export interface CreateCitaInput {
   sillon_id?: string | null;
 }
 
+// SIN telefono2: esa columna no existe en pacientes. Pedirla hacía que la base
+// rechazara la consulta ENTERA (error 42703) y la agenda y el Dashboard
+// quedaban vacíos. Pasó del 2026-10-01 al 02, cuando salió el recordatorio por
+// WhatsApp que la había agregado. Antes de pedir una columna en un select,
+// confirmar que exista (trampa 5 del CLAUDE.md).
 const CITA_SELECT =
-  "*, paciente:pacientes(id, nombres, apellidos, documento, tipo, telefono, telefono2), medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color))";
+  "*, paciente:pacientes(id, nombres, apellidos, documento, tipo, telefono), medico:medicos(id, nombres, apellidos, especialidad:especialidades(nombre, color))";
 
 /**
  * Una fecha en formato yyyy-mm-dd, tomando el día del CALENDARIO LOCAL.
