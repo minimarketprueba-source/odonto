@@ -136,6 +136,13 @@ export function CefalometriaEditor({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // Punto bajo el mouse: muestra un cartel con su nombre y qué es.
+  const [hoverPunto, setHoverPunto] = useState<{ id: string; x: number; y: number } | null>(null);
+  const mostrarCartel = (id: string, e: React.MouseEvent) => {
+    const caja = containerRef.current?.getBoundingClientRect();
+    if (!caja) return;
+    setHoverPunto({ id, x: e.clientX - caja.left, y: e.clientY - caja.top });
+  };
   const imgRef = useRef<HTMLImageElement>(null);
 
   // Si no hay puntos colocados, sugerir posiciones aproximadas iniciales al cargar la imagen
@@ -638,6 +645,27 @@ export function CefalometriaEditor({
             </Button>
           </div>
 
+          {/* Cartel del punto bajo el mouse */}
+          {hoverPunto && !arrastrandoPuntoId && (() => {
+            const def = PUNTOS_CEFALOMETRICOS.find((p) => p.id === hoverPunto.id);
+            if (!def) return null;
+            const ancho = containerRef.current?.clientWidth ?? 0;
+            const izquierda = hoverPunto.x + 290 > ancho ? hoverPunto.x - 284 : hoverPunto.x + 14;
+            return (
+              <div
+                className="pointer-events-none absolute z-40 w-[270px] rounded-lg border border-slate-600 bg-slate-900/95 px-3 py-2 text-xs shadow-2xl"
+                style={{ left: izquierda, top: hoverPunto.y + 14 }}
+              >
+                <p className="font-bold text-white">
+                  <span style={{ color: def.color }}>●</span> {def.simbolo}
+                  <span className="font-normal text-slate-300"> · {def.nombre}</span>
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-slate-400">{def.descripcion}</p>
+                <p className="mt-1 text-[10px] text-slate-500">Arrastre para moverlo · clic derecho para borrarlo</p>
+              </div>
+            );
+          })()}
+
           {/* Asistente: qué punto toca, qué es y dónde buscarlo */}
           {!modoCalibracion && srcImagen && (() => {
             const def = PUNTOS_CEFALOMETRICOS.find((p) => p.id === puntoActivoId);
@@ -768,6 +796,10 @@ export function CefalometriaEditor({
               viewBox={`0 0 ${imgDimensions.width} ${imgDimensions.height}`}
               className="absolute inset-0 w-full h-full cursor-crosshair"
               style={{ overflow: 'visible', pointerEvents: 'all' }}
+              onMouseDown={(e) => {
+                // Solo el botón izquierdo: el derecho es para borrar un punto.
+                if (e.button === 0) handleCanvasClick(e);
+              }}
             >
               {/* Superficie de captura: responde al primer clic sobre cualquier
                   parte de la radiografía, aun sin puntos. */}
@@ -779,7 +811,6 @@ export function CefalometriaEditor({
                 fill="#000000"
                 fillOpacity="0.001"
                 pointerEvents="all"
-                onMouseDown={handleCanvasClick}
               />
 
               {/* Líneas y Planos Cefalométricos */}
@@ -800,7 +831,9 @@ export function CefalometriaEditor({
                       strokeWidth={seg.grosor || 1.5}
                       strokeDasharray={seg.dash ? '4,4' : undefined}
                       opacity={0.85}
-                    />
+                    >
+                      <title>{seg.etiqueta ?? `${seg.de} – ${seg.a}`}</title>
+                    </line>
                   );
                 })}
 
@@ -843,6 +876,9 @@ export function CefalometriaEditor({
                     key={def.id}
                     onMouseDown={(e) => handlePointMouseDown(def.id, e)}
                     onClick={(e) => e.stopPropagation()}
+                    onMouseEnter={(e) => mostrarCartel(def.id, e)}
+                    onMouseMove={(e) => mostrarCartel(def.id, e)}
+                    onMouseLeave={() => setHoverPunto(null)}
                     onContextMenu={(e) => {
                       // Clic derecho: eliminar el punto
                       e.preventDefault();
