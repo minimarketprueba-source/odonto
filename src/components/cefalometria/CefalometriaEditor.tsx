@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
 import {
   PUNTOS_CEFALOMETRICOS,
+  SECUENCIA_RICKETTS,
   SEGMENTOS_CEFALOMETRICOS,
   calcularAnalisisCefalometrico,
   distanciaPuntos,
@@ -97,7 +98,23 @@ export function CefalometriaEditor({
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
 
   // Punto seleccionado para colocar o inspeccionar
-  const [puntoActivoId, setPuntoActivoId] = useState<string>('S');
+  // Asistente de marcado: guía punto por punto en el orden de Ricketts (o por
+  // todos los puntos si se apaga). Cada clic coloca el punto que toca y pasa
+  // solo al siguiente que falte. No coloca nada por su cuenta: cada punto lo
+  // marca el profesional sobre ESTA radiografía.
+  const [guiaRicketts, setGuiaRicketts] = useState(true);
+  const secuencia = useMemo(
+    () => (guiaRicketts ? SECUENCIA_RICKETTS : PUNTOS_CEFALOMETRICOS.map((p) => p.id)),
+    [guiaRicketts]
+  );
+  const siguienteSinMarcar = (desde: string | null, marcados: PuntosCefalometricosMap): string => {
+    const i = desde ? secuencia.indexOf(desde) : -1;
+    const orden = [...secuencia.slice(i + 1), ...secuencia.slice(0, Math.max(i + 1, 0))];
+    return orden.find((id) => !marcados[id]) ?? '';
+  };
+  const [puntoActivoId, setPuntoActivoId] = useState<string>(
+    () => SECUENCIA_RICKETTS.find((id) => !(estudio.puntos || {})[id]) ?? ''
+  );
   const [mostrarEtiquetas, setMostrarEtiquetas] = useState(true);
   const [mostrarLineas, setMostrarLineas] = useState(true);
   const [filtroTipoPunto, setFiltroTipoPunto] = useState<'todos' | 'esqueletico' | 'dental' | 'blando'>('todos');
@@ -186,18 +203,21 @@ export function CefalometriaEditor({
       return;
     }
 
-    // Colocar el punto activo
+    // Colocar el punto activo y pasar al siguiente que falte
     if (puntoActivoId) {
-      setPuntos((prev) => ({
-        ...prev,
-        [puntoActivoId]: coords,
-      }));
+      const nuevos = { ...puntos, [puntoActivoId]: coords };
+      setPuntos(nuevos);
       setGuardadoStatus('cambios');
 
-      // Avanzar al siguiente punto en la lista
-      const idx = PUNTOS_CEFALOMETRICOS.findIndex((p) => p.id === puntoActivoId);
-      if (idx >= 0 && idx < PUNTOS_CEFALOMETRICOS.length - 1) {
-        setPuntoActivoId(PUNTOS_CEFALOMETRICOS[idx + 1].id);
+      const siguiente = siguienteSinMarcar(puntoActivoId, nuevos);
+      setPuntoActivoId(siguiente);
+      if (!siguiente) {
+        toast.success(
+          guiaRicketts
+            ? 'Puntos de Ricketts completos. Revise el diagnóstico y guarde.'
+            : 'Todos los puntos marcados. Revise el diagnóstico y guarde.'
+        );
+        setTabDerecho('analisis');
       }
     }
   };
@@ -592,6 +612,61 @@ export function CefalometriaEditor({
             </Button>
           </div>
 
+          {/* Asistente: qué punto toca, qué es y dónde buscarlo */}
+          {!modoCalibracion && srcImagen && (() => {
+            const def = PUNTOS_CEFALOMETRICOS.find((p) => p.id === puntoActivoId);
+            const hechos = secuencia.filter((id) => puntos[id]).length;
+            const posicion = def ? secuencia.indexOf(def.id) : -1;
+            const irA = (paso: number) => {
+              if (posicion < 0) return;
+              const n = secuencia.length;
+              setPuntoActivoId(secuencia[(posicion + paso + n) % n]);
+            };
+            return (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(640px,calc(100%-6rem))] rounded-xl border border-cyan-500/40 bg-slate-900/95 px-4 py-2.5 text-xs shadow-2xl backdrop-blur">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-cyan-300">
+                    {guiaRicketts ? 'Guía Ricketts' : 'Todos los puntos'} · {hechos} de {secuencia.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-slate-300 hover:bg-slate-800"
+                      onClick={() => irA(-1)} disabled={!def}>
+                      Anterior
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-slate-300 hover:bg-slate-800"
+                      onClick={() => setPuntoActivoId(siguienteSinMarcar(puntoActivoId, puntos))} disabled={!def}>
+                      Saltar
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-slate-400 hover:bg-slate-800"
+                      onClick={() => {
+                        setGuiaRicketts((g) => !g);
+                        setPuntoActivoId('');
+                      }}
+                      title="Cambiar entre los puntos de Ricketts y todos los puntos">
+                      {guiaRicketts ? 'Ver todos' : 'Solo Ricketts'}
+                    </Button>
+                  </div>
+                </div>
+                {def ? (
+                  <p className="mt-1 text-slate-200">
+                    Marque <span className="font-bold text-white">{def.simbolo}</span>
+                    <span className="text-slate-400"> · {def.nombre}</span>
+                    <span className="block text-[11px] text-slate-400">{def.descripcion}</span>
+                  </p>
+                ) : hechos < secuencia.length ? (
+                  <button type="button" className="mt-1 text-cyan-300 underline"
+                    onClick={() => setPuntoActivoId(siguienteSinMarcar(null, puntos))}>
+                    Seguir marcando los puntos que faltan
+                  </button>
+                ) : (
+                  <p className="mt-1 text-emerald-300">
+                    Listo. Para corregir un punto, arrástrelo o elíjalo en la pestaña Puntos.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Banner de Calibración activa */}
           {modoCalibracion && (
             <div className="absolute top-4 z-30 bg-amber-500 text-slate-950 px-4 py-2 rounded-full font-bold text-xs shadow-2xl flex items-center gap-2 animate-bounce">
@@ -974,18 +1049,26 @@ export function CefalometriaEditor({
                     {(() => {
                       const anb = mediciones.find((m) => m.sigla === 'ANB');
                       const fma = mediciones.find((m) => m.sigla === 'FMA');
+                      const faltanAnb = ['S', 'N', 'A', 'B'].filter((id) => !puntos[id]);
+                      const faltanFma = ['Po', 'Or', 'Go', 'Me'].filter((id) => !puntos[id]);
                       return (
                         <div className="space-y-1.5 pt-1">
                           <div className="flex justify-between items-center text-[11px]">
                             <span className="text-slate-400">Patrón Sagital:</span>
-                            <Badge className="bg-blue-900/60 text-blue-200 border-blue-700">
-                              {anb?.interpretacion || 'Calculando...'}
+                            <Badge
+                              className="bg-blue-900/60 text-blue-200 border-blue-700"
+                              title={anb ? undefined : `Marque: ${faltanAnb.join(', ')}`}
+                            >
+                              {anb?.interpretacion ?? `Faltan: ${faltanAnb.join(', ')}`}
                             </Badge>
                           </div>
                           <div className="flex justify-between items-center text-[11px]">
                             <span className="text-slate-400">Patrón Vertical:</span>
-                            <Badge className="bg-purple-900/60 text-purple-200 border-purple-700">
-                              {fma?.interpretacion || 'Calculando...'}
+                            <Badge
+                              className="bg-purple-900/60 text-purple-200 border-purple-700"
+                              title={fma ? undefined : `Marque: ${faltanFma.join(', ')}`}
+                            >
+                              {fma?.interpretacion ?? `Faltan: ${faltanFma.join(', ')}`}
                             </Badge>
                           </div>
                         </div>
@@ -1087,12 +1170,23 @@ export function CefalometriaEditor({
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-200">Resultados Cefalométricos</span>
                     <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-700">
-                      Steiner / Tweed
+                      {mediciones.length} medidas
                     </Badge>
                   </div>
+                  {!calibracion.pixelesPorMm && (
+                    <p className="rounded-md border border-amber-700/50 bg-amber-950/40 p-2 text-[11px] text-amber-300">
+                      Sin calibrar: faltan las medidas en milímetros (convexidad, incisivos a A-Pog,
+                      labios a la línea E). Calibre con la regla de la radiografía.
+                    </p>
+                  )}
 
-                  <div className="space-y-2">
-                    {mediciones.map((m, idx) => (
+                  {(['Ricketts', 'Steiner', 'Tweed'] as const).map((grupo) => {
+                    const delGrupo = mediciones.filter((m) => (m.analisis ?? 'Ricketts') === grupo);
+                    if (!delGrupo.length) return null;
+                    return (
+                  <div key={grupo} className="space-y-2">
+                    <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300">{grupo}</p>
+                    {delGrupo.map((m, idx) => (
                       <div
                         key={idx}
                         className="p-2.5 rounded-lg bg-slate-800/70 border border-slate-700/60 space-y-1"
@@ -1117,6 +1211,8 @@ export function CefalometriaEditor({
                       </div>
                     ))}
                   </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

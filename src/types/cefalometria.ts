@@ -38,6 +38,8 @@ export interface MedicionResultado {
   desviacion?: number;
   interpretacion?: string;
   esqueletica?: boolean;
+  /** A qué análisis pertenece: se agrupan así en la pantalla y en el informe. */
+  analisis?: 'Ricketts' | 'Steiner' | 'Tweed';
 }
 
 export type TipoEstudioCefalometrico =

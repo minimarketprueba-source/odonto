@@ -164,6 +164,25 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     color: '#d946ef',
     sugerido: { x: 0.42, y: 0.59 },
   },
+  {
+    id: 'PM',
+    simbolo: 'PM',
+    nombre: 'Suprapogonion / Protuberancia mentoniana (Ricketts)',
+    descripcion:
+      'En el borde anterior de la sínfisis, donde la curva pasa de cóncava a convexa, por encima de Pogonion.',
+    tipo: 'esqueletico',
+    color: '#a3e635',
+    sugerido: { x: 0.6, y: 0.7 },
+  },
+  {
+    id: 'DC',
+    simbolo: 'DC',
+    nombre: 'Centro del cóndilo (Ricketts)',
+    descripcion: 'Centro del cuello del cóndilo, sobre la línea Ba-N.',
+    tipo: 'esqueletico',
+    color: '#f472b6',
+    sugerido: { x: 0.36, y: 0.5 },
+  },
 
   // --- Dentales ---
   {
@@ -511,6 +530,11 @@ export function calcularAnalisisCefalometrico(
   const Go = puntos['Go'];
   const Me = puntos['Me'];
   const Pt = puntos['Pt'];
+  const PM = puntos['PM'];
+  const DC = puntos['DC'];
+  const Xi = puntos['Xi'];
+  const ANS = puntos['ANS'];
+  const Pog = puntos['Pog'];
   const Ba = puntos['Ba'];
   const Gn = puntos['Gn'];
   const U1A = puntos['U1A'];
@@ -735,5 +759,153 @@ export function calcularAnalisisCefalometrico(
     });
   }
 
-  return resultados;
+  // ================================================================
+  // RICKETTS (resumen clínico)
+  // ================================================================
+  // Normas de adulto. En niños varias cambian con la edad (el ángulo facial
+  // aumenta ~1° cada 3 años): la interpretación es orientativa y la decide el
+  // profesional.
+  const empujar = (
+    m: Omit<MedicionResultado, 'desviacion' | 'interpretacion'> & { normaValor: number; tolerancia: number },
+    textos: [mas: string, menos: string, normal: string]
+  ) => {
+    const { normaValor, tolerancia, ...resto } = m;
+    const desv = Number((m.valor - normaValor).toFixed(1));
+    resultados.push({
+      ...resto,
+      desviacion: desv,
+      interpretacion: desv > tolerancia ? textos[0] : desv < -tolerancia ? textos[1] : textos[2],
+    });
+  };
+
+  // Ángulo facial (profundidad facial): Frankfort con N-Pog.
+  if (Po && Or && N && Pog) {
+    empujar(
+      { nombre: 'Ángulo facial (profundidad facial)', sigla: 'Ángulo facial', tipo: 'angulo',
+        valor: Number(anguloEntreVectores(Po, Or, Pog, N).toFixed(1)), unidad: '°',
+        norma: '87° (± 3°)', normaValor: 87, tolerancia: 3, esqueletica: true },
+      ['Mandíbula adelantada (tendencia Clase III)', 'Mandíbula retruida (tendencia Clase II)', 'Posición mandibular normal']
+    );
+  }
+
+  // Profundidad maxilar: Frankfort con N-A.
+  if (Po && Or && N && A) {
+    empujar(
+      { nombre: 'Profundidad maxilar', sigla: 'Prof. maxilar', tipo: 'angulo',
+        valor: Number(anguloEntreVectores(Po, Or, A, N).toFixed(1)), unidad: '°',
+        norma: '90° (± 3°)', normaValor: 90, tolerancia: 3, esqueletica: true },
+      ['Maxilar adelantado', 'Maxilar retruido', 'Maxilar bien ubicado']
+    );
+  }
+
+  // Plano mandibular respecto a Frankfort (la versión de Ricketts).
+  if (Po && Or && Go && Me) {
+    empujar(
+      { nombre: 'Ángulo del plano mandibular (Ricketts)', sigla: 'Plano mandibular', tipo: 'angulo',
+        valor: Number(anguloEntreLineas(Po, Or, Go, Me).toFixed(1)), unidad: '°',
+        norma: '26° (± 4°)', normaValor: 26, tolerancia: 4, esqueletica: true },
+      ['Dolicofacial (crecimiento vertical)', 'Braquifacial (crecimiento horizontal)', 'Mesofacial']
+    );
+  }
+
+  // Altura facial inferior: ANS-Xi-PM.
+  if (ANS && Xi && PM) {
+    empujar(
+      { nombre: 'Altura facial inferior (ANS-Xi-PM)', sigla: 'AFI', tipo: 'angulo',
+        valor: Number(anguloEntre3Puntos(ANS, Xi, PM).toFixed(1)), unidad: '°',
+        norma: '47° (± 4°)', normaValor: 47, tolerancia: 4, esqueletica: true },
+      ['Altura facial inferior aumentada (mordida abierta)', 'Altura facial inferior disminuida (mordida profunda)', 'Altura facial inferior normal']
+    );
+  }
+
+  // Arco mandibular: eje del cóndilo (DC-Xi) con el cuerpo (Xi-PM).
+  if (DC && Xi && PM) {
+    empujar(
+      { nombre: 'Arco mandibular (DC-Xi / Xi-PM)', sigla: 'Arco mandibular', tipo: 'angulo',
+        valor: Number((180 - anguloEntre3Puntos(DC, Xi, PM)).toFixed(1)), unidad: '°',
+        norma: '26° (± 4°)', normaValor: 26, tolerancia: 4, esqueletica: true },
+      ['Mandíbula cuadrada (braquifacial)', 'Mandíbula abierta (dolicofacial)', 'Arco mandibular normal']
+    );
+  }
+
+  // Deflexión craneal: Ba-N con Frankfort.
+  if (Ba && N && Po && Or) {
+    empujar(
+      { nombre: 'Deflexión craneal (Ba-N / Frankfort)', sigla: 'Deflexión craneal', tipo: 'angulo',
+        valor: Number(anguloEntreLineas(Ba, N, Po, Or).toFixed(1)), unidad: '°',
+        norma: '27° (± 3°)', normaValor: 27, tolerancia: 3, esqueletica: true },
+      ['Base de cráneo favorece Clase III', 'Base de cráneo favorece Clase II', 'Deflexión craneal normal']
+    );
+  }
+
+  // Convexidad: distancia de A al plano facial N-Pog (positivo = A por delante).
+  if (A && N && Pog && pxPorMm) {
+    empujar(
+      { nombre: 'Convexidad facial (A a N-Pog)', sigla: 'Convexidad', tipo: 'distancia',
+        valor: Number((sentido * distanciaPuntoALinea(A, N, Pog, pxPorMm)).toFixed(1)), unidad: 'mm',
+        norma: '2 mm (± 2 mm)', normaValor: 2, tolerancia: 2, esqueletica: true },
+      ['Perfil convexo (tendencia Clase II)', 'Perfil cóncavo (tendencia Clase III)', 'Convexidad normal']
+    );
+  }
+
+  // Incisivo inferior respecto de A-Pog: posición (mm) e inclinación (°).
+  if (L1I && A && Pog && pxPorMm) {
+    empujar(
+      { nombre: 'Incisivo inferior a A-Pog (protrusión)', sigla: 'L1-APog (mm)', tipo: 'distancia',
+        valor: Number((sentido * distanciaPuntoALinea(L1I, A, Pog, pxPorMm)).toFixed(1)), unidad: 'mm',
+        norma: '1 mm (± 2 mm)', normaValor: 1, tolerancia: 2, esqueletica: false },
+      ['Incisivo inferior protruido', 'Incisivo inferior retruido', 'Posición normal']
+    );
+  }
+  if (L1A && L1I && A && Pog) {
+    empujar(
+      { nombre: 'Inclinación del incisivo inferior a A-Pog', sigla: 'L1-APog (°)', tipo: 'angulo',
+        valor: Number(anguloEntreLineas(L1A, L1I, A, Pog).toFixed(1)), unidad: '°',
+        norma: '22° (± 4°)', normaValor: 22, tolerancia: 4, esqueletica: false },
+      ['Incisivo inferior proinclinado', 'Incisivo inferior retroinclinado', 'Inclinación normal']
+    );
+  }
+
+  // Incisivo superior respecto de A-Pog.
+  if (U1I && A && Pog && pxPorMm) {
+    empujar(
+      { nombre: 'Incisivo superior a A-Pog (protrusión)', sigla: 'U1-APog (mm)', tipo: 'distancia',
+        valor: Number((sentido * distanciaPuntoALinea(U1I, A, Pog, pxPorMm)).toFixed(1)), unidad: 'mm',
+        norma: '3,5 mm (± 2 mm)', normaValor: 3.5, tolerancia: 2, esqueletica: false },
+      ['Incisivo superior protruido', 'Incisivo superior retruido', 'Posición normal']
+    );
+  }
+  if (U1A && U1I && A && Pog) {
+    empujar(
+      { nombre: 'Inclinación del incisivo superior a A-Pog', sigla: 'U1-APog (°)', tipo: 'angulo',
+        valor: Number(anguloEntreLineas(U1A, U1I, A, Pog).toFixed(1)), unidad: '°',
+        norma: '28° (± 4°)', normaValor: 28, tolerancia: 4, esqueletica: false },
+      ['Incisivo superior proinclinado', 'Incisivo superior retroinclinado', 'Inclinación normal']
+    );
+  }
+
+  return resultados.map((m) => ({ ...m, analisis: ANALISIS_DE[m.sigla] ?? 'Ricketts' }));
 }
+
+/** A qué análisis corresponde cada medida, para agruparlas. */
+const ANALISIS_DE: Record<string, MedicionResultado['analisis']> = {
+  SNA: 'Steiner',
+  SNB: 'Steiner',
+  ANB: 'Steiner',
+  '1-NA (°)': 'Steiner',
+  '1-NB (°)': 'Steiner',
+  Interincisivo: 'Steiner',
+  FMA: 'Tweed',
+  IMPA: 'Tweed',
+};
+
+/**
+ * Orden de marcado del asistente para el análisis de Ricketts: de arriba hacia
+ * abajo y de atrás hacia adelante, como se recorre la placa. Solo los puntos
+ * que usa el análisis (más los de Steiner, que salen gratis con los mismos).
+ */
+export const SECUENCIA_RICKETTS: string[] = [
+  'S', 'N', 'Ba', 'Po', 'Or', 'Pt', 'DC', 'Xi', 'ANS', 'PNS', 'A',
+  'U1A', 'U1I', 'L1I', 'L1A', 'B', 'PM', 'Pog', 'Gn', 'Me', 'Go',
+  'Pn', 'UL', 'LL', 'Pog_b',
+];
