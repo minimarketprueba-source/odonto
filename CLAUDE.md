@@ -399,7 +399,7 @@ Trampas de los scripts de prueba: PostgREST exige que todos los objetos de un lo
 ## Pendientes
 
 1. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta. **Bloquea las recetas**: sin ficha vinculada no se puede emitir ninguna, porque el documento se firma con ese nombre y su `numero_colegiatura`. Al 2026-08-06 sigue habiendo 0.
-2. **Publicar las Edge Functions `create-user` y `update-user-password`** desde el panel (Edge Functions → Deploy via Editor, nombre exacto, pegar el `index.ts` de cada una). Al 2026-10-02 las dos responden `404`: sin ellas no se pueden crear cuentas nuevas (sí sumar cuentas existentes a una empresa) ni cambiar contraseñas desde Usuarios. Las dos se reescribieron para multiempresa.
+2. ~~Publicar las Edge Functions~~ → **publicadas el 2026-10-02** (`create-user` y `update-user-password`). Ojo: el editor del panel propone un nombre AL AZAR (`rapid-task`…); hay que escribir el nombre exacto antes de Deploy, porque después no se puede renombrar. Probadas en vivo: el dueño crea el admin de una empresa nueva, el admin crea y cambia la contraseña de su gente, y no puede crear gente en otra empresa ni tocar contraseñas ajenas (403).
 3. **Completar los datos del consultorio** en Mantenimiento → Consultorio: el nombre ya está, faltan RUC, dirección y teléfono. Salen en todos los impresos.
 4. **Revisar las tarifas**: hay 12 de ejemplo.
 5. Sin revisar: los impresos de odontograma y consentimiento, cómo se ve en celular, y **emitir una receta de punta a punta** (no se pudo por el punto 1).
