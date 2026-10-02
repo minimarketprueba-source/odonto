@@ -70,8 +70,9 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `medicos_vinculo_unico.sql` | Índice único: una cuenta, una sola ficha de odontólogo | Aplicada 2026-08-06 |
 | `cefalometria_setup.sql` | `cefalometria_estudios` + depósito PRIVADO `cefalometria` para radiografías y fotos | Aplicada 2026-09-30 |
 | `historial_procedimientos_y_archivos.sql` | `fecha_realizado` en tratamientos + depósito PRIVADO `radiografias` (imágenes y PDF de la ficha) | Aplicada 2026-09-30 |
-| `marca_mova_dent_icono.sql` | **Solo Mova Dent**: guarda su ícono en su base (el de fábrica pasó a ser genérico) | Pendiente (2026-10-01) |
-| `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Pendiente (2026-10-01) |
+| `marca_mova_dent_icono.sql` | **Solo Mova Dent**: guarda su ícono en su base (el de fábrica pasó a ser genérico) | Aplicada 2026-10-02 (por API) |
+| `reparar_cuentas_rotas.sql` | Pone '' en columnas de `auth.users` que estaban en NULL (cuentas creadas con INSERT directo) | Aplicada 2026-10-02 |
+| `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Aplicada 2026-10-02 |
 
 ---
 
@@ -199,8 +200,14 @@ sirviendo para una instalación aparte, pero lo normal es sumar empresas desde l
 pantalla **Empresas**. Decisiones del usuario:
 
 - **Las empresas las crea solo el dueño del sistema** (`sistema_duenos`,
-  pantalla `/empresas`). Los dueños iniciales son las cuentas que eran
-  `superadmin`.
+  pantalla `/empresas`). El usuario pidió que sea una cuenta APARTE de la de
+  Karen: el único dueño es **superadmin1@odonto.com**, y se la sacó de Mova
+  Dent (no ve pacientes). superadmin2 sigue como superadmin de Mova Dent.
+  Karen (`karynair91@gmail.com`) es admin de Mova Dent.
+- **Cuentas creadas con INSERT directo en `auth.users` quedan rotas**
+  ("Database error loading user") y además rompen la lista de usuarios del
+  panel entera. Las superadmin1/2 estaban así hasta el 2026-10-02. Crear
+  cuentas SIEMPRE con la API admin o la Edge Function `create-user`.
 - **El dueño NO ve pacientes.** Ser dueño solo permite crear empresas y darles
   administrador. Ver fichas exige ser miembro de la empresa.
 - **Una persona puede trabajar en varias empresas** con un rol en cada una:
@@ -242,6 +249,11 @@ a correr si existe `sistema_duenos`, porque recrearían reglas sin empresa
 `rls_completo.sql`…) y, como las reglas se SUMAN, abrirían los pacientes de
 todas las empresas. Un cambio de permisos nuevo va en una migración NUEVA que
 respete `mi_clinica_id()`, nunca reeditando las viejas.
+
+**Probado en vivo** el 2026-10-02: el dueño entra, no ve pacientes y crea
+empresas desde la pantalla; una persona en dos empresas ve solo la activa y
+el selector cambia lo que ve; Karen y el odontólogo de Mova Dent siguen
+viendo sus 16 pacientes y nada de las empresas de prueba (borradas después).
 
 **Probado** el 2026-10-01 con PGlite (Postgres en memoria): actualización de
 una base con datos como la de Mova Dent (no se pierde nada, todos siguen
@@ -387,7 +399,7 @@ Trampas de los scripts de prueba: PostgREST exige que todos los objetos de un lo
 ## Pendientes
 
 1. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta. **Bloquea las recetas**: sin ficha vinculada no se puede emitir ninguna, porque el documento se firma con ese nombre y su `numero_colegiatura`. Al 2026-08-06 sigue habiendo 0.
-2. **Publicar la Edge Function `create-user`** desde el panel (Edge Functions → Deploy via Editor, nombre exacto `create-user`, pegar `supabase/functions/create-user/index.ts`). Sin ella el botón "Crear usuario" falla: **la función nunca existió en el servidor**, respondía `404 NOT_FOUND`.
+2. **Publicar las Edge Functions `create-user` y `update-user-password`** desde el panel (Edge Functions → Deploy via Editor, nombre exacto, pegar el `index.ts` de cada una). Al 2026-10-02 las dos responden `404`: sin ellas no se pueden crear cuentas nuevas (sí sumar cuentas existentes a una empresa) ni cambiar contraseñas desde Usuarios. Las dos se reescribieron para multiempresa.
 3. **Completar los datos del consultorio** en Mantenimiento → Consultorio: el nombre ya está, faltan RUC, dirección y teléfono. Salen en todos los impresos.
 4. **Revisar las tarifas**: hay 12 de ejemplo.
 5. Sin revisar: los impresos de odontograma y consentimiento, cómo se ve en celular, y **emitir una receta de punta a punta** (no se pudo por el punto 1).
