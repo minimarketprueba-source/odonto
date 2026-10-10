@@ -17,6 +17,7 @@ import { CasoDetalleView, ImagenGuardada } from '@/components/cefalometria/CasoD
 import { EstudioCefalometrico } from '@/types/cefalometria';
 import { Search, Plus, Trash2, ScanLine, User, ImageIcon, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { showSwal } from '@/components/ui/swal';
 
 const mensajeError = (error: unknown, porDefecto: string) =>
   error instanceof Error && error.message ? error.message : porDefecto;
@@ -128,7 +129,15 @@ export default function Cefalometria() {
 
   const handleEliminarEstudio = async (estudio: EstudioCefalometrico, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!window.confirm('¿Eliminar este registro cefalométrico con su trazado y sus imágenes?')) return;
+    const { isConfirmed } = await showSwal({
+      icon: 'warning',
+      title: '¿Eliminar este registro?',
+      text: 'Se eliminarán el trazado y todas sus imágenes.',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar registro',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!isConfirmed) return;
     try {
       await eliminarEstudioMutation.mutateAsync(estudio);
       if (estudioEnEdicion?.id === estudio.id) setEstudioEnEdicion(null);

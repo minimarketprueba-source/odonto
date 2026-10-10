@@ -59,20 +59,17 @@ async function ensureSwal() {
     }
   }
 
-  // Fallback: devolver un mock mínimo que no rompa los callers
+  // Si SweetAlert2 no pudiera cargarse, no se abre un diálogo nativo del
+  // navegador. En especial, una confirmación debe quedar cancelada por
+  // seguridad y no ejecutar acciones destructivas.
   const noopSwal = {
     fire: async (opts: SweetAlertOptions) => {
-      const title = typeof opts.title === "string" ? opts.title : "Alerta"
-      const text = typeof opts.text === "string" ? opts.text : ""
-      // Intentar usar alert nativo como último recurso
-      if (typeof window !== "undefined" && window.alert) {
-        window.alert(`${title}\n\n${text}`)
-      }
+      console.error('[swal] SweetAlert2 no se pudo cargar.', opts)
       return {
-        isConfirmed: true,
+        isConfirmed: false,
         isDenied: false,
-        isDismissed: false,
-        value: true,
+        isDismissed: true,
+        value: undefined,
       }
     },
   }

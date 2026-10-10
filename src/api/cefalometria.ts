@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { generarUuid } from '@/lib/uuid';
 import { EstudioCefalometrico } from '@/types/cefalometria';
 import { esTablaInexistente } from '@/lib/esquema';
 
@@ -120,7 +121,7 @@ export async function getEstudiosPorPaciente(pacienteId: string): Promise<Estudi
 export async function guardarEstudioCefalometrico(
   estudio: Partial<EstudioCefalometrico> & { paciente_id: string }
 ): Promise<EstudioCefalometrico> {
-  const id = estudio.id || crypto.randomUUID();
+  const id = estudio.id || generarUuid();
 
   let imagenUrl = estudio.imagen_url || '';
   if (imagenUrl.startsWith('data:')) {

@@ -434,8 +434,8 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
                 ? undefined
                 : (marcaVigente(piezaSeleccionada, zona.cara) ??
                   marcaVigente(piezaSeleccionada, 'completo'))
-            const propiedades = {
-              key: zona.cara,
+            const { cara: key, ...propiedades } = {
+              cara: zona.cara,
               role: 'button',
               tabIndex: 0,
               fill: estado?.color ?? 'rgb(var(--card))',
@@ -456,11 +456,11 @@ export function Odontograma({ pacienteId }: OdontogramaProps) {
             }
 
             return zona.forma === 'rect' ? (
-              <rect {...propiedades} x="25" y="25" width="30" height="30" rx="3">
+              <rect key={key} {...propiedades} x="25" y="25" width="30" height="30" rx="3">
                 <title>{NOMBRE_CARA[zona.cara] ?? zona.cara}</title>
               </rect>
             ) : (
-              <path {...propiedades} d={zona.d}>
+              <path key={key} {...propiedades} d={zona.d}>
                 <title>{NOMBRE_CARA[zona.cara] ?? zona.cara}</title>
               </path>
             )

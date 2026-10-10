@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { generarUuid } from '@/lib/uuid';
 
 // ---------------------------------------------------------------------------
 // Interfaces y Tipos
@@ -720,7 +721,7 @@ export async function uploadImagenFile(
     .replace(/[^a-zA-Z0-9_-]/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 80) || "radiografia";
-  const ruta = `${pacienteId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const ruta = `${pacienteId}/${Date.now()}-${generarUuid()}.${extension}`;
 
   const { error } = await supabase.storage.from("radiografias").upload(ruta, file, {
     cacheControl: "3600",

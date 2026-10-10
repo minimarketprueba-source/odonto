@@ -38,6 +38,7 @@ import {
 import { toast } from 'sonner';
 import { esRutaDeposito, useUrlImagenCefalometria } from '@/api/cefalometria';
 import { imprimirInformeCefalometrico } from '@/lib/imprimir';
+import { showSwal } from '@/components/ui/swal';
 
 interface CefalometriaEditorProps {
   estudio: EstudioCefalometrico;
@@ -302,8 +303,16 @@ export function CefalometriaEditor({
   };
 
   // Eliminar todos los puntos del trazado
-  const handleLimpiarTrazado = () => {
-    if (!window.confirm('¿Eliminar todos los puntos del trazado cefalométrico? Esta acción no se puede deshacer.')) return;
+  const handleLimpiarTrazado = async () => {
+    const { isConfirmed } = await showSwal({
+      icon: 'warning',
+      title: '¿Eliminar todo el trazado?',
+      text: 'Se eliminarán todos los puntos y la calibración. Esta acción no se puede deshacer.',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar trazado',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!isConfirmed) return;
     setPuntos({});
     setCalibracion({ distanciaRealMm: 10 });
     setGuardadoStatus('cambios');
@@ -350,14 +359,17 @@ export function CefalometriaEditor({
   };
 
   // Restablecer puntos a valores sugeridos
-  const handleRestablecerPuntos = () => {
-    if (
-      !window.confirm(
-        'Se colocarán los puntos en posiciones promedio de una plantilla, NO de esta radiografía. ' +
-          'Sirven de guía: hay que arrastrar cada uno a su lugar antes de usar las medidas. ¿Continuar?'
-      )
-    )
-      return;
+  const handleRestablecerPuntos = async () => {
+    const { isConfirmed } = await showSwal({
+      icon: 'warning',
+      title: '¿Usar la plantilla de puntos?',
+      text:
+        'Colocará los puntos en posiciones promedio, no en esta radiografía. Son solo una guía: ajuste cada punto antes de usar las medidas.',
+      showCancelButton: true,
+      confirmButtonText: 'Usar plantilla',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!isConfirmed) return;
     const sugeridos: PuntosCefalometricosMap = {};
     PUNTOS_CEFALOMETRICOS.forEach((p) => {
       if (p.sugerido) {
@@ -437,12 +449,18 @@ export function CefalometriaEditor({
     });
   };
 
-  const handleVolver = () => {
-    if (
-      guardadoStatus === 'cambios' &&
-      !window.confirm('Hay cambios en el trazado que no se guardaron. ¿Salir igual y perderlos?')
-    )
-      return;
+  const handleVolver = async () => {
+    if (guardadoStatus === 'cambios') {
+      const { isConfirmed } = await showSwal({
+        icon: 'warning',
+        title: 'Hay cambios sin guardar',
+        text: 'Si sale ahora, se perderán los cambios del trazado.',
+        showCancelButton: true,
+        confirmButtonText: 'Salir sin guardar',
+        cancelButtonText: 'Seguir editando',
+      });
+      if (!isConfirmed) return;
+    }
     onVolver?.();
   };
 
@@ -877,7 +895,6 @@ export function CefalometriaEditor({
                     onMouseDown={(e) => handlePointMouseDown(def.id, e)}
                     onClick={(e) => e.stopPropagation()}
                     onMouseEnter={(e) => mostrarCartel(def.id, e)}
-                    onMouseMove={(e) => mostrarCartel(def.id, e)}
                     onMouseLeave={() => setHoverPunto(null)}
                     onContextMenu={(e) => {
                       // Clic derecho: eliminar el punto
@@ -885,7 +902,7 @@ export function CefalometriaEditor({
                       e.stopPropagation();
                       handleEliminarPunto(def.id);
                     }}
-                    className="cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                    className="cursor-grab active:cursor-grabbing"
                     style={{ pointerEvents: 'all' }}
                   >
                     {/* Anillo de punto activo o seleccionado */}

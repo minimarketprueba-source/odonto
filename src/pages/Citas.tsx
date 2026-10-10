@@ -26,6 +26,7 @@ import {
 import { PreconsultaDialog } from "@/components/citas/preconsulta-dialog";
 import { useBorrarCita } from "@/api/anulaciones";
 import { useSillones } from "@/api/sillones";
+import { showSwal } from "@/components/ui/swal";
 
 // Auxiliar para plurales simples en los avisos
 function plural(n: number, singular: string, plural: string): string {
@@ -92,12 +93,17 @@ export default function Citas() {
 
   const handleBorrarCita = async (cita: Cita) => {
     const quien = cita.paciente ? `${cita.paciente.apellidos}, ${cita.paciente.nombres}` : "este paciente";
-    const confirmado = window.confirm(
-      `¿Borrar la cita del ${cita.fecha} a las ${(cita.hora || "").slice(0, 5)} de ${quien}?\n\n` +
-      "Se borra para siempre y no queda ningún registro. Use esto solo si la cita se cargó por error.\n" +
-      'Si el paciente no vino, es mejor "No acudió"; si se suspendió, "Cancelar".'
-    );
-    if (!confirmado) return;
+    const { isConfirmed } = await showSwal({
+      icon: "warning",
+      title: "¿Borrar esta cita?",
+      text:
+        `Cita del ${cita.fecha} a las ${(cita.hora || "").slice(0, 5)} de ${quien}. ` +
+        'Se borra definitivamente. Si el paciente no vino, use “No acudió”; si se suspendió, “Cancelar”.',
+      showCancelButton: true,
+      confirmButtonText: "Borrar cita",
+      cancelButtonText: "Conservar cita",
+    });
+    if (!isConfirmed) return;
     try {
       await borrar.mutateAsync(cita.id);
       toast.success("Cita borrada.");

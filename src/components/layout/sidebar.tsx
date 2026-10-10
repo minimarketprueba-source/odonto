@@ -9,6 +9,7 @@ import { useState } from "react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useEmpresa } from "@/api/empresa";
 import { ICONO_PREDETERMINADO } from "@/lib/clinica";
+import { showSwal } from '@/components/ui/swal'
 
 // Helper para obtener la ruta correcta del logo
 const getLogoPath = () => {
@@ -90,8 +91,9 @@ export function Sidebar() {
         )}
       >
         <div className="flex flex-col h-full relative">
-          {/* Gradient overlay with breathing animation */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none animate-pulse" style={{ animationDuration: '4s' }} />
+          {/* Fondo sutil y estático: la animación continua del menú provocaba
+              distracción y un parpadeo visible en equipos de menor potencia. */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
 
           {/* Subtle border animation */}
           <div className="absolute inset-0 border-l-2 border-gradient-to-b from-primary/20 via-accent/10 to-primary/20 pointer-events-none" />
@@ -172,7 +174,11 @@ export function Sidebar() {
                     await cambiarEmpresa(e.target.value)
                   } catch (error) {
                     setCambiando(false)
-                    alert(error instanceof Error ? error.message : "No se pudo cambiar de empresa")
+                    await showSwal({
+                      icon: 'error',
+                      title: 'No se pudo cambiar de empresa',
+                      text: error instanceof Error ? error.message : undefined,
+                    })
                   }
                 }}
                 className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm font-medium"
@@ -206,7 +212,7 @@ export function Sidebar() {
                     onClick={() => setIsOpen(false)}
                   >
                     {isActive && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 animate-pulse" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20" />
                     )}
                     <item.icon className={cn(
                       "w-5 h-5 transition-all duration-200 relative z-10 flex-shrink-0",
@@ -232,7 +238,7 @@ export function Sidebar() {
                     )}
 
                     {isActive && !item.badge && !isCollapsed && (
-                      <div className="absolute right-2 w-2 h-2 bg-white rounded-full animate-pulse" />
+                      <div className="absolute right-2 h-2 w-2 rounded-full bg-white" />
                     )}
                   </Link>
                 </div>
@@ -254,7 +260,7 @@ export function Sidebar() {
                   {(nombreMostrado?.charAt(0) || user?.email?.charAt(0) || 'U').toUpperCase()}
                 </span>
                 {/* Online status indicator */}
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full animate-pulse" />
+                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
               </div>
               <div className={cn(
                 "flex-1 min-w-0 transition-all duration-300 overflow-hidden",

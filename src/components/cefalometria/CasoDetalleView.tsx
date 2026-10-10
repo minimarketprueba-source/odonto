@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useUrlImagenCefalometria } from '@/api/cefalometria'
+import { showSwal } from '@/components/ui/swal'
 
 type PestanaId =
   | 'digitalizacion'
@@ -293,7 +294,15 @@ export function CasoDetalleView({
       return
     }
     const nombre = SLOTS_IMAGENES.find((slot) => slot.id === slotId)?.etiqueta || 'la imagen'
-    if (!window.confirm(`¿Quitar ${nombre} de este registro?`)) return
+    const { isConfirmed } = await showSwal({
+      icon: 'warning',
+      title: `¿Quitar ${nombre}?`,
+      text: 'La imagen se quitará de este registro.',
+      showCancelButton: true,
+      confirmButtonText: 'Quitar imagen',
+      cancelButtonText: 'Cancelar',
+    })
+    if (!isConfirmed) return
     const actualizadas = { ...imagenesSlots }
     delete actualizadas[slotId]
     if (await guardarImagenes(slotId, actualizadas)) toast.success('Imagen quitada.')

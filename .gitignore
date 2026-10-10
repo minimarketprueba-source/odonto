@@ -11,6 +11,7 @@
 # production (build/ es buildResources de electron-builder: contiene el icono, se versiona)
 /dist
 /release
+/release-portable*
 
 # debug
 npm-debug.log*
