@@ -43,6 +43,9 @@ const ORDEN = [
   // No toca reglas de acceso (solo habilita los avisos en vivo), así que puede
   // ir después de multiempresa sin romper la condición de arriba.
   'tiempo_real.sql',
+  // Tiene que ir DESPUÉS de multiempresa: reemplaza la regla común que ese
+  // archivo le da a liquidaciones_odontologos por una de solo administrador.
+  'liquidaciones_solo_admin.sql',
 ];
 
 // Datos de Mova Dent: sus precios y su nombre. Un consultorio nuevo arranca

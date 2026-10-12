@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- este archivo ES el que escribe en la consola; el resto del código pasa por acá. */
 /**
  * Sistema de logging que deshabilita logs en producción
  * En desarrollo: muestra todos los logs

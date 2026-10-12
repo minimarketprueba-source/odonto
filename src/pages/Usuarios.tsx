@@ -32,8 +32,9 @@ import { toast } from "@/hooks/use-toast";
 import { showSwal } from "@/components/ui/swal";
 import { supabase, getSupabaseUrl, getSupabaseAnonKey } from "@/lib/supabase";
 import { recordAuditAction } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 import {
-  useAuth, esEstadoActivo, DEFAULT_PERMISOS_CLINICA, MODULOS_CLINICA, ROLES_CLINICA_OPCIONES,
+  useAuth, esEstadoActivo, DEFAULT_PERMISOS_CLINICA, MODULOS_CLINICA, ROLES_CLINICA_OPCIONES, normalizarRol,
 } from "@/context/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -228,7 +229,7 @@ function buildUsers(profiles: RawProfile[], roles: RawRoleRow[]): UserRecord[] {
         null,
       // Sin fila en user_roles no hay acceso: mostrarlo como
       // "solo lectura" hacía creer que la persona podía entrar.
-      role: roleRow?.role ?? profile?.role ?? "sin_rol",
+      role: normalizarRol(roleRow?.role ?? profile?.role) ?? "sin_rol",
       statusLabel: isActive ? "Activo" : "Inactivo",
       isActive,
       seccion: profile?.seccion ?? profile?.area ?? null,
@@ -376,7 +377,7 @@ export default function Usuarios() {
             displayName,
             createdAt: row.created_at ?? null,
             lastLoginAt: row.last_sign_in_at ?? row.role_updated_at ?? null,
-            role: rol?.role ?? row.role ?? "sin_rol",
+            role: normalizarRol(rol?.role ?? row.role) ?? "sin_rol",
             statusLabel: isActive ? "Activo" : "Inactivo",
             isActive,
             seccion: null,
@@ -689,7 +690,7 @@ export default function Usuarios() {
     } catch (error) {
       console.error("Error actualizando rol:", error);
       const detail = error && typeof error === "object" ? (error as any).message || (error as any).details || JSON.stringify(error) : String(error);
-      console.debug("updateRole error detail:", detail);
+      logger.debug("updateRole error detail:", detail);
       if ((error as any)?.status === 403) {
         toast({
           title: "Acción prohibida",
@@ -790,7 +791,7 @@ export default function Usuarios() {
           details: `Vía UI - toggleActiveState`,
         });
       } catch (auditErr) {
-        console.debug("No se pudo registrar auditoría:", auditErr);
+        logger.debug("No se pudo registrar auditoría:", auditErr);
       }
 
       toast({
@@ -801,7 +802,7 @@ export default function Usuarios() {
       console.error("Error cambiando estado:", error);
       // Mostrar detalle del error para facilitar debugging en entorno de desarrollo
       const detail = error && typeof error === "object" ? (error as any).message || (error as any).details || JSON.stringify(error) : String(error);
-      console.debug("toggleActiveState error detail:", detail);
+      logger.debug("toggleActiveState error detail:", detail);
       await showSwal({
         icon: "error",
         title: "Error al cambiar estado",
@@ -817,7 +818,7 @@ export default function Usuarios() {
           details: String(detail).slice(0, 1000),
         });
       } catch (auditErr) {
-        console.debug("No se pudo registrar auditoría (error):", auditErr);
+        logger.debug("No se pudo registrar auditoría (error):", auditErr);
       }
       toast({
         title: "Error",
@@ -867,7 +868,7 @@ export default function Usuarios() {
         target_user_id: passwordDialogUser.id,
         action: "cambio_contrasenna",
         details: `Contraseña de ${passwordDialogUser.displayName} actualizada por administrador.`,
-      }).catch(err => console.debug("Fallo registro auditoría clave:", err));
+      }).catch(err => logger.debug("Fallo registro auditoría clave:", err));
 
       toast({
         title: "Contraseña actualizada",

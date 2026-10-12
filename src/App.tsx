@@ -121,7 +121,7 @@ function App() {
           <Route path="/citas" element={<ProtectedRoute moduleKey="citas"><Citas /></ProtectedRoute>} />
           <Route path="/horarios" element={<ProtectedRoute moduleKey="citas"><Horarios /></ProtectedRoute>} />
           <Route path="/presupuestos" element={<ProtectedRoute moduleKey="consultas"><Presupuestos /></ProtectedRoute>} />
-          <Route path="/liquidaciones" element={<ProtectedRoute moduleKey="consultas"><Liquidaciones /></ProtectedRoute>} />
+          <Route path="/liquidaciones" element={<ProtectedRoute moduleKey="consultas" soloAdmin><Liquidaciones /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><PerfilUsuario /></ProtectedRoute>} />
           <Route path="/reportes" element={<ProtectedRoute moduleKey="reportes"><Reportes /></ProtectedRoute>} />
           <Route path="/mantenimiento" element={<ProtectedRoute moduleKey="mantenimiento"><Mantenimiento /></ProtectedRoute>} />

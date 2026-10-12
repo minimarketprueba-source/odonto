@@ -64,7 +64,7 @@ export default function PerfilUsuario() {
       setApellidoMedico((prev) => prev || miMedico.apellidos || "");
       setRegistroMedico((prev) => prev || (miMedico as any).numero_colegiatura || perfilProf?.registro || "");
     }
-  }, [miMedico, nombrePerfil, perfilProf?.registro]);
+  }, [miMedico, nombrePerfil, perfilProf?.registro, perfilProf?.telefono]);
 
   const guardarFichaMedico = async () => {
     if (!miMedico) return;

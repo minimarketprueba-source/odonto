@@ -74,6 +74,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `reparar_cuentas_rotas.sql` | Pone '' en columnas de `auth.users` que estaban en NULL (cuentas creadas con INSERT directo) | Aplicada 2026-10-02 |
 | `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Aplicada 2026-10-02 |
 | `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | **PENDIENTE de aplicar** |
+| `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | **PENDIENTE de aplicar** |
 
 ---
 
@@ -320,9 +321,24 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   importe; un pago mayor al saldo o sobre un plan sin procedimientos pide
   confirmación diciendo cuánto sobra (no se bloquea: la seña es un caso real).
 
-Quedaron anotados para después: el rol `asistente` lo aceptan la base y
-`create-user` pero la app no; recepción ve Liquidaciones; logos de la Policía y
-de Mova Dent sin uso en `public/`.
+- **Liquidaciones solo para el administrador** (decisión por defecto de Claude;
+  el usuario no contestó): la pantalla usa `soloAdmin` en `ProtectedRoute` y el
+  menú, y la base lo hace cumplir con `liquidaciones_solo_admin.sql`. NO es un
+  módulo repartible en Usuarios a propósito: si se le diera a recepción, la base
+  igual le negaría los datos. ⚠️ Si alguna vez se vuelve a correr
+  `multiempresa.sql`, hay que volver a correr `liquidaciones_solo_admin.sql`.
+  Probado en PGlite con el instalador completo: admin ve y crea lo de su
+  empresa; recepción y odontólogo no ven ni crean; el admin de otra empresa no
+  puede cargar una liquidación para un odontólogo ajeno.
+- **Rol `asistente`**: `normalizarRol()` lo convierte en `enfermeria` al leerlo
+  (auth-context y la lista de Usuarios). Antes entraba y veía "Sin acceso".
+- Se quitaron los logos de la Policía (`public/logos/`), el encabezado
+  institucional y las pantallas de registro público, que nadie usaba.
+  Los logos de Mova Dent en `public/` se dejaron: `mova-dent-icono.png` lo usa
+  la base (`clinicas.icono_url`) y los otros podrían estar referenciados ahí.
+
+Quedan 83 avisos de lint, todos `no-explicit-any` (tipos sin declarar); no
+cambian el funcionamiento. `npm run lint` sigue fallando por eso.
 
 ## Cefalometría (revisado el 2026-09-30)
 
@@ -377,7 +393,7 @@ Chrome del sistema vía Playwright.
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (258 tests)
+npm run test:run     # Vitest una corrida (263 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql

@@ -12,6 +12,12 @@ interface ProtectedRouteProps {
   moduleKey?: string
   /** Solo para dueños del sistema (pantalla Empresas). No requiere empresa. */
   soloDueno?: boolean
+  /**
+   * Solo administradores de la empresa (Liquidaciones: lo que se le paga a cada
+   * odontólogo). No es un permiso repartible en Usuarios porque la base lo
+   * niega igual a los demás roles (liquidaciones_solo_admin.sql).
+   */
+  soloAdmin?: boolean
 }
 
 /** Usuario autenticado pero sin un rol que dé acceso a la clínica. */
@@ -43,12 +49,13 @@ function SinAcceso() {
   )
 }
 
-export function ProtectedRoute({ children, moduleKey, soloDueno }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, moduleKey, soloDueno, soloAdmin }: ProtectedRouteProps) {
   const { user, role, isLoading, esDueno } = useAuth()
-  const { canView } = usePermissions()
+  const { canView, isAdmin } = usePermissions()
   const navigate = useNavigate()
 
   const esPersonalClinica = !!role && ROLES_CLINICA.includes(role)
+  const sinPermiso = (!!moduleKey && !canView(moduleKey)) || (!!soloAdmin && !isAdmin)
 
   // Suscripción automática a Realtime Postgres Changes
   useRealtimeSubscriptions(!!user && esPersonalClinica)
@@ -57,11 +64,11 @@ export function ProtectedRoute({ children, moduleKey, soloDueno }: ProtectedRout
     if (isLoading) return;
     if (!user) {
       navigate("/auth/login")
-    } else if (esPersonalClinica && moduleKey && !canView(moduleKey)) {
+    } else if (esPersonalClinica && sinPermiso) {
       // Si el usuario está autenticado pero no tiene permiso para el módulo
       navigate("/", { replace: true })
     }
-  }, [user, isLoading, navigate, moduleKey, canView, esPersonalClinica])
+  }, [user, isLoading, navigate, sinPermiso, esPersonalClinica])
 
   if (isLoading) {
     return (
@@ -84,7 +91,7 @@ export function ProtectedRoute({ children, moduleKey, soloDueno }: ProtectedRout
 
   // Mientras se procesa la redirección en el useEffect, mostramos un estado de carga
   // para evitar el flash de contenido antes de navegar
-  if (!user || (moduleKey && !canView(moduleKey))) {
+  if (!user || sinPermiso) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

@@ -8,6 +8,7 @@ import {
   ROLES_CLINICA_OPCIONES,
   esEstadoActivo,
   resolverPermisosClinica,
+  normalizarRol,
 } from '@/context/auth-context'
 
 /**
@@ -117,5 +118,21 @@ describe('permisos efectivos', () => {
 
   it('sin rol no concede permisos', () => {
     expect(resolverPermisosClinica(null, {})).toBeNull()
+  })
+})
+
+describe('rol asistente', () => {
+  // La base y create-user aceptan `asistente`; la app lo conocía como
+  // `enfermeria`. Una cuenta con `asistente` entraba y veía "Sin acceso".
+  it('asistente se trata como el asistente dental de la app', () => {
+    expect(normalizarRol('asistente')).toBe('enfermeria')
+    expect(normalizarRol(' Asistente ')).toBe('enfermeria')
+    expect(ROLES_CLINICA).toContain(normalizarRol('asistente'))
+  })
+
+  it('los demás roles quedan como están', () => {
+    expect(normalizarRol('ADMIN')).toBe('admin')
+    expect(normalizarRol('recepcion')).toBe('recepcion')
+    expect(normalizarRol(null)).toBeNull()
   })
 })

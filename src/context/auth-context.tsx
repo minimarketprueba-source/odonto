@@ -152,6 +152,17 @@ export function rolPorCorreo(email?: string | null): string {
   return 'medico'
 }
 
+/**
+ * El rol tal como lo usa la app. La base y la Edge Function `create-user`
+ * aceptan `asistente`, pero la app nació con `enfermeria` para el mismo puesto
+ * (asistente dental): una cuenta con `asistente` entraba y veía "Sin acceso".
+ */
+export function normalizarRol(rol: string | null | undefined): string | null {
+  if (!rol) return null
+  const r = rol.trim().toLowerCase()
+  return r === 'asistente' ? 'enfermeria' : r
+}
+
 export function resolverPermisosClinica(
   rol: string | null,
   permissions: Record<string, string[]> | null
@@ -448,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setRole(null)
           setPermissions(null)
         } else if (roleData) {
-          const rol = roleData.role ? roleData.role.toLowerCase() : null
+          const rol = normalizarRol(roleData.role)
           setRole(rol)
           setPermissions(
             resolverPermisosClinica(rol, roleData.permissions as Record<string, string[]> | null)
@@ -477,7 +488,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           syncedProfilesRef.current.add(user.id)
         }
       } catch (syncError) {
-        console.error('[DEBUG] Error sincronizando el perfil del usuario:', syncError)
         logger.error('Error sincronizando el perfil del usuario:', syncError)
       } finally {
         // Siempre marcar como resuelto para no dejar el loader colgado.
@@ -502,7 +512,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     })
     if (error) {
-      console.error('[DEBUG] Login error details:', error)
+      logger.error('Error al iniciar sesión:', error)
       throw error
     }
   }

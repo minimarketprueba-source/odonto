@@ -37,7 +37,7 @@ export function Sidebar() {
   const { data: perfil } = usePerfilProfesional(user)
   const nombreMostrado = perfil?.nombre?.trim() || null
   const { isOpen, setIsOpen, isCollapsed, setIsCollapsed } = useSidebar()
-  const { canView } = usePermissions()
+  const { canView, isAdmin } = usePermissions()
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: Home, badge: null as number | null },
@@ -46,7 +46,7 @@ export function Sidebar() {
     { name: "Citas", href: "/citas", icon: CalendarDays, badge: null as number | null, moduleKey: "citas" },
     { name: "Horarios", href: "/horarios", icon: Clock, badge: null as number | null, moduleKey: "citas" },
     { name: "Presupuestos", href: "/presupuestos", icon: DollarSign, badge: null as number | null, moduleKey: "consultas" },
-    { name: "Liquidaciones", href: "/liquidaciones", icon: Receipt, badge: null as number | null, moduleKey: "consultas" },
+    { name: "Liquidaciones", href: "/liquidaciones", icon: Receipt, badge: null as number | null, moduleKey: "consultas", soloAdmin: true },
     { name: "Reportes", href: "/reportes", icon: BarChart2, badge: null as number | null, moduleKey: "reportes" },
     { name: "Mantenimiento", href: "/mantenimiento", icon: Settings, badge: null as number | null, moduleKey: "mantenimiento" },
     { name: "Usuarios", href: "/usuarios", icon: Shield, badge: null as number | null, moduleKey: "usuarios" },
@@ -57,6 +57,8 @@ export function Sidebar() {
 
   const visibleNavigation = navigation.filter(item => {
     if ('soloDueno' in item) return esDueno;
+    // Liquidaciones: lo que cobra cada odontólogo, solo lo ve el administrador.
+    if ('soloAdmin' in item && item.soloAdmin && !isAdmin) return false;
     if (!item.moduleKey) return true; // Dashboard y Notificaciones siempre visibles
     return canView(item.moduleKey);
   });

@@ -178,7 +178,7 @@ export default function Reportes() {
     rolUsuario: role ?? undefined,
   })
 
-  const atenciones = produccion?.atenciones ?? []
+  const atenciones = useMemo(() => produccion?.atenciones ?? [], [produccion?.atenciones])
   const facturacion = produccion?.facturacion ?? {
     cobrado: 0,
     presupuestado: 0,

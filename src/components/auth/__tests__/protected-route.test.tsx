@@ -121,4 +121,43 @@ describe("ProtectedRoute - Guardias de Navegación y Roles", () => {
     expect(screen.getByText("Sin acceso al sistema")).toBeDefined();
     expect(screen.queryByText("Dashboard de la clínica")).toBeNull();
   });
+
+  // Liquidaciones: lo que cobra cada odontólogo. Antes la veía cualquiera con
+  // el módulo de presupuestos, incluida recepción.
+  function liquidacionesComo(role: string) {
+    authState.user = { id: "user-123", email: "x@odonto.com" };
+    authState.role = role;
+    authState.permissions = { consultas: ["ver", "editar"] };
+    render(
+      <MemoryRouter initialEntries={["/liquidaciones"]}>
+        <Routes>
+          <Route path="/" element={<div>Dashboard de la clínica</div>} />
+          <Route
+            path="/liquidaciones"
+            element={
+              <ProtectedRoute moduleKey="consultas" soloAdmin>
+                <div>Liquidaciones de honorarios</div>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it("una pantalla soloAdmin no se abre para recepción aunque tenga el módulo", () => {
+    liquidacionesComo("recepcion");
+    expect(screen.queryByText("Liquidaciones de honorarios")).toBeNull();
+    expect(screen.getByText("Dashboard de la clínica")).toBeDefined();
+  });
+
+  it("una pantalla soloAdmin tampoco se abre para un odontólogo", () => {
+    liquidacionesComo("medico");
+    expect(screen.queryByText("Liquidaciones de honorarios")).toBeNull();
+  });
+
+  it("una pantalla soloAdmin se abre para el administrador", () => {
+    liquidacionesComo("admin");
+    expect(screen.getByText("Liquidaciones de honorarios")).toBeDefined();
+  });
 });
