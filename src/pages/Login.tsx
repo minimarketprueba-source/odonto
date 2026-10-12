@@ -16,7 +16,7 @@ import { useEmpresa } from '@/api/empresa'
  */
 function mensajeErrorLogin(err: unknown): string {
   const e = err as { message?: string; code?: string } | null
-  const codigo = (e as any)?.code ?? ''
+  const codigo = e?.code ?? ''
   const texto = e?.message ?? ''
 
   if (codigo === 'email_not_confirmed' || texto.includes('Email not confirmed')) {

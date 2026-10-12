@@ -173,7 +173,7 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
       });
       return noOpObj;
     }
-    const value = (client as any)[prop];
+    const value = (client as unknown as Record<string | symbol, unknown>)[prop];
     return typeof value === 'function' ? value.bind(client) : value;
   },
 });

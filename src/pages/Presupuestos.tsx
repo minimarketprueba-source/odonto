@@ -19,6 +19,7 @@ import {
   useOdontoPrecios,
   useSaveOdontoPrecio,
   useDeletePresupuesto,
+  type OdontoPrecio,
 } from '@/api/odontologia'
 import {
   DollarSign,
@@ -76,14 +77,14 @@ export default function Presupuestos() {
     }
   }
 
-  const handleEditPrecioClick = (p: any) => {
+  const handleEditPrecioClick = (p: OdontoPrecio) => {
     setEditingPrecioId(p.id)
     setPrecioCodigo(p.codigo)
     setPrecioNombre(p.nombre)
     setPrecioCosto(String(p.costo))
   }
 
-  const handleTogglePrecioActivo = async (p: any) => {
+  const handleTogglePrecioActivo = async (p: OdontoPrecio) => {
     try {
       await savePrecio.mutateAsync({
         ...p,

@@ -39,6 +39,7 @@ import {
   useCreateConsentimiento,
   useOdontoPrecios,
   useProcedimientosRealizadosPaciente,
+  type Presupuesto,
   uploadImagenFile,
 } from '@/api/odontologia'
 import { Combobox } from '@/components/ui/combobox'
@@ -419,7 +420,7 @@ export default function FichaPaciente() {
         fecha: formatDateDisplay(p.fecha, 'es-PY'),
         monto: Number(p.monto) || 0,
         metodo: p.tipo_pago ?? '—',
-        plan: (p as any).plan ?? null,
+        plan: p.plan ?? null,
       })),
       totalCobrado,
       totalAdeudado,
@@ -487,7 +488,7 @@ export default function FichaPaciente() {
       detalles: detalles.map((d) => ({
         pieza: d.pieza,
         cara: d.cara,
-        tratamiento: (d as any).odontologia_precios?.nombre ?? 'Procedimiento',
+        tratamiento: d.odontologia_precios?.nombre ?? 'Procedimiento',
         costo: Number(d.costo) || 0,
         descuento: Number(d.descuento) || 0,
       })),
@@ -1117,7 +1118,7 @@ export default function FichaPaciente() {
                             onValueChange={(val) =>
                               updatePresupuesto.mutate({
                                 id: activePresupuesto.id,
-                                cambios: { estado: val as any },
+                                cambios: { estado: val as Presupuesto['estado'] },
                               })
                             }
                           >

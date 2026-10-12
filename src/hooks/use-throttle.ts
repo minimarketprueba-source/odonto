@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 
-export function useThrottle<T extends (...args: any[]) => any>(
+export function useThrottle<T extends (...args: never[]) => unknown>(
   callback: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -19,7 +19,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
   )
 }
 
-export function useDebounceCallback<T extends (...args: any[]) => any>(
+export function useDebounceCallback<T extends (...args: never[]) => unknown>(
   callback: T,
   delay: number
 ): (...args: Parameters<T>) => void {

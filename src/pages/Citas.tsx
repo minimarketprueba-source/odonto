@@ -498,7 +498,7 @@ export default function Citas() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
               {sillones.map((s) => {
-                const citasSillon = citas.filter((c: any) => c.sillon_id === s.id);
+                const citasSillon = citas.filter((c) => c.sillon_id === s.id);
                 return (
                   <div key={s.id} className="border rounded-xl bg-card overflow-hidden">
                     <div className="px-4 py-3 font-semibold text-white flex items-center gap-2" style={{ backgroundColor: s.color }}>
@@ -543,14 +543,14 @@ export default function Citas() {
                 <div className="px-4 py-3 font-semibold text-muted-foreground border-b border-dashed flex items-center gap-2">
                   Sin Sillón Asignado
                   <span className="ml-auto bg-muted px-2 py-0.5 rounded-full text-xs text-foreground">
-                    {citas.filter((c: any) => !c.sillon_id).length}
+                    {citas.filter((c) => !c.sillon_id).length}
                   </span>
                 </div>
                 <div className="p-2 space-y-2 max-h-[60vh] overflow-y-auto">
-                  {citas.filter((c: any) => !c.sillon_id).length === 0 ? (
+                  {citas.filter((c) => !c.sillon_id).length === 0 ? (
                     <p className="text-sm text-center text-muted-foreground py-6">Todos los pacientes tienen sillón</p>
                   ) : (
-                    citas.filter((c: any) => !c.sillon_id).map((c) => (
+                    citas.filter((c) => !c.sillon_id).map((c) => (
                       <div key={c.id} className="p-2 border rounded bg-background shadow-sm flex flex-col gap-1 text-sm">
                         <div className="flex justify-between items-start">
                           <span className="font-bold">{(c.hora || "").slice(0, 5)}</span>

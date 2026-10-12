@@ -18,7 +18,7 @@ const getLogoPath = () => {
   // oscuro, así que se ve igual en modo claro y oscuro.
   const archivo = ICONO_PREDETERMINADO.replace(/^\//, '');
   // En Electron, usar ruta relativa al index.html
-  if (typeof window !== 'undefined' && (window as any).electron) {
+  if (typeof window !== 'undefined' && window.electron) {
     return `./${archivo}`;
   }
   // En web, usar ruta absoluta

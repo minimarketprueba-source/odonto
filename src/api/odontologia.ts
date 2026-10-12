@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { generarUuid } from '@/lib/uuid';
 import { toast } from "sonner";
-import { esColumnaInexistente, esTablaInexistente } from "@/lib/esquema";
+import { esColumnaInexistente, esTablaInexistente, type ErrorSupabase } from "@/lib/esquema";
 import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ export const odontoKeys = {
 // PGRST204, un dígito). Antes las dos decían "la tabla no existe" y mandaban a
 // ejecutar odontologia_setup.sql, que ya está aplicada, cuando lo que faltaba
 // era una columna de esquema_completo.sql.
-function handleDbError(error: any, tabla: string): never {
+function handleDbError(error: ErrorSupabase | null, tabla: string): never {
   logger.error(`Error en tabla ${tabla}:`, error);
   if (esTablaInexistente(error)) {
     throw new Error(
@@ -409,10 +409,11 @@ export async function recalcularTotalesPresupuesto(presupuestoId: string | numbe
   if (errorPagos) handleDbError(errorPagos, "pagos_presupuesto");
 
   const total = (detalles ?? []).reduce(
-    (suma, d: any) => suma + (Number(d.costo) || 0) - (Number(d.descuento) || 0),
+    (suma, d: Pick<PresupuestoDetalle, "costo" | "descuento">) =>
+      suma + (Number(d.costo) || 0) - (Number(d.descuento) || 0),
     0
   );
-  const abonado = (pagos ?? []).reduce((suma, p: any) => suma + (Number(p.monto) || 0), 0);
+  const abonado = (pagos ?? []).reduce((suma, p: Pick<PagoPresupuesto, "monto">) => suma + (Number(p.monto) || 0), 0);
 
   // Si el paciente pagó de más (una seña mayor al plan todavía sin cargar), el
   // saldo es 0 y no un número negativo, que se leería como deuda al revés.
@@ -518,13 +519,27 @@ export function useUpdatePresupuestoDetalle() {
  * Tratamientos efectivamente realizados, separados de los que solamente fueron
  * presupuestados. La fecha es la de realización y nunca la fecha del plan.
  */
+/** "2026-08-15" del día LOCAL de una marca de tiempo (no el día UTC). */
+function diaLocal(marca: string): string {
+  const d = new Date(marca);
+  if (Number.isNaN(d.getTime())) return "";
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
+/** Fila de presupuesto_detalles con el tratamiento y el plan anidados. */
+type DetalleRealizadoFila = Pick<PresupuestoDetalle, "id" | "pieza" | "cara" | "fecha_realizado" | "created_at"> & {
+  odontologia_precios?: { nombre?: string | null } | null;
+  presupuesto?: { titulo?: string | null } | null;
+};
+
 export async function fetchProcedimientosRealizadosPaciente(
   pacienteId: string
 ): Promise<ProcedimientoRealizado[]> {
   const { data, error } = await supabase
     .from("presupuesto_detalles")
     .select(
-      "id, pieza, cara, fecha_realizado, odontologia_precios(nombre), presupuesto:presupuestos!inner(paciente_id, titulo)"
+      "id, pieza, cara, fecha_realizado, created_at, odontologia_precios(nombre), presupuesto:presupuestos!inner(paciente_id, titulo)"
     )
     .eq("estado", "realizado")
     .eq("presupuesto.paciente_id", pacienteId)
@@ -532,9 +547,13 @@ export async function fetchProcedimientosRealizadosPaciente(
 
   if (error) handleDbError(error, "presupuesto_detalles");
 
-  return (data ?? []).map((detalle: any) => ({
+  // PostgREST devuelve las relaciones de a una como objeto; el tipo que infiere
+  // supabase-js sin el esquema generado las da como lista.
+  return ((data ?? []) as unknown as DetalleRealizadoFila[]).map((detalle) => ({
     id: detalle.id,
-    fecha: detalle.fecha_realizado,
+    // Los marcados como realizados antes de existir fecha_realizado no la
+    // tienen: sin esto el historial mostraba "Invalid Date" y se desordenaba.
+    fecha: detalle.fecha_realizado || diaLocal(detalle.created_at),
     nombre: detalle.odontologia_precios?.nombre ?? "Procedimiento sin nombre",
     pieza: detalle.pieza ?? null,
     cara: detalle.cara ?? null,
@@ -611,7 +630,10 @@ export async function fetchPagosPaciente(pacienteId: string): Promise<(PagoPresu
     .eq("presupuesto.paciente_id", pacienteId)
     .order("fecha", { ascending: true });
   if (error) handleDbError(error, "pagos_presupuesto");
-  return (data ?? []).map((p: any) => ({ ...p, plan: p.presupuesto?.titulo ?? null }));
+  return (data ?? []).map((p: PagoPresupuesto & { presupuesto?: { titulo?: string | null } | null }) => ({
+    ...p,
+    plan: p.presupuesto?.titulo ?? null,
+  }));
 }
 
 export function usePagosPaciente(pacienteId: string) {

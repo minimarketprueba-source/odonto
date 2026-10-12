@@ -57,9 +57,66 @@ import {
 } from "lucide-react";
 import { MIN_CONTRASENA, AVISO_CONTRASENA_CORTA } from "@/lib/contrasena";
 
+/**
+ * Fila de profiles. Los nombres alternativos (correo, full_name, phone…) son de
+ * cuentas que vienen de las apps de las que nació esta: se leen si están.
+ */
 interface RawProfile {
-  [key: string]: any;
   id: string;
+  email?: string | null;
+  correo?: string | null;
+  email_principal?: string | null;
+  username?: string | null;
+  nombre?: string | null;
+  apellido?: string | null;
+  nombre_completo?: string | null;
+  full_name?: string | null;
+  activo?: boolean | null;
+  status?: string | null;
+  role?: string | null;
+  created_at?: string | null;
+  createdAt?: string | null;
+  last_login_at?: string | null;
+  last_sign_in_at?: string | null;
+  updated_at?: string | null;
+  seccion?: string | null;
+  area?: string | null;
+  telefono?: string | null;
+  phone?: string | null;
+}
+
+/** Fila de user_admin_audit tal como la muestra la pestaña de auditoría. */
+interface RegistroAuditoria {
+  id: string | number;
+  created_at: string;
+  action: string;
+  details: string | null;
+  actor_id: string | null;
+}
+
+/** Fila que devuelve la función list_admin_users. */
+interface FilaListaUsuarios {
+  id: string;
+  email?: string | null;
+  username?: string | null;
+  activo?: boolean | null;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+  role_updated_at?: string | null;
+  role?: string | null;
+}
+
+/** El texto más útil de un error de Supabase, de fetch o de lo que sea. */
+function detalleDeError(error: unknown): string {
+  if (error && typeof error === "object") {
+    const e = error as { message?: string; details?: string };
+    return e.message || e.details || JSON.stringify(error);
+  }
+  return String(error);
+}
+
+function estadoHttpDe(error: unknown): number | undefined {
+  return (error as { status?: number } | null)?.status;
 }
 
 interface RawRoleRow {
@@ -205,7 +262,7 @@ function buildUsers(profiles: RawProfile[], roles: RawRoleRow[]): UserRecord[] {
       profile?.email ?? profile?.correo ?? profile?.email_principal ?? profile?.username ?? "Sin correo";
     const displayName =
       [profile?.nombre, profile?.apellido]
-        .filter((value?: string) => Boolean(value && value.trim().length))
+        .filter((value?: string | null) => Boolean(value && value.trim().length))
         .join(" ") || profile?.nombre_completo || profile?.full_name || email;
 
     // Manda `user_roles.status`, que es lo que mira el RLS y lo que escribe
@@ -281,7 +338,7 @@ export default function Usuarios() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // Estado para los logs de auditoría
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<RegistroAuditoria[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_PAGE_SIZE = 20;
@@ -368,7 +425,7 @@ export default function Usuarios() {
           (roleRows ?? []).map((r) => [r.user_id, r as RawRoleRow])
         );
 
-        const normalized: UserRecord[] = (rpcData as any[]).map((row) => {
+        const normalized: UserRecord[] = (rpcData as FilaListaUsuarios[]).map((row) => {
           const rol = estadoPorUsuario.get(row.id);
           const isActive = rol ? esEstadoActivo(rol.status) : row.activo ?? true;
           const displayName = row.username || row.email || "Sin nombre";
@@ -518,7 +575,7 @@ export default function Usuarios() {
 
       // Leer respuesta como texto primero para evitar crash si no es JSON válido
       const resText = await res.text();
-      let data: any;
+      let data: { error?: string; existente?: boolean; user_id?: string } | null;
       try {
         data = JSON.parse(resText);
       } catch {
@@ -587,9 +644,9 @@ export default function Usuarios() {
 
       resetNewUserForm();
       setCreateDialogOpen(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creando usuario:", error);
-      setCreateError(error?.message || "No se pudo crear el usuario.");
+      setCreateError((error as Error)?.message || "No se pudo crear el usuario.");
     } finally {
       setIsCreating(false);
     }
@@ -690,9 +747,9 @@ export default function Usuarios() {
       setRoleDialogUser(null);
     } catch (error) {
       console.error("Error actualizando rol:", error);
-      const detail = error && typeof error === "object" ? (error as any).message || (error as any).details || JSON.stringify(error) : String(error);
+      const detail = detalleDeError(error);
       logger.debug("updateRole error detail:", detail);
-      if ((error as any)?.status === 403) {
+      if (estadoHttpDe(error) === 403) {
         toast({
           title: "Acción prohibida",
           description: "No tienes permisos suficientes para actualizar roles (403).",
@@ -761,7 +818,7 @@ export default function Usuarios() {
         .select("user_id, status, role");
       if (error) {
         console.error("Supabase user_roles upsert error:", error);
-        if ((error as any)?.status === 403) {
+        if (estadoHttpDe(error) === 403) {
           toast({
             title: "Acción prohibida",
             description: "No tienes permisos suficientes para modificar el estado (403).",
@@ -802,7 +859,7 @@ export default function Usuarios() {
     } catch (error) {
       console.error("Error cambiando estado:", error);
       // Mostrar detalle del error para facilitar debugging en entorno de desarrollo
-      const detail = error && typeof error === "object" ? (error as any).message || (error as any).details || JSON.stringify(error) : String(error);
+      const detail = detalleDeError(error);
       logger.debug("toggleActiveState error detail:", detail);
       await showSwal({
         icon: "error",

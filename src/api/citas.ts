@@ -43,6 +43,7 @@ export interface Cita {
   agendado_por: string | null; // email de quien agendó (registro estilo PY HIS)
   admitida_at: string | null; // cuándo llegó el paciente (check-in)
   orden_llegada: number | null; // nº de orden del día para el médico
+  sillon_id?: string | null; // sillón asignado (vista por sillones de la agenda)
   // Preconsulta: signos vitales que se toman mientras el paciente
   // espera al médico. Todos opcionales (migración SQL_Preconsulta.txt).
   pa_sistolica?: number | null;
@@ -81,6 +82,9 @@ export interface Medico {
   apellidos: string;
   activo: boolean;
   user_id?: string | null;
+  /** Solo los trae fetchMiMedico (Mi perfil los muestra y los vuelve a guardar). */
+  numero_colegiatura?: string | null;
+  telefono?: string | null;
   especialidad: { id: string; nombre: string; color: string | null } | null;
 }
 
@@ -288,7 +292,10 @@ export async function fetchMiMedico(userId: string): Promise<Medico | null> {
   // que un dato viejo no deje a nadie sin trabajar.
   const { data, error } = await supabase
     .from("medicos")
-    .select("id, nombres, apellidos, activo, user_id, especialidad:especialidades(id, nombre, color)")
+    // numero_colegiatura y telefono SÍ hacen falta: Mi perfil los muestra y al
+    // guardar los vuelve a escribir. Sin pedirlos, el campo aparecía vacío y
+    // guardar el perfil BORRABA el registro profesional que firma las recetas.
+    .select("id, nombres, apellidos, activo, user_id, numero_colegiatura, telefono, especialidad:especialidades(id, nombre, color)")
     .eq("user_id", userId)
     .order("activo", { ascending: false })
     .limit(2);

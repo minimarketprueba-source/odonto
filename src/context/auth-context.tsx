@@ -234,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The errors will still be handled properly by our error handlers below
     const originalConsoleError = console.error
 
-    console.error = function (...args: any[]) {
+    console.error = function (...args: unknown[]) {
       const suppressedErrors = ['AuthApiError', 'Invalid Refresh Token', 'refresh_token_not_found']
 
       const shouldSuppress = args.some((arg) => {
@@ -246,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (typeof arg === 'object' && arg !== null) {
           // Check message property or stringify for other objects
-          const msg = arg.message || JSON.stringify(arg)
+          const msg = String((arg as { message?: unknown }).message || JSON.stringify(arg))
           return suppressedErrors.some((err) => msg.includes(err))
         }
         return false
@@ -394,7 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!data) {
-          const payload: Record<string, any> = {
+          const payload: Record<string, unknown> = {
             id: user.id,
           }
 
@@ -449,7 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             code: roleError.code,
             details: roleError.details,
             hint: roleError.hint,
-            status: (roleError as any).status,
+            status: (roleError as { status?: number }).status,
           })
         } else if (roleData && !esEstadoActivo(roleData.status as string | null)) {
           // Cuenta suspendida: se la trata como sin rol para que ProtectedRoute
@@ -530,7 +530,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const { error } = result as any
+    const { error } = result as Awaited<typeof signOutPromise>
     setUser(null)
     setRole(null)
     setPermissions(null)

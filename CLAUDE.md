@@ -348,8 +348,30 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   ⚠️ Las Edge Functions todavía aceptan 6 (estaban siendo editadas por otra
   sesión y no se tocaron). Las contraseñas existentes siguen sirviendo.
 
-Quedan 83 avisos de lint, todos `no-explicit-any` (tipos sin declarar); no
-cambian el funcionamiento. `npm run lint` sigue fallando por eso.
+- **`npm run lint` pasa con 0 avisos** (antes 94). En las pruebas se apagó
+  `no-explicit-any` (dobles de Supabase armados a mano); en el resto se
+  declararon los tipos. Se quitó `src/types/sweetalert2.d.ts`: la librería trae
+  los suyos, más precisos. Mantenerlo en 0: un aviso nuevo es una señal.
+  Al tipar aparecieron dos errores de verdad:
+  - **Mi perfil BORRABA el registro profesional y el teléfono del odontólogo**
+    al guardar: `fetchMiMedico` no pedía esas columnas, el campo salía vacío y
+    se guardaba vacío. El registro es el que firma las recetas.
+  - Un procedimiento "realizado" sin `fecha_realizado` (marcado antes de que
+    existiera la columna) salía como "Invalid Date" en el historial. Ahora usa
+    la fecha de carga.
+  - Supabase-js, sin el esquema generado, tipa las relaciones anidadas como
+    listas; PostgREST las devuelve como objeto. Por eso hay `as unknown as`
+    con un tipo de fila declarado en `odontologia.ts` y `productividad.ts`.
+- **Página en blanco** (`ErrorBoundary` en `App.tsx` + `recarga-por-version.ts`
+  + `vite:preloadError` en `main.tsx`): no había ningún ErrorBoundary. Si se
+  publica con la app abierta, al abrir una pantalla su archivo ya no existe:
+  ahora recarga sola (una vez por minuto como máximo) y, si sigue fallando,
+  muestra un aviso con "Recargar". Probado en Chrome borrando un archivo de
+  `dist/`.
+- Se quitaron restos sin uso del sistema anterior: `api/consultas.ts`,
+  `api/lista-espera.ts`, `api/index.ts`, `lib/utils/imc-utils.ts`,
+  `types/peso.ts`. Quedan componentes de `ui/` sin usar: son de la plantilla
+  shadcn y no llegan al sitio.
 
 ## Cefalometría (revisado el 2026-09-30)
 
@@ -404,7 +426,7 @@ Chrome del sistema vía Playwright.
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (266 tests)
+npm run test:run     # Vitest una corrida (271 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql

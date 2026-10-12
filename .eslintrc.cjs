@@ -38,6 +38,15 @@ module.exports = {
       version: 'detect',
     },
   },
+  overrides: [
+    {
+      // Las pruebas arman dobles de Supabase a mano (objetos que imitan la
+      // cadena .from().select().eq()...): tiparlos entero no protege de nada y
+      // tapaba con ruido los avisos del código de verdad.
+      files: ['src/**/__tests__/**', 'src/setupTests.ts'],
+      rules: { '@typescript-eslint/no-explicit-any': 'off' },
+    },
+  ],
   // `supabase/functions` corre en Deno, no en el navegador: usa `Deno.serve` e
   // importa por URL, y no está en el tsconfig del frontend. Lintearlo acá solo
   // produce ruido sobre un archivo que este eslint no puede entender.

@@ -63,7 +63,7 @@ export default function PerfilUsuario() {
     if (miMedico) {
       setNombreMedico((prev) => prev || miMedico.nombres || "");
       setApellidoMedico((prev) => prev || miMedico.apellidos || "");
-      setRegistroMedico((prev) => prev || (miMedico as any).numero_colegiatura || perfilProf?.registro || "");
+      setRegistroMedico((prev) => prev || miMedico.numero_colegiatura || perfilProf?.registro || "");
     }
   }, [miMedico, nombrePerfil, perfilProf?.registro, perfilProf?.telefono]);
 
@@ -131,7 +131,7 @@ export default function PerfilUsuario() {
   };
 
   useEffect(() => {
-    if (miMedico) setTelefono((miMedico as { telefono?: string | null }).telefono ?? "");
+    if (miMedico) setTelefono(miMedico.telefono ?? "");
   }, [miMedico]);
 
   /** Los rechazos de Supabase al cambiar la contraseña, en castellano. */

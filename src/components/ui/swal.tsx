@@ -3,7 +3,9 @@ import { useCallback } from "react"
 import type { SweetAlertOptions } from "sweetalert2"
 import "@/styles/components/swal.css"
 
-let Swal: any = null
+type SwalLib = typeof import("sweetalert2").default
+
+let Swal: SwalLib | null = null
 let loadAttempted = false
 
 function sleep(ms: number) {
@@ -13,9 +15,9 @@ function sleep(ms: number) {
 async function ensureSwal() {
   if (Swal) return Swal
 
-  const tryLoad = async (): Promise<any> => {
+  const tryLoad = async (): Promise<SwalLib> => {
     const mod = await import("sweetalert2")
-    let s = mod.default ?? mod
+    let s = mod.default
     // Configuración global para mejorar accesibilidad
     if (s.mixin) {
       s = s.mixin({
@@ -210,7 +212,9 @@ export async function showSwal(options: SweetAlertOptions) {
     }
   }
 
-  return s.fire(combinedOptions)
+  // combinedOptions sale de un SweetAlertOptions con agregados; el tipo oficial
+  // es una unión según el tipo de campo (input) que el spread no conserva.
+  return s.fire(combinedOptions as SweetAlertOptions)
 }
 
 export default useSwal

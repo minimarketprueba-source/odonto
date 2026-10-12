@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { HelmetProvider } from 'react-helmet-async'
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import { isSupabaseConfigured } from "@/lib/supabase"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as ToasterSonner } from "@/components/ui/sonner"
@@ -49,6 +50,7 @@ const ConfigurarSupabase = lazy(() => import('./pages/ConfigurarSupabase'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 
 function App() {
+  const location = useLocation();
   const [configured, setConfigured] = useState<boolean | null>(null);
   // El nombre y el ícono de la pestaña salen de la base, no de index.html:
   // ese archivo se escribe al compilar y dejaría "Mova Dent" fijo para
@@ -92,6 +94,8 @@ function App() {
 
   return (
     <HelmetProvider>
+      {/* key: al cambiar de pantalla se olvida el error de la anterior. */}
+      <ErrorBoundary key={location.pathname}>
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
@@ -132,6 +136,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
       {/* DOS sistemas de avisos, y hay que montar los dos.
           `Toaster` es el de shadcn, que usa `useToast` de @/hooks/use-toast.
           `ToasterSonner` es el de la librería sonner, que usa `toast` de

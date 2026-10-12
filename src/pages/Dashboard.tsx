@@ -451,7 +451,7 @@ export default function Dashboard() {
                             fontWeight: 600,
                           }}
                           itemStyle={{ color: 'rgb(var(--foreground))' }}
-                          formatter={(value: any, name: any) => [
+                          formatter={(value: number | string, name: string) => [
                             `${Number(value).toLocaleString('es-PY')} ₲`,
                             name,
                           ]}
@@ -519,7 +519,7 @@ export default function Dashboard() {
                                 fontSize: '12px',
                               }}
                               itemStyle={{ color: 'rgb(var(--foreground))' }}
-                              formatter={(value: any) => [`${value} planes`, 'Cantidad']}
+                              formatter={(value: number | string) => [`${value} planes`, 'Cantidad']}
                             />
                           </PieChart>
                         </ResponsiveContainer>

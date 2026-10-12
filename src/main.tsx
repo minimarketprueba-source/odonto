@@ -7,9 +7,19 @@ import { AuthProvider } from './context/auth-context'
 import { SidebarProvider } from './context/sidebar-context'
 import { ThemeProvider } from '@/components/theme-provider'
 import { queryClient } from '@/lib/query-client'
+import { recargarUnaVez } from '@/lib/recarga-por-version'
+
+// Vite avisa con este evento cuando no pudo bajar el archivo de una pantalla:
+// casi siempre es porque se publicó una versión nueva con la app abierta y el
+// archivo viejo ya no existe. Recargar trae los nombres nuevos (ver
+// recarga-por-version.ts). Si ya se recargó hace menos de un minuto, se deja
+// seguir el error para que lo muestre el ErrorBoundary.
+window.addEventListener('vite:preloadError', (evento) => {
+  if (recargarUnaVez()) evento.preventDefault()
+})
 
 // Detectar si estamos en Electron
-const isElectron = typeof window !== 'undefined' && (window as any).electron !== undefined
+const isElectron = typeof window !== 'undefined' && window.electron !== undefined
 // Usar HashRouter en Electron, BrowserRouter en navegador web
 const Router = isElectron ? HashRouter : BrowserRouter
 

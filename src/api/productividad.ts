@@ -105,6 +105,32 @@ function diaSiguiente(fecha: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Fila de evoluciones_clinicas con odontólogo y paciente anidados. PostgREST
+ * devuelve cada relación de a una como objeto (supabase-js, sin el esquema
+ * generado, la tipa como lista: por eso el `as unknown`).
+ */
+interface EvolucionFila {
+  id: string;
+  fecha_registro: string | null;
+  pieza: string | number | null;
+  procedimiento: string | null;
+  nota_clinica: string | null;
+  medico: {
+    id: string;
+    nombres: string | null;
+    apellidos: string | null;
+    numero_colegiatura: string | null;
+    especialidad: { id: string; nombre: string | null } | null;
+  } | null;
+  paciente: {
+    nombres: string | null;
+    apellidos: string | null;
+    documento: string | null;
+    sexo: string | null;
+  } | null;
+}
+
 export async function fetchProduccionDental(
   filtros: FiltrosProductividad
 ): Promise<ProduccionDental> {
@@ -150,7 +176,7 @@ export async function fetchProduccionDental(
   }
 
   const atenciones: AtencionProductividad[] = [];
-  for (const e of (datosEvoluciones ?? []) as any[]) {
+  for (const e of (datosEvoluciones ?? []) as unknown as EvolucionFila[]) {
     const medico = e.medico;
     const especialidad = medico?.especialidad;
 
@@ -195,7 +221,7 @@ export async function fetchProduccionDental(
   if (errorPagos && !avisarEsquemaFaltante(errorPagos, "Reportes · pagos")) {
     console.error("Error al cargar los pagos:", errorPagos);
   }
-  for (const p of (pagos ?? []) as any[]) facturacion.cobrado += Number(p.monto) || 0;
+  for (const p of (pagos ?? []) as { monto: unknown }[]) facturacion.cobrado += Number(p.monto) || 0;
 
   const { data: presupuestos, error: errorPresupuestos } = await supabase
     .from("presupuestos")
@@ -206,7 +232,7 @@ export async function fetchProduccionDental(
   if (errorPresupuestos && !avisarEsquemaFaltante(errorPresupuestos, "Reportes · presupuestos")) {
     console.error("Error al cargar los presupuestos:", errorPresupuestos);
   }
-  for (const p of (presupuestos ?? []) as any[]) {
+  for (const p of (presupuestos ?? []) as { total: unknown; saldo_pendiente: unknown; estado: string | null }[]) {
     facturacion.planes += 1;
     facturacion.presupuestado += Number(p.total) || 0;
     // Un plan rechazado o anulado no es plata por cobrar.
@@ -232,7 +258,7 @@ export async function fetchProduccionDental(
   }
 
   const citasPorEstado: Record<string, number> = {};
-  for (const c of (citas ?? []) as any[]) {
+  for (const c of (citas ?? []) as { estado: string | null }[]) {
     const estado = c.estado || "sin estado";
     citasPorEstado[estado] = (citasPorEstado[estado] ?? 0) + 1;
   }
