@@ -75,7 +75,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Aplicada 2026-10-02 |
 | `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | Aplicada 2026-10-12 (las 9 confirmadas) |
 | `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | Aplicada 2026-10-12 (4 reglas confirmadas) |
-| `marca_publica.sql` | Código de acceso por consultorio (`?c=movadent`) y `marca_publica()`: logo en la pantalla de ingreso para todos | **PENDIENTE de aplicar** |
+| `marca_publica.sql` | Código de acceso por consultorio (`?c=movadent`) y `marca_publica()`: logo en la pantalla de ingreso para todos | Aplicada 2026-10-12 (movadent, sonrisas; probada en vivo) |
 
 ---
 
