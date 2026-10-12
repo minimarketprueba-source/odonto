@@ -810,6 +810,78 @@ export function imprimirComprobantePagos(datos: DatosComprobantePagos) {
 }
 
 // ============================================================================
+// Recibo de liquidación de honorarios
+// ============================================================================
+// El papel que firma el odontólogo al cobrar su comisión. Antes el botón
+// "Imprimir recibo" llamaba a window.print() y salía la pantalla entera, con
+// el menú y la lista de TODAS las liquidaciones.
+
+export interface DatosReciboLiquidacion {
+  numero: string | number;
+  profesional: string;
+  registroProfesional?: string | null;
+  /** Período ya formateado para leer (dd/mm/aaaa). */
+  desde: string;
+  hasta: string;
+  produccion: number;
+  comisionPorcentaje: number;
+  totalPagar: number;
+  estado: "borrador" | "pagado";
+  fechaEmision: string;
+}
+
+export function imprimirReciboLiquidacion(datos: DatosReciboLiquidacion) {
+  const tituloDoc = "RECIBO DE HONORARIOS PROFESIONALES";
+  const gs = (n: number) => `${Math.round(n).toLocaleString("es-PY")} ₲`;
+  const celda = "padding:8px; border:1px solid #cbd5e1;";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding:22px; color:#0f172a; max-width:720px; margin:0 auto;">
+      ${encabezadoDocumento(tituloDoc, { sub: `Liquidación Nº ${esc(String(datos.numero))} · Emitido el ${esc(datos.fechaEmision)}`, margen: 18 })}
+
+      ${
+        datos.estado === "borrador"
+          ? `<p style="margin:0 0 14px; padding:8px; text-align:center; border:2px dashed #b45309; color:#b45309; font-weight:bold;">BORRADOR — todavía no figura como pagada</p>`
+          : ""
+      }
+
+      <div style="margin-bottom:16px; padding:10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc;">
+        <p style="margin:4px 0;"><strong>Profesional:</strong> ${esc(datos.profesional)}</p>
+        ${datos.registroProfesional ? `<p style="margin:4px 0;"><strong>Registro profesional:</strong> ${esc(datos.registroProfesional)}</p>` : ""}
+        <p style="margin:4px 0;"><strong>Período:</strong> del ${esc(datos.desde)} al ${esc(datos.hasta)}</p>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <tr><td style="${celda}">Producción del período</td><td style="${celda} text-align:right; width:180px;">${gs(datos.produccion)}</td></tr>
+        <tr><td style="${celda}">Comisión</td><td style="${celda} text-align:right;">${datos.comisionPorcentaje}%</td></tr>
+        <tr style="background:#f0fdf4;">
+          <td style="${celda} font-size:14px;"><strong>TOTAL A PAGAR</strong></td>
+          <td style="${celda} text-align:right; font-size:15px; color:#15803d;"><strong>${gs(datos.totalPagar)}</strong></td>
+        </tr>
+      </table>
+
+      <p style="margin-top:22px; font-size:12px;">
+        Recibí conforme la suma de <strong>${gs(datos.totalPagar)}</strong> en concepto de honorarios
+        profesionales correspondientes al período indicado.
+      </p>
+
+      <div style="margin-top:55px; display:flex; justify-content:space-around; text-align:center;">
+        <div>
+          <div style="width:200px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
+          <span style="font-size:11px;">Firma del profesional</span>
+        </div>
+        <div>
+          <div style="width:200px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>
+          <span style="font-size:11px;">Firma y sello de la clínica</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  ejecutarImpresionIframe(tituloDoc, html);
+}
+
+// ============================================================================
 // Receta odontológica
 // ============================================================================
 // El papel que se lleva el paciente a la farmacia. Lleva el número correlativo

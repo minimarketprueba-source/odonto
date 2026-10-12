@@ -291,6 +291,29 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
 - **Las migraciones NO llegan solas**: cada archivo nuevo de
   `supabase/migrations/` hay que ejecutarlo en la base de CADA consultorio.
 
+## Revisión del 2026-10-12
+
+- **Liquidaciones nunca pudo guardar**: hacía `Number(medicoId)` sobre un UUID
+  (trampa 1). Además "Imprimir recibo" era `window.print()` (salía la pantalla
+  entera); ahora hay un recibo de verdad (`imprimirReciboLiquidacion`).
+  La producción se sigue escribiendo a mano.
+- **Recálculo de saldos** (trampa 3): si fallaba la lectura de procedimientos o
+  pagos, se grababa total 0 y saldo 0 encima del plan. Ahora no escribe nada.
+  Y si el pago se guarda pero el recálculo falla, ya NO se informa como error
+  (`recalcularTrasGuardar`): la gente volvía a apretar y el pago quedaba doble.
+- **OJO, sin verificar**: `odontologia_setup.sql` también crea triggers que
+  recalculan los totales en la base (`trg_actualizar_saldo_presupuesto`,
+  `trg_actualizar_total_presupuesto`). Si están activos en vivo, el cálculo
+  se hace dos veces (da lo mismo, pero sobra uno).
+- `handleDbError` de `odontologia.ts` decía "la tabla no existe" también
+  cuando faltaba una columna (trampa 5). Ahora usa `src/lib/esquema.ts`.
+
+Quedaron anotados para después: el tiempo real escucha tablas del sistema
+policial y no las dentales; el rol `asistente` lo aceptan la base y
+`create-user` pero la app no; recepción ve Liquidaciones; los cobros no
+avisan de pago en 0, descuento mayor al importe o pago mayor al saldo; logos de
+la Policía y de Mova Dent sin uso en `public/`.
+
 ## Cefalometría (revisado el 2026-09-30)
 
 El módulo se publicó sin su tabla en la base y **fingía guardar** en el
@@ -344,7 +367,7 @@ Chrome del sistema vía Playwright.
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (154 tests)
+npm run test:run     # Vitest una corrida (229 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql
@@ -401,9 +424,9 @@ Trampas de los scripts de prueba: PostgREST exige que todos los objetos de un lo
 1. **Cargar los odontólogos reales** en Mantenimiento → Médicos, vinculando cada uno a su cuenta. **Bloquea las recetas**: sin ficha vinculada no se puede emitir ninguna, porque el documento se firma con ese nombre y su `numero_colegiatura`. Al 2026-08-06 sigue habiendo 0.
 2. ~~Publicar las Edge Functions~~ → **publicadas el 2026-10-02** (`create-user` y `update-user-password`). Ojo: el editor del panel propone un nombre AL AZAR (`rapid-task`…); hay que escribir el nombre exacto antes de Deploy, porque después no se puede renombrar. Probadas en vivo: el dueño crea el admin de una empresa nueva, el admin crea y cambia la contraseña de su gente, y no puede crear gente en otra empresa ni tocar contraseñas ajenas (403).
 3. **Completar los datos del consultorio** en Mantenimiento → Consultorio: el nombre ya está, faltan RUC, dirección y teléfono. Salen en todos los impresos.
-4. **Revisar las tarifas**: hay 12 de ejemplo.
+4. ~~Revisar las tarifas~~ → la usuaria cargó 32 propias.
 5. Sin revisar: los impresos de odontograma y consentimiento, cómo se ve en celular, y **emitir una receta de punta a punta** (no se pudo por el punto 1).
-6. Sin decidir: el PDF `Documento A5 Recetario...` que el usuario dejó en `public/`. **No está commiteado, así que NO se publica**, pero conviene sacarlo de esa carpeta: todo lo que está ahí queda accesible en internet. Puede ser el diseño que quiere para la receta impresa.
+6. ~~El PDF del recetario en `public/`~~ → ya no está (verificado el 2026-10-12).
 
 ### Cosas que YA NO son pendientes (verificadas el 2026-08-06)
 

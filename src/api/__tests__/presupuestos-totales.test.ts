@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Doble de Supabase: guarda lo que se lee de cada tabla y lo que se actualiza.
 const DATOS: Record<string, any[]> = {};
 const ACTUALIZACIONES: { tabla: string; cambios: any }[] = [];
+// Error que devuelve la LECTURA de una tabla (simula un corte de conexión).
+const ERRORES_LECTURA: Record<string, any> = {};
+
+vi.mock("sonner", () => ({ toast: { warning: vi.fn(), error: vi.fn(), success: vi.fn() } }));
 
 vi.mock("@/lib/supabase", () => {
   const constructor = (tabla: string) => {
@@ -21,18 +25,55 @@ vi.mock("@/lib/supabase", () => {
       return api;
     };
     api.then = (resolve: any) =>
-      resolve({ data: cambiosUpdate ? null : DATOS[tabla] ?? [], error: null });
+      cambiosUpdate
+        ? resolve({ data: null, error: null })
+        : resolve({
+            data: ERRORES_LECTURA[tabla] ? null : DATOS[tabla] ?? [],
+            error: ERRORES_LECTURA[tabla] ?? null,
+          });
     return api;
   };
   return { supabase: { from: constructor } };
 });
 
-import { recalcularTotalesPresupuesto } from "@/api/odontologia";
+import { recalcularTotalesPresupuesto, addPagoPresupuesto } from "@/api/odontologia";
+import { toast } from "sonner";
 
 describe("cuentas del plan de tratamiento", () => {
   beforeEach(() => {
     for (const k of Object.keys(DATOS)) delete DATOS[k];
+    for (const k of Object.keys(ERRORES_LECTURA)) delete ERRORES_LECTURA[k];
     ACTUALIZACIONES.length = 0;
+    vi.mocked(toast.warning).mockClear();
+  });
+
+  it("si no puede leer los pagos, NO graba ceros encima del plan", async () => {
+    // Antes el error de lectura se ignoraba, la lista llegaba vacía y el plan
+    // quedaba con total 0 y saldo 0.
+    DATOS.presupuesto_detalles = [{ costo: 1000000, descuento: 0 }];
+    ERRORES_LECTURA.pagos_presupuesto = { code: "08006", message: "connection failure" };
+
+    await expect(recalcularTotalesPresupuesto("p1")).rejects.toThrow();
+    expect(ACTUALIZACIONES.filter((a) => a.tabla === "presupuestos")).toHaveLength(0);
+  });
+
+  it("si no puede leer los procedimientos, tampoco graba nada", async () => {
+    ERRORES_LECTURA.presupuesto_detalles = { code: "08006", message: "connection failure" };
+    DATOS.pagos_presupuesto = [{ monto: 250000 }];
+
+    await expect(recalcularTotalesPresupuesto("p1")).rejects.toThrow();
+    expect(ACTUALIZACIONES.filter((a) => a.tabla === "presupuestos")).toHaveLength(0);
+  });
+
+  it("un pago ya guardado no se informa como error aunque falle el recálculo", async () => {
+    // Si decía "error", lo natural era apretar de nuevo y el pago quedaba doble.
+    DATOS.pagos_presupuesto = [{ id: 7, presupuesto_id: 3, monto: 250000 }];
+    ERRORES_LECTURA.presupuesto_detalles = { code: "08006", message: "connection failure" };
+
+    const pago = await addPagoPresupuesto({ presupuesto_id: 3, monto: 250000 });
+
+    expect(pago.id).toBe(7);
+    expect(toast.warning).toHaveBeenCalledTimes(1);
   });
 
   it("descuenta el pago del saldo", async () => {

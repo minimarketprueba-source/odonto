@@ -3,7 +3,10 @@ import { supabase } from "@/lib/supabase";
 
 export interface Liquidacion {
   id: number;
-  medico_id: number;
+  // UUID, como todos los ids de medicos. Era `number` por herencia y la pantalla
+  // hacía Number(id): daba NaN, viajaba como null y la base rechazaba TODA
+  // liquidación (medico_id es NOT NULL). La pantalla nunca pudo guardar una.
+  medico_id: string;
   fecha_inicio: string;
   fecha_fin: string;
   total_produccion: number;
@@ -15,6 +18,7 @@ export interface Liquidacion {
   medico?: {
     nombres: string;
     apellidos: string;
+    numero_colegiatura?: string | null;
     especialidad?: { nombre: string };
   };
 }
@@ -22,7 +26,7 @@ export interface Liquidacion {
 export async function fetchLiquidaciones(): Promise<Liquidacion[]> {
   const { data, error } = await supabase
     .from("liquidaciones_odontologos")
-    .select("*, medico:medicos(nombres, apellidos, especialidad:especialidades(nombre))")
+    .select("*, medico:medicos(nombres, apellidos, numero_colegiatura, especialidad:especialidades(nombre))")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Error cargando liquidaciones: ${error.message}`);

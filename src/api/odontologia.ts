@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { generarUuid } from '@/lib/uuid';
+import { toast } from "sonner";
+import { esColumnaInexistente, esTablaInexistente } from "@/lib/esquema";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Interfaces y Tipos
@@ -137,13 +140,23 @@ export const odontoKeys = {
   pagosPaciente: (pacienteId: string) => [...odontoKeys.all, "pagos-paciente", pacienteId] as const,
 };
 
-// Helper para atrapar errores de tabla inexistente y dar una guía clara al usuario
+// Traduce los errores de la base a un mensaje que diga qué hacer.
+// OJO: tabla faltante y columna faltante son cosas distintas (PGRST205 vs
+// PGRST204, un dígito). Antes las dos decían "la tabla no existe" y mandaban a
+// ejecutar odontologia_setup.sql, que ya está aplicada, cuando lo que faltaba
+// era una columna de esquema_completo.sql.
 function handleDbError(error: any, tabla: string): never {
-  console.error(`Error en tabla ${tabla}:`, error);
-  if (error?.code === "PGRST204" || error?.code === "42P01" || error?.message?.includes("relation")) {
+  logger.error(`Error en tabla ${tabla}:`, error);
+  if (esTablaInexistente(error)) {
     throw new Error(
-      `La tabla '${tabla}' no existe en la base de datos de Supabase. ` +
-      `Por favor, pegue el contenido de 'supabase/migrations/odontologia_setup.sql' en el SQL Editor de su Supabase y ejecútelo para continuar.`
+      `La tabla '${tabla}' no existe en la base de datos. ` +
+      `Falta aplicar 'supabase/migrations/odontologia_setup.sql' en el SQL Editor de Supabase.`
+    );
+  }
+  if (esColumnaInexistente(error)) {
+    throw new Error(
+      `A la tabla '${tabla}' le falta una columna (${error?.message ?? "sin detalle"}). ` +
+      `Falta aplicar 'supabase/migrations/esquema_completo.sql' en el SQL Editor de Supabase.`
     );
   }
   throw new Error(error?.message || "Error de base de datos desconocido");
@@ -381,10 +394,19 @@ export async function fetchPresupuestoDetalles(presupuestoId: number): Promise<P
  * siempre.
  */
 export async function recalcularTotalesPresupuesto(presupuestoId: string | number): Promise<void> {
-  const [{ data: detalles }, { data: pagos }] = await Promise.all([
+  const [
+    { data: detalles, error: errorDetalles },
+    { data: pagos, error: errorPagos },
+  ] = await Promise.all([
     supabase.from("presupuesto_detalles").select("costo, descuento").eq("presupuesto_id", presupuestoId),
     supabase.from("pagos_presupuesto").select("monto").eq("presupuesto_id", presupuestoId),
   ]);
+
+  // Si alguna lectura falló NO se escribe nada. Antes el error se ignoraba,
+  // la lista llegaba vacía y se grababa total 0 y saldo 0 encima del plan:
+  // bastaba un corte de internet en ese segundo para borrar la cuenta.
+  if (errorDetalles) handleDbError(errorDetalles, "presupuesto_detalles");
+  if (errorPagos) handleDbError(errorPagos, "pagos_presupuesto");
 
   const total = (detalles ?? []).reduce(
     (suma, d: any) => suma + (Number(d.costo) || 0) - (Number(d.descuento) || 0),
@@ -403,6 +425,26 @@ export async function recalcularTotalesPresupuesto(presupuestoId: string | numbe
   if (error) handleDbError(error, "presupuestos");
 }
 
+/**
+ * Recalcula después de un cambio que YA quedó guardado, sin hacer fallar la
+ * operación si el recálculo falla.
+ *
+ * Por qué: si el pago se grababa pero el recálculo tiraba error, la pantalla
+ * decía "error" y lo natural era apretar de nuevo: el pago quedaba DOBLE.
+ * El cambio ya está en la base; lo único atrasado es el total guardado, y el
+ * próximo recálculo lo corrige porque cuenta desde cero.
+ */
+async function recalcularTrasGuardar(presupuestoId: string | number): Promise<void> {
+  try {
+    await recalcularTotalesPresupuesto(presupuestoId);
+  } catch (error) {
+    logger.error("No se pudo recalcular el presupuesto", { presupuestoId, error });
+    toast.warning("Se guardó, pero el saldo del plan no se pudo actualizar.", {
+      description: "No lo cargue de nuevo. Recargue la página para ver el saldo correcto.",
+    });
+  }
+}
+
 export async function addPresupuestoDetalle(detalle: Partial<PresupuestoDetalle>): Promise<PresupuestoDetalle> {
   const { data, error } = await supabase
     .from("presupuesto_detalles")
@@ -410,7 +452,7 @@ export async function addPresupuestoDetalle(detalle: Partial<PresupuestoDetalle>
     .select()
     .single();
   if (error) handleDbError(error, "presupuesto_detalles");
-  if (data?.presupuesto_id) await recalcularTotalesPresupuesto(data.presupuesto_id);
+  if (data?.presupuesto_id) await recalcularTrasGuardar(data.presupuesto_id);
   return data;
 }
 
@@ -422,7 +464,7 @@ export async function updatePresupuestoDetalle(id: number, cambios: Partial<Pres
     .select()
     .single();
   if (error) handleDbError(error, "presupuesto_detalles");
-  if (data?.presupuesto_id) await recalcularTotalesPresupuesto(data.presupuesto_id);
+  if (data?.presupuesto_id) await recalcularTrasGuardar(data.presupuesto_id);
   return data;
 }
 
@@ -437,7 +479,7 @@ export async function deletePresupuestoDetalle(id: number): Promise<void> {
 
   const { error } = await supabase.from("presupuesto_detalles").delete().eq("id", id);
   if (error) handleDbError(error, "presupuesto_detalles");
-  if (previo?.presupuesto_id) await recalcularTotalesPresupuesto(previo.presupuesto_id);
+  if (previo?.presupuesto_id) await recalcularTrasGuardar(previo.presupuesto_id);
 }
 
 export function usePresupuestoDetalles(presupuestoId: number) {
@@ -540,7 +582,7 @@ export async function addPagoPresupuesto(pago: Partial<PagoPresupuesto>): Promis
     .single();
   if (error) handleDbError(error, "pagos_presupuesto");
   // Sin esto el pago quedaba registrado pero el saldo no bajaba.
-  if (data?.presupuesto_id) await recalcularTotalesPresupuesto(data.presupuesto_id);
+  if (data?.presupuesto_id) await recalcularTrasGuardar(data.presupuesto_id);
   return data;
 }
 
@@ -553,7 +595,7 @@ export async function deletePagoPresupuesto(id: string | number): Promise<void> 
 
   const { error } = await supabase.from("pagos_presupuesto").delete().eq("id", id);
   if (error) handleDbError(error, "pagos_presupuesto");
-  if (previo?.presupuesto_id) await recalcularTotalesPresupuesto(previo.presupuesto_id);
+  if (previo?.presupuesto_id) await recalcularTrasGuardar(previo.presupuesto_id);
 }
 
 /**

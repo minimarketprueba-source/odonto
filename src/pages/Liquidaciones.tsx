@@ -20,12 +20,19 @@ import {
 import { DollarSign, Printer, Plus, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/auth-context'
-import { useMedicosActivos } from '@/api/citas'
+import { useMedicosActivos, fechaHoyISO } from '@/api/citas'
+import { imprimirReciboLiquidacion } from '@/lib/imprimir'
+import { formatDateDisplay } from '@/lib/utils'
 import {
   useLiquidaciones,
   useCreateLiquidacion,
   useMarcarLiquidacionPagada,
+  type Liquidacion,
 } from '@/api/liquidaciones'
+
+/** 01/09/2026. Fecha sin hora: con new Date() saldría un día antes en Paraguay. */
+const fechaCorta = (f: string) =>
+  formatDateDisplay(f, 'es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 export default function Liquidaciones() {
   const { user } = useAuth()
@@ -47,13 +54,22 @@ export default function Liquidaciones() {
       toast.error('Complete todos los campos obligatorios.')
       return
     }
+    if (fechaFin < fechaInicio) {
+      toast.error('La fecha de fin no puede ser anterior a la de inicio.')
+      return
+    }
+    const porcentaje = Number(comision)
+    if (!Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+      toast.error('La comisión tiene que estar entre 0 y 100 %.')
+      return
+    }
     try {
       await createLiquidacion.mutateAsync({
-        medico_id: Number(medicoId),
+        medico_id: medicoId,
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
         total_produccion: Number(produccion),
-        comision_porcentaje: Number(comision),
+        comision_porcentaje: porcentaje,
         estado: 'borrador',
         generado_por: user?.id,
       })
@@ -64,6 +80,21 @@ export default function Liquidaciones() {
     } catch (e) {
       toast.error((e as Error).message)
     }
+  }
+
+  const imprimirRecibo = (l: Liquidacion) => {
+    imprimirReciboLiquidacion({
+      numero: l.id,
+      profesional: l.medico ? `Dr(a). ${l.medico.apellidos}, ${l.medico.nombres}` : 'Odontólogo',
+      registroProfesional: l.medico?.numero_colegiatura ?? null,
+      desde: fechaCorta(l.fecha_inicio),
+      hasta: fechaCorta(l.fecha_fin),
+      produccion: Number(l.total_produccion) || 0,
+      comisionPorcentaje: Number(l.comision_porcentaje) || 0,
+      totalPagar: Number(l.total_pagar) || 0,
+      estado: l.estado,
+      fechaEmision: fechaCorta(fechaHoyISO()),
+    })
   }
 
   const handlePagar = async (id: number) => {
@@ -121,13 +152,13 @@ export default function Liquidaciones() {
                     <td className="p-3 font-medium">
                       {l.medico
                         ? `Dr(a). ${l.medico.apellidos}, ${l.medico.nombres}`
-                        : `Médico #${l.medico_id}`}
+                        : 'Odontólogo dado de baja'}
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
-                      {l.fecha_inicio} a {l.fecha_fin}
+                      {fechaCorta(l.fecha_inicio)} a {fechaCorta(l.fecha_fin)}
                     </td>
                     <td className="p-3 text-right text-muted-foreground">
-                      {Number(l.total_produccion).toLocaleString()} ₲
+                      {Number(l.total_produccion).toLocaleString('es-PY')} ₲
                     </td>
                     <td className="p-3 text-right">
                       <span className="mr-2 rounded bg-muted px-2 py-0.5 text-xs">
@@ -135,7 +166,7 @@ export default function Liquidaciones() {
                       </span>
                     </td>
                     <td className="p-3 text-right font-bold text-emerald-600">
-                      {Number(l.total_pagar).toLocaleString()} ₲
+                      {Number(l.total_pagar).toLocaleString('es-PY')} ₲
                     </td>
                     <td className="p-3 text-center">
                       <span
@@ -154,7 +185,7 @@ export default function Liquidaciones() {
                           variant="ghost"
                           size="icon"
                           title="Imprimir Recibo"
-                          onClick={() => window.print()}
+                          onClick={() => imprimirRecibo(l)}
                         >
                           <Printer className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -243,7 +274,7 @@ export default function Liquidaciones() {
             <div className="flex items-center justify-between rounded-lg border bg-muted p-3 text-sm">
               <span className="font-semibold text-muted-foreground">Total a Pagar Estimado:</span>
               <span className="text-lg font-bold text-emerald-600">
-                {(Number(produccion) * (Number(comision) / 100)).toLocaleString() || '0'} ₲
+                {Math.round((Number(produccion) || 0) * ((Number(comision) || 0) / 100)).toLocaleString('es-PY')} ₲
               </span>
             </div>
 
