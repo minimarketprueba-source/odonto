@@ -63,12 +63,16 @@ export default function LoginPage() {
     }
   }
 
+  // Completa SOLO el correo y deja el cursor en la contraseña. Antes ponía
+  // "123456", la contraseña de prueba de agosto: desde que se cambiaron las
+  // contraseñas reales (2026-08-05) ningún botón podía entrar y parecían rotos.
   const fillDemoUser = (roleKey: string) => {
     const demo = DEMO_USERS[roleKey]
     if (demo) {
       setEmail(demo.email)
-      setPassword('123456')
+      setPassword('')
       setError(null)
+      document.getElementById('password')?.focus()
     }
   }
 
@@ -202,6 +206,9 @@ export default function LoginPage() {
             <div className="border-t border-border pt-2">
               <p className="mb-3 text-center text-xs font-medium text-muted-foreground">
                 ⚡ Accesos Rápidos de Prueba / Demo:
+              </p>
+              <p className="-mt-2 mb-3 text-center text-[11px] text-muted-foreground">
+                Completan el correo; escriba la contraseña real de esa cuenta.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <Button
