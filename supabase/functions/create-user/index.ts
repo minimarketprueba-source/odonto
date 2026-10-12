@@ -102,29 +102,60 @@ Deno.serve(async (req: Request) => {
       return responder({ error: "Sesión no válida. Volvé a iniciar sesión." }, 401);
     }
 
+    const callerId = authData.user.id;
+
     // --- 2. ¿Puede crear gente, y en qué empresa? ----------------------------
-    // Se pregunta a la base CON LA SESIÓN de quien llama: son las mismas
-    // funciones que usan los permisos, así que acá no puede valer otra regla.
-    // No se confía en lo que diga la pantalla: cualquiera puede llamar a esta
-    // dirección con su propio token.
     const cuerpo = await req.json().catch(() => null);
     if (!cuerpo) return responder({ error: "No se recibieron los datos." }, 400);
 
-    const anonKey = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SB_PUBLISHABLE_KEY");
-    const comoQuienLlama = createClient(url, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const [{ data: empresaActiva }, { data: esAdminActivo }, { data: esDueno }] = await Promise.all([
-      comoQuienLlama.rpc("mi_clinica_id"),
-      comoQuienLlama.rpc("es_odonto_admin"),
-      comoQuienLlama.rpc("es_dueno_sistema"),
+    // Permisos consultados con el cliente admin, sin depender de la anon key
+    // (con las claves nuevas de Supabase la consulta "como quien llama" podía
+    // fallar). OJO: esto REPITE a mano la regla de la base —mi_clinica_id(),
+    // odonto_estado_activo() y es_odonto_admin() de multiempresa.sql—. Si se
+    // cambia allá, cambiarlo acá y en update-user-password.
+    const [{ data: duenoRow }, { data: callerProfile }, { data: callerRoles }] = await Promise.all([
+      admin.from("sistema_duenos").select("user_id").eq("user_id", callerId).maybeSingle(),
+      admin.from("profiles").select("clinica_activa").eq("id", callerId).maybeSingle(),
+      admin.from("user_roles").select("clinica_id, role, status, created_at").eq("user_id", callerId),
     ]);
+
+    const esDueno = !!duenoRow?.user_id;
+
+    // Determinar la clínica activa del usuario que llama
+    const rolesActivos = (callerRoles ?? []).filter((r: any) =>
+      !r.status || ["activo", "active", "habilitado", "enabled"].includes(String(r.status).toLowerCase())
+    );
+
+    let empresaActiva: string | null = null;
+    let rolEnEmpresaActiva: string | null = null;
+
+    if (callerProfile?.clinica_activa) {
+      const match = rolesActivos.find((r: any) => r.clinica_id === callerProfile.clinica_activa);
+      if (match) {
+        empresaActiva = match.clinica_id;
+        rolEnEmpresaActiva = match.role ? String(match.role).toLowerCase() : null;
+      }
+    }
+
+    if (!empresaActiva && rolesActivos.length > 0) {
+      // Mismo orden que mi_clinica_id(): por fecha de alta y, a igualdad, por id.
+      rolesActivos.sort((a: any, b: any) =>
+        (a.created_at || "").localeCompare(b.created_at || "") ||
+        String(a.clinica_id).localeCompare(String(b.clinica_id))
+      );
+      empresaActiva = rolesActivos[0].clinica_id;
+      rolEnEmpresaActiva = rolesActivos[0].role ? String(rolesActivos[0].role).toLowerCase() : null;
+    }
+
+    const esAdminActivo = rolEnEmpresaActiva && ["admin", "superadmin", "super_admin"].includes(rolEnEmpresaActiva);
 
     const pedida = cuerpo.clinica_id ? String(cuerpo.clinica_id) : null;
     let clinicaId: string | null = null;
+
     if (pedida && esDueno) {
       clinicaId = pedida; // el dueño da de alta gente en cualquier empresa
+    } else if (!pedida && esDueno && empresaActiva) {
+      clinicaId = empresaActiva;
     } else if (!pedida || pedida === empresaActiva) {
       if (!esAdminActivo || !empresaActiva) {
         return responder({ error: "Solo un administrador activo puede crear usuarios." }, 403);
@@ -135,34 +166,43 @@ Deno.serve(async (req: Request) => {
     }
 
     // --- 3. Los datos que llegaron ------------------------------------------
-
     const email = String(cuerpo.email ?? "").trim().toLowerCase();
     const password = String(cuerpo.password ?? "");
     const role = String(cuerpo.role ?? "").toLowerCase();
 
     if (!email || !email.includes("@")) return responder({ error: "Correo no válido." }, 400);
-    if (password.length < 6) {
-      return responder({ error: "La contraseña debe tener al menos 6 caracteres." }, 400);
+    // Igual que la app (src/lib/contrasena.ts).
+    if (password.length < 8) {
+      return responder({ error: "La contraseña debe tener al menos 8 caracteres." }, 400);
     }
     if (!ROLES_VALIDOS.includes(role)) {
       return responder({ error: `Rol no válido: ${role}` }, 400);
     }
 
-    // --- 4. ¿Ya tiene cuenta? Entonces solo se la suma a esta empresa ---------
-    // Sin tocar su contraseña: si no, el admin de un consultorio podría tomar
-    // la cuenta de alguien que también trabaja en otro.
-    const { data: existente } = await admin
-      .from("profiles").select("id").eq("email", email).maybeSingle();
-    if (existente?.id) {
+    // --- 4. ¿Ya tiene cuenta? ------------------------------------------------
+    // Búsqueda EXACTA sin distinguir mayúsculas. En ilike, "_" y "%" son
+    // comodines: sin escaparlos, crear a juan_perez@x.com encontraba a
+    // juanXperez@x.com y SUMABA A OTRA PERSONA a esta empresa con el rol elegido.
+    const patronExacto = email.replace(/[\\%_]/g, (c) => "\\" + c);
+    let existenteId: string | null = null;
+    const { data: existenteProfile } = await admin
+      .from("profiles").select("id").ilike("email", patronExacto).maybeSingle();
+
+    if (existenteProfile?.id) {
+      existenteId = existenteProfile.id;
+    }
+
+    // Si ya existe, solo se suma a esta empresa sin tocar su contraseña
+    if (existenteId) {
       const { error: errSumar } = await admin.from("user_roles").upsert(
-        { user_id: existente.id, clinica_id: clinicaId, role, status: "Activo" },
+        { user_id: existenteId, clinica_id: clinicaId, role, status: "Activo" },
         { onConflict: "user_id,clinica_id" }
       );
       if (errSumar) return responder({ error: errSumar.message }, 500);
-      return responder({ user_id: existente.id, email, existente: true });
+      return responder({ user_id: existenteId, email, existente: true });
     }
 
-    // --- 5. Crear la cuenta --------------------------------------------------
+    // --- 5. Crear la cuenta en auth.admin ------------------------------------
     const { data: creado, error: errCrear } = await admin.auth.admin.createUser({
       email,
       password,
@@ -174,21 +214,35 @@ Deno.serve(async (req: Request) => {
       },
     });
 
+    let userId: string | null = null;
+    let recienCreada = false;
+
     if (errCrear || !creado?.user) {
       const msg = errCrear?.message ?? "No se pudo crear la cuenta.";
-      // El error crudo de Supabase viene en inglés y no dice qué hacer.
+      // Si ya existía en auth.users pero no tenía perfil, lo buscamos para vincularlo
       if (/already been registered|already exists/i.test(msg)) {
-        return responder({ error: `Ya existe una cuenta con el correo ${email}.` }, 409);
+        // listUsers() devuelve de a una página: se recorren todas (con un tope).
+        let authUser: any = null;
+        for (let pagina = 1; pagina <= 20 && !authUser; pagina++) {
+          const { data: listData } = await admin.auth.admin.listUsers({ page: pagina, perPage: 1000 });
+          const usuarios = listData?.users ?? [];
+          authUser = usuarios.find((u: any) => u.email?.toLowerCase().trim() === email) ?? null;
+          if (usuarios.length < 1000) break;
+        }
+        if (authUser) {
+          userId = authUser.id;
+        } else {
+          return responder({ error: `Ya existe una cuenta con el correo ${email}.` }, 409);
+        }
+      } else {
+        return responder({ error: msg }, 400);
       }
-      return responder({ error: msg }, 400);
+    } else {
+      userId = creado.user.id;
+      recienCreada = true;
     }
 
-    const userId = creado.user.id;
-
-    // --- 6. Ficha y rol en la empresa ---------------------------------------
-    // Si algo de esto falla, la cuenta YA existe: se borra para no dejar a
-    // alguien pudiendo entrar sin rol ni permisos, que es un estado raro y
-    // difícil de detectar después.
+    // --- 6. Ficha de perfil y rol en la empresa ------------------------------
     const { error: errPerfil } = await admin.from("profiles").upsert(
       {
         id: userId,
@@ -207,7 +261,12 @@ Deno.serve(async (req: Request) => {
     );
 
     if (errPerfil || errRol) {
-      await admin.auth.admin.deleteUser(userId).catch(() => { /* ya está el error de arriba */ });
+      // Si la cuenta la acabamos de crear, se borra: si no, queda alguien que
+      // puede entrar pero ve "Sin acceso", un estado raro y difícil de notar.
+      // Una cuenta que ya existía no se toca.
+      if (recienCreada && userId) {
+        await admin.auth.admin.deleteUser(userId).catch(() => { /* ya está el error */ });
+      }
       return responder(
         { error: `La cuenta no se pudo completar: ${(errPerfil ?? errRol)?.message}` },
         500

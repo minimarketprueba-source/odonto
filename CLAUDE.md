@@ -379,32 +379,29 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   calcular la producción de Liquidaciones (vía `medicos.user_id`), pero falta
   que el usuario decida a quién se le atribuye cada procedimiento.
 
-### ⚠️ Edge Functions con cambios SIN commitear de otra sesión (2026-10-12)
+### Edge Functions: cambio de otra sesión, corregido (2026-10-12)
 
-`create-user` y `update-user-password` aparecieron modificadas a las 13:39 por
-alguien que no era esta sesión, y no se tocaron (no se sabe si ya se pegaron
-en el panel de Supabase). El cambio reemplaza las consultas a la base
-(`mi_clinica_id()`, `es_odonto_admin()`) por la misma lógica copiada a mano con
-el cliente admin. Revisión:
+Otra sesión reemplazó en `create-user` y `update-user-password` las consultas
+a la base hechas "como quien llama" (`mi_clinica_id()`, `es_odonto_admin()`) por
+la misma lógica escrita a mano con el cliente admin (probablemente porque con
+las claves nuevas de Supabase la consulta con la anon key fallaba). El usuario
+eligió conservar ese enfoque y corregir los problemas (opción A):
 
-1. **Grave — `create-user` busca la cuenta existente con
-   `.ilike("email", email)`.** En `ilike`, `_` y `%` son comodines:
-   `juan_perez@x.com` coincide con `juanXperez@x.com`. Un admin que crea
-   `a_b@x.com` puede terminar SUMANDO A SU EMPRESA, con el rol elegido, a otra
-   persona que ya tenía cuenta. Usar `.eq("email", email)` (los correos se
-   guardan en minúsculas) o escapar `\`, `%` y `_`.
-2. Se quitó el borrado de la cuenta cuando falla asignar el rol: queda una
-   cuenta que entra y ve "Sin acceso". Antes se deshacía.
-3. Si la cuenta existe en `auth.users` sin perfil, la vincula buscándola con
-   `listUsers()`, que devuelve solo la primera página (50): con más usuarios
-   no la encuentra.
-4. La lógica de "empresa activa" y "estado activo" queda copiada en tres
-   lugares (la base y las dos funciones): si un día cambia en la base, las
-   funciones quedan desfasadas sin que nada avise.
-5. `update-user-password` deja pasar al dueño del sistema en el primer control,
-   pero lo frena después (no tiene empresa activa): no rompe nada, solo no
-   funciona.
-6. Siguen aceptando contraseñas de 6 caracteres (la app pide 8).
+- **Grave, corregido**: `create-user` buscaba la cuenta existente con
+  `ilike(email)` sin escapar: `_` y `%` son comodines y crear
+  `juan_perez@x.com` SUMABA A LA EMPRESA a `juanXperez@x.com`. Ahora se escapan
+  (probado en Postgres: antes coincidía, ahora no).
+- Vuelve a borrarse la cuenta RECIÉN creada si falla asignar perfil o rol (una
+  que ya existía no se toca).
+- `listUsers()` se recorre por páginas (antes miraba solo la primera).
+- Mínimo de contraseña 8, igual que la app.
+- `update-user-password`: se quitó el paso libre del dueño del sistema (no
+  funcionaba: el control siguiente lo frenaba igual).
+- ⚠️ La regla de "empresa activa" queda REPETIDA en la base y en las dos
+  funciones (comentado en el código): si cambia en `multiempresa.sql`,
+  cambiarla también acá. Mismo orden de desempate que `mi_clinica_id()`.
+- **Commiteadas pero NO publicadas en Supabase**: hay que pegarlas en el panel
+  (Edge Functions → cada una → Edit → pegar → Deploy).
 
 ## Cefalometría (revisado el 2026-09-30)
 

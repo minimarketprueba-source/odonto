@@ -86,18 +86,47 @@ Deno.serve(async (req: Request) => {
       return responder({ error: "Sesión no válida. Volvé a iniciar sesión." }, 401);
     }
 
+    const callerId = authData.user.id;
+
     // --- 2. ¿Es administrador activo de su empresa? -------------------------
-    // Se pregunta a la base con la sesión de quien llama (las mismas funciones
-    // que usan los permisos).
-    const anonKey = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SB_PUBLISHABLE_KEY");
-    const comoQuienLlama = createClient(url, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const [{ data: empresaActiva }, { data: esAdminActivo }] = await Promise.all([
-      comoQuienLlama.rpc("mi_clinica_id"),
-      comoQuienLlama.rpc("es_odonto_admin"),
+    // Consultado con el cliente admin, sin depender de la anon key. OJO: REPITE
+    // a mano la regla de la base (mi_clinica_id(), odonto_estado_activo(),
+    // es_odonto_admin() de multiempresa.sql). Si se cambia allá, cambiarlo acá
+    // y en create-user.
+    // El dueño del sistema NO tiene paso libre: no trabaja en ninguna empresa,
+    // y el control de abajo ("¿trabaja en SU empresa?") lo frenaría igual.
+    const [{ data: callerProfile }, { data: callerRoles }] = await Promise.all([
+      admin.from("profiles").select("clinica_activa").eq("id", callerId).maybeSingle(),
+      admin.from("user_roles").select("clinica_id, role, status, created_at").eq("user_id", callerId),
     ]);
+
+    const rolesActivos = (callerRoles ?? []).filter((r: any) =>
+      !r.status || ["activo", "active", "habilitado", "enabled"].includes(String(r.status).toLowerCase())
+    );
+
+    let empresaActiva: string | null = null;
+    let rolEnEmpresaActiva: string | null = null;
+
+    if (callerProfile?.clinica_activa) {
+      const match = rolesActivos.find((r: any) => r.clinica_id === callerProfile.clinica_activa);
+      if (match) {
+        empresaActiva = match.clinica_id;
+        rolEnEmpresaActiva = match.role ? String(match.role).toLowerCase() : null;
+      }
+    }
+
+    if (!empresaActiva && rolesActivos.length > 0) {
+      // Mismo orden que mi_clinica_id(): por fecha de alta y, a igualdad, por id.
+      rolesActivos.sort((a: any, b: any) =>
+        (a.created_at || "").localeCompare(b.created_at || "") ||
+        String(a.clinica_id).localeCompare(String(b.clinica_id))
+      );
+      empresaActiva = rolesActivos[0].clinica_id;
+      rolEnEmpresaActiva = rolesActivos[0].role ? String(rolesActivos[0].role).toLowerCase() : null;
+    }
+
+    const esAdminActivo = rolEnEmpresaActiva && ["admin", "superadmin", "super_admin"].includes(rolEnEmpresaActiva);
+
     if (!esAdminActivo || !empresaActiva) {
       return responder(
         { error: "Solo un administrador activo puede cambiar la contraseña de otra cuenta." },
@@ -111,8 +140,9 @@ Deno.serve(async (req: Request) => {
     const password = String(cuerpo?.password ?? "");
 
     if (!userId) return responder({ error: "Falta indicar de qué cuenta." }, 400);
-    if (password.length < 6) {
-      return responder({ error: "La contraseña debe tener al menos 6 caracteres." }, 400);
+    // Igual que la app (src/lib/contrasena.ts).
+    if (password.length < 8) {
+      return responder({ error: "La contraseña debe tener al menos 8 caracteres." }, 400);
     }
 
     // --- 3b. ¿Es una persona de SU empresa, y solo de su empresa? -------------
