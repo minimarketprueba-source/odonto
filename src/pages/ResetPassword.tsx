@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Link, useNavigate } from 'react-router-dom'
+import { MIN_CONTRASENA, AVISO_CONTRASENA_CORTA } from '@/lib/contrasena'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -18,8 +19,8 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError(null)
     setMessage(null)
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
+    if (password.length < MIN_CONTRASENA) {
+      setError(AVISO_CONTRASENA_CORTA)
       return
     }
     if (password !== repeatPassword) {

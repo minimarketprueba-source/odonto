@@ -73,7 +73,25 @@ describe("producción odontológica", () => {
     const evo = CONSULTAS.find((c) => c.tabla === "evoluciones_clinicas")!;
     // Se compara contra el día SIGUIENTE, si no las marcas de tiempo del día 31
     // (que llevan hora) quedarían afuera y faltaría un día de producción.
-    expect(evo.filtros).toContain("lt:fecha_registro,2026-09-01");
+    // Y contra la medianoche de PARAGUAY (03:00 UTC), no la de UTC: si no, lo
+    // cargado entre las 21:00 y las 24:00 caía en el período siguiente.
+    expect(evo.filtros).toContain("lt:fecha_registro,2026-09-01T03:00:00.000Z");
+    expect(evo.filtros).toContain("gte:fecha_registro,2026-08-01T03:00:00.000Z");
+
+    // Los pagos son de solo fecha: ahí se comparan días.
+    const pagos = CONSULTAS.find((c) => c.tabla === "pagos_presupuesto")!;
+    expect(pagos.filtros).toContain("lt:fecha,2026-09-01");
+  });
+
+  it("un procedimiento de las 22:30 sale con su día, no con el siguiente", async () => {
+    // 22:30 del 15 de agosto en Paraguay = 01:30 UTC del 16.
+    RESPUESTAS.evoluciones_clinicas = {
+      data: [{ id: 1, fecha_registro: "2026-08-16T01:30:00+00:00", procedimiento: "Exodoncia" }],
+      error: null,
+    };
+    const r = await fetchProduccionDental({ fechaDesde: "2026-08-01", fechaHasta: "2026-08-31" });
+    expect(r.atenciones[0].fecha).toBe("2026-08-15");
+    expect(r.atenciones[0].hora).toBe("22:30");
   });
 
   it("suma lo cobrado y lo pendiente", async () => {

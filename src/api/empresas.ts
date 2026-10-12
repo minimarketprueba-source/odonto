@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseAnonKey, getSupabaseUrl, supabase } from "@/lib/supabase";
+import { MIN_CONTRASENA, AVISO_CONTRASENA_CORTA } from "@/lib/contrasena";
 
 export interface EmpresaDelSistema {
   clinica_id: string;
@@ -53,7 +54,7 @@ export async function darAdministrador(input: {
     return { existente: true };
   }
 
-  if (input.password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+  if (input.password.length < MIN_CONTRASENA) throw new Error(AVISO_CONTRASENA_CORTA);
   const { data: sesion } = await supabase.auth.getSession();
   const token = sesion.session?.access_token;
   if (!token) throw new Error("Sesión no válida. Volvé a iniciar sesión.");

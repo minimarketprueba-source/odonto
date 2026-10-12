@@ -84,9 +84,25 @@ function horaDe(valor?: string | null): string | null {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+/**
+ * El día LOCAL de una marca de tiempo. Antes se cortaban los 10 primeros
+ * caracteres, que son el día en UTC: un procedimiento de las 22:30 en Paraguay
+ * (01:30 UTC) salía en la planilla con la fecha del día siguiente y la hora
+ * 22:30, todo junto.
+ */
 function soloFecha(valor?: string | null): string {
   if (!valor) return "";
-  return String(valor).slice(0, 10);
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return String(valor).slice(0, 10);
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
+/** "2026-08-31" → "2026-09-01", sin pasar por la zona horaria. */
+function diaSiguiente(fecha: string): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 export async function fetchProduccionDental(
@@ -94,11 +110,15 @@ export async function fetchProduccionDental(
 ): Promise<ProduccionDental> {
   const { fechaDesde, fechaHasta, especialidadId, medicoId } = filtros;
 
-  // El día "hasta" se incluye entero: las marcas de tiempo de ese día llegan
-  // hasta las 23:59, así que se compara contra el día siguiente.
-  const hastaExclusivo = new Date(`${fechaHasta}T00:00:00`);
-  hastaExclusivo.setDate(hastaExclusivo.getDate() + 1);
-  const hastaISO = hastaExclusivo.toISOString().slice(0, 10);
+  // El día "hasta" se incluye entero: se compara contra el día siguiente.
+  // Columnas de solo fecha (pagos): se comparan días.
+  const hastaISO = diaSiguiente(fechaHasta);
+  // Columnas con hora (procedimientos, planes): se comparan INSTANTES desde la
+  // medianoche LOCAL. Con "2026-08-31" a secas, la base entiende medianoche
+  // UTC = 21:00 en Paraguay, y lo cargado entre las 21:00 y las 24:00 caía en
+  // el período siguiente.
+  const desdeInstante = new Date(`${fechaDesde}T00:00:00`).toISOString();
+  const hastaInstante = new Date(`${hastaISO}T00:00:00`).toISOString();
 
   // --- 1. Producción clínica: los procedimientos asentados ---
   let consultaEvoluciones = supabase
@@ -115,8 +135,8 @@ export async function fetchProduccionDental(
       ),
       paciente:pacientes(id, nombres, apellidos, documento, sexo)
     `)
-    .gte("fecha_registro", fechaDesde)
-    .lt("fecha_registro", hastaISO)
+    .gte("fecha_registro", desdeInstante)
+    .lt("fecha_registro", hastaInstante)
     .order("fecha_registro", { ascending: true })
     .limit(5000);
 
@@ -180,8 +200,8 @@ export async function fetchProduccionDental(
   const { data: presupuestos, error: errorPresupuestos } = await supabase
     .from("presupuestos")
     .select("total, saldo_pendiente, estado, created_at")
-    .gte("created_at", fechaDesde)
-    .lt("created_at", hastaISO)
+    .gte("created_at", desdeInstante)
+    .lt("created_at", hastaInstante)
     .limit(5000);
   if (errorPresupuestos && !avisarEsquemaFaltante(errorPresupuestos, "Reportes · presupuestos")) {
     console.error("Error al cargar los presupuestos:", errorPresupuestos);

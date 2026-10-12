@@ -49,7 +49,10 @@ BEGIN
 END $$;
 
 -- Tienen que aparecer 4 reglas, todas con es_odonto_admin().
-SELECT polname AS regla, pg_get_expr(polqual, polrelid) AS condicion
+-- La de INSERT no tiene condición de lectura (polqual), solo de escritura
+-- (polwithcheck): por eso se muestra la que haya.
+SELECT polname AS regla,
+       COALESCE(pg_get_expr(polqual, polrelid), pg_get_expr(polwithcheck, polrelid)) AS condicion
 FROM pg_policy
 WHERE polrelid = 'public.liquidaciones_odontologos'::regclass
 ORDER BY polname;

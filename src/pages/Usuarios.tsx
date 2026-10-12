@@ -55,6 +55,7 @@ import {
   KeyRound,
   ClipboardList,
 } from "lucide-react";
+import { MIN_CONTRASENA, AVISO_CONTRASENA_CORTA } from "@/lib/contrasena";
 
 interface RawProfile {
   [key: string]: any;
@@ -473,8 +474,8 @@ export default function Usuarios() {
       setCreateError("El correo y la contraseña son obligatorios.");
       return;
     }
-    if (newUserForm.password.length < 6) {
-      setCreateError("La contraseña debe tener al menos 6 caracteres.");
+    if (newUserForm.password.length < MIN_CONTRASENA) {
+      setCreateError(AVISO_CONTRASENA_CORTA);
       return;
     }
     if (!isCurrentUserAdmin) {
@@ -842,10 +843,10 @@ export default function Usuarios() {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < MIN_CONTRASENA) {
       toast({
         title: "Contraseña muy corta",
-        description: "La contraseña debe tener al menos 6 caracteres.",
+        description: AVISO_CONTRASENA_CORTA,
         variant: "destructive",
       });
       return;
@@ -1298,7 +1299,7 @@ export default function Usuarios() {
                   <Input
                     id="new-password"
                     type={showNewPassword ? "text" : "password"}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={`Mínimo ${MIN_CONTRASENA} caracteres`}
                     value={newUserForm.password}
                     onChange={(e) => setNewUserForm((f) => ({ ...f, password: e.target.value }))}
                     required
@@ -1384,7 +1385,7 @@ export default function Usuarios() {
                   <Input
                     id="change-password"
                     type={showPasswordInDialog ? "text" : "password"}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={`Mínimo ${MIN_CONTRASENA} caracteres`}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="pr-10"
@@ -1408,7 +1409,7 @@ export default function Usuarios() {
               <Button variant="outline" onClick={() => setPasswordDialogUser(null)} disabled={isUpdatingPassword}>
                 Cancelar
               </Button>
-              <Button onClick={handleUpdatePassword} disabled={isUpdatingPassword || !newPassword || newPassword.length < 6}>
+              <Button onClick={handleUpdatePassword} disabled={isUpdatingPassword || !newPassword || newPassword.length < MIN_CONTRASENA}>
                 {isUpdatingPassword ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

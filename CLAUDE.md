@@ -73,8 +73,8 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `marca_mova_dent_icono.sql` | **Solo Mova Dent**: guarda su ícono en su base (el de fábrica pasó a ser genérico) | Aplicada 2026-10-02 (por API) |
 | `reparar_cuentas_rotas.sql` | Pone '' en columnas de `auth.users` que estaban en NULL (cuentas creadas con INSERT directo) | Aplicada 2026-10-02 |
 | `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Aplicada 2026-10-02 |
-| `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | **PENDIENTE de aplicar** |
-| `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | **PENDIENTE de aplicar** |
+| `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | Aplicada 2026-10-12 (las 9 confirmadas) |
+| `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | Aplicada 2026-10-12 (4 reglas confirmadas) |
 
 ---
 
@@ -337,6 +337,17 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   Los logos de Mova Dent en `public/` se dejaron: `mova-dent-icono.png` lo usa
   la base (`clinicas.icono_url`) y los otros podrían estar referenciados ahí.
 
+- **Reportes y la hora** (`productividad.ts`): las columnas con hora se
+  comparaban contra "2026-08-31" a secas, que la base lee como medianoche UTC
+  (21:00 en Paraguay): lo cargado de 21 a 24 caía en el período siguiente, y
+  la planilla mostraba el día UTC con la hora local. Ahora se compara contra la
+  medianoche local convertida a instante; los pagos (columna de solo fecha)
+  siguen comparando días. Las pruebas corren con `TZ=America/Asuncion`
+  (`vitest.config.ts`).
+- **Contraseñas**: mínimo 8 en todas las pantallas, desde `src/lib/contrasena.ts`.
+  ⚠️ Las Edge Functions todavía aceptan 6 (estaban siendo editadas por otra
+  sesión y no se tocaron). Las contraseñas existentes siguen sirviendo.
+
 Quedan 83 avisos de lint, todos `no-explicit-any` (tipos sin declarar); no
 cambian el funcionamiento. `npm run lint` sigue fallando por eso.
 
@@ -393,7 +404,7 @@ Chrome del sistema vía Playwright.
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (263 tests)
+npm run test:run     # Vitest una corrida (266 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql

@@ -10,6 +10,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
     css: true,
+    // Las cuentas de fechas dependen de la zona horaria: se fija la del
+    // consultorio para que las pruebas den lo mismo en cualquier computadora.
+    env: { TZ: 'America/Asuncion' },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

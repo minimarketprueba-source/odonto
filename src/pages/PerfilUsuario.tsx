@@ -13,6 +13,7 @@ import { usePerfilProfesional, guardarPerfilPropio, cambiarCorreoPropio } from "
 import { updateMedico } from "@/api/mantenimiento";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-client";
+import { MIN_CONTRASENA, AVISO_CONTRASENA_CORTA } from "@/lib/contrasena";
 
 export default function PerfilUsuario() {
   const { user, role } = useAuth();
@@ -140,7 +141,7 @@ export default function PerfilUsuario() {
       return "La contraseña nueva es igual a la actual. Elija una distinta.";
     }
     if (m.includes("at least") || m.includes("too short") || m.includes("length")) {
-      return "La contraseña es demasiado corta. Use al menos 6 caracteres.";
+      return `La contraseña es demasiado corta. Use al menos ${MIN_CONTRASENA} caracteres.`;
     }
     if (m.includes("weak") || m.includes("pwned") || m.includes("compromised")) {
       return "Esa contraseña es muy común y fácil de adivinar. Elija otra.";
@@ -155,7 +156,7 @@ export default function PerfilUsuario() {
   };
 
   const cambiarPassword = async () => {
-    if (pass1.length < 6) { await showSwalError("La contraseña nueva debe tener al menos 6 caracteres."); return; }
+    if (pass1.length < MIN_CONTRASENA) { await showSwalError(AVISO_CONTRASENA_CORTA); return; }
     if (pass1 !== pass2) { await showSwalError("Las contraseñas no coinciden."); return; }
     setGuardandoPass(true);
     try {
@@ -362,7 +363,7 @@ export default function PerfilUsuario() {
               <KeyRound className="w-5 h-5 text-primary" /> Cambiar mi contraseña
             </CardTitle>
             <CardDescription>
-              Elija una contraseña que solo usted conozca. Mínimo 6 caracteres.
+              Elija una contraseña que solo usted conozca. Mínimo {MIN_CONTRASENA} caracteres.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

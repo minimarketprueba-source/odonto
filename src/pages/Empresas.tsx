@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Building2, Plus, ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCrearEmpresa, useDarAdministrador, useEmpresasDelSistema, type EmpresaDelSistema } from '@/api/empresas'
-import { formatDateDisplay } from '@/lib/utils'
 
 // Solo para el dueño del sistema (la ruta lo exige). Acá se crean empresas y se
 // les da administrador; desde acá NO se ven pacientes de ninguna.
@@ -156,7 +155,7 @@ export default function Empresas() {
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span>{e.personas} {Number(e.personas) === 1 ? 'persona' : 'personas'}</span>
-                  {e.created_at && <span>desde {formatDateDisplay(e.created_at.slice(0, 10), 'es-PY')}</span>}
+                  {e.created_at && <span>desde {new Date(e.created_at).toLocaleDateString('es-PY')}</span>}
                   <Button size="sm" variant="outline" className="gap-1.5"
                     onClick={() => { setParaAdmin(e); setAdminEmail(''); setAdminPassword('') }}>
                     <UserPlus className="h-3.5 w-3.5" /> Dar administrador
