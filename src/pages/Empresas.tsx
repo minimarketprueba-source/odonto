@@ -3,26 +3,34 @@ import { AppLayout } from '@/components/layout/app-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Building2, Plus, ShieldCheck, UserPlus, Users } from 'lucide-react'
+import { Building2, Plus, ShieldCheck, UserPlus, Users, Settings, LogIn, Loader2, CheckCircle2, Phone } from 'lucide-react'
 import { toast } from 'sonner'
-import { useCrearEmpresa, useDarAdministrador, useEmpresasDelSistema, type EmpresaDelSistema } from '@/api/empresas'
+import { useAuth } from '@/context/auth-context'
+import { useCrearEmpresa, useDarAdministrador, useEmpresasDelSistema, entrarAEmpresa, type EmpresaDelSistema } from '@/api/empresas'
+import { ModalEditarEmpresa } from '@/components/empresas/ModalEditarEmpresa'
 
-// Solo para el dueño del sistema (la ruta lo exige). Acá se crean empresas y se
-// les da administrador; desde acá NO se ven pacientes de ninguna.
+// Solo para el dueño del sistema (la ruta lo exige). Acá se crean empresas, se
+// configuran sus logos/datos de marca y se les da administrador.
 
 const VACIO = { nombre: '', nombreCorto: '', adminEmail: '', adminPassword: '' }
 
 export default function Empresas() {
+  const { user, empresas: misEmpresas } = useAuth()
   const { data: empresas = [], isLoading, error } = useEmpresasDelSistema()
   const crear = useCrearEmpresa()
   const darAdmin = useDarAdministrador()
 
   const [form, setForm] = useState(VACIO)
   const [paraAdmin, setParaAdmin] = useState<EmpresaDelSistema | null>(null)
+  const [paraEditar, setParaEditar] = useState<EmpresaDelSistema | null>(null)
+  const [entrandoId, setEntrandoId] = useState<string | null>(null)
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
+
+  const idEmpresaActiva = misEmpresas.find((e) => e.activa)?.clinica_id
 
   const enviarNueva = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,6 +79,16 @@ export default function Empresas() {
     }
   }
 
+  const handleEntrarEmpresa = async (clinicaId: string) => {
+    setEntrandoId(clinicaId)
+    try {
+      await entrarAEmpresa(clinicaId, user?.email)
+    } catch (err) {
+      setEntrandoId(null)
+      toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a la empresa.')
+    }
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6 pb-12">
@@ -79,10 +97,10 @@ export default function Empresas() {
             <Building2 className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Empresas</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Gestión de Empresas</h1>
             <p className="text-xs text-muted-foreground">
-              Los consultorios que usan el sistema. Cada uno ve solo sus pacientes; desde acá no se
-              ve ninguna ficha clínica.
+              Consultorios y empresas que usan el sistema. Puedes personalizar sus logos, membretes,
+              colores y entrar a gestionar cada una.
             </p>
           </div>
         </div>
@@ -93,8 +111,8 @@ export default function Empresas() {
               <Plus className="h-4 w-4" /> Nueva empresa
             </CardTitle>
             <CardDescription>
-              Arranca con las especialidades y un sillón cargados. Su administrador carga después los
-              datos del consultorio, los precios y al resto del personal.
+              Arranca con especialidades y un sillón cargados. Una vez creada podrás personalizar su
+              logo, aranceles y resto del personal.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -132,41 +150,138 @@ export default function Empresas() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="h-4 w-4" /> Empresas en el sistema ({empresas.length})
+              <Users className="h-4 w-4" /> Empresas registradas ({empresas.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+          <CardContent className="space-y-3">
+            {isLoading && <p className="text-sm text-muted-foreground">Cargando empresas…</p>}
             {error && (
               <p className="text-sm text-destructive">
                 {error instanceof Error ? error.message : 'No se pudieron cargar las empresas.'}
               </p>
             )}
-            {empresas.map((e) => (
-              <div key={e.clinica_id}
-                className="flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold">{e.nombre_corto}</p>
-                  <p className="truncate text-xs text-muted-foreground">{e.nombre}</p>
-                  <p className="mt-1 flex items-center gap-1 text-xs">
-                    <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                    {e.administradores || <span className="text-amber-600">Sin administrador</span>}
-                  </p>
+            {empresas.map((e) => {
+              const esActiva = e.clinica_id === idEmpresaActiva
+              const imagenMarca = e.icono_url || e.logo_url
+
+              return (
+                <div
+                  key={e.clinica_id}
+                  className={`flex flex-col gap-3 rounded-xl border p-4 transition-all sm:flex-row sm:items-center sm:justify-between ${
+                    esActiva ? 'border-primary/50 bg-primary/[0.03] shadow-sm' : 'hover:border-border'
+                  }`}
+                >
+                  {/* Identidad de la empresa */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-slate-900 shadow-sm"
+                      style={{ borderColor: e.color_primario || '#334155' }}
+                    >
+                      {imagenMarca ? (
+                        <img
+                          src={imagenMarca}
+                          alt={e.nombre_corto}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span
+                          className="text-base font-extrabold text-white"
+                          style={{ color: e.color_primario || '#38bdf8' }}
+                        >
+                          {e.nombre_corto?.charAt(0) || 'C'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-bold text-foreground">{e.nombre_corto}</p>
+                        {esActiva && (
+                          <Badge variant="default" className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-xs">
+                            <CheckCircle2 className="h-3 w-3" /> Empresa Activa
+                          </Badge>
+                        )}
+                        {e.ruc && (
+                          <Badge variant="outline" className="text-[11px] font-mono">
+                            RUC: {e.ruc}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <p className="truncate text-xs text-muted-foreground">{e.nombre}</p>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                          {e.administradores || <span className="text-amber-600">Sin administrador</span>}
+                        </span>
+                        {e.telefono && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" /> {e.telefono}
+                          </span>
+                        )}
+                        <span>{e.personas} {Number(e.personas) === 1 ? 'persona' : 'personas'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botones de acción */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
+                    {/* Botón Entrar / Cambiar */}
+                    <Button
+                      size="sm"
+                      variant={esActiva ? 'secondary' : 'default'}
+                      disabled={esActiva || entrandoId === e.clinica_id}
+                      className="gap-1.5"
+                      onClick={() => handleEntrarEmpresa(e.clinica_id)}
+                    >
+                      {entrandoId === e.clinica_id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <LogIn className="h-3.5 w-3.5" />
+                      )}
+                      {esActiva ? 'Activa ahora' : 'Entrar a empresa'}
+                    </Button>
+
+                    {/* Botón Editar datos y logos */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setParaEditar(e)}
+                    >
+                      <Settings className="h-3.5 w-3.5" /> Logos y Datos
+                    </Button>
+
+                    {/* Botón Dar administrador */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1 text-xs"
+                      onClick={() => {
+                        setParaAdmin(e)
+                        setAdminEmail('')
+                        setAdminPassword('')
+                      }}
+                    >
+                      <UserPlus className="h-3.5 w-3.5" /> Asignar admin
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>{e.personas} {Number(e.personas) === 1 ? 'persona' : 'personas'}</span>
-                  {e.created_at && <span>desde {new Date(e.created_at).toLocaleDateString('es-PY')}</span>}
-                  <Button size="sm" variant="outline" className="gap-1.5"
-                    onClick={() => { setParaAdmin(e); setAdminEmail(''); setAdminPassword('') }}>
-                    <UserPlus className="h-3.5 w-3.5" /> Dar administrador
-                  </Button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </CardContent>
         </Card>
       </div>
 
+      {/* Modal para editar datos y logos de la empresa */}
+      <ModalEditarEmpresa
+        empresa={paraEditar}
+        open={!!paraEditar}
+        onOpenChange={(abierto) => !abierto && setParaEditar(null)}
+      />
+
+      {/* Modal para asignar administrador */}
       <Dialog open={!!paraAdmin} onOpenChange={(abierto) => !abierto && setParaAdmin(null)}>
         <DialogContent>
           <DialogHeader>

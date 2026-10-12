@@ -479,9 +479,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.rpc('mis_empresas'),
           supabase.from('sistema_duenos').select('user_id').eq('user_id', user.id).maybeSingle(),
         ])
+        let empresasFinales: EmpresaDeUsuario[] = Array.isArray(listaEmpresas)
+          ? (listaEmpresas as EmpresaDeUsuario[])
+          : []
+        const esDuenoSistema = !!filaDueno
+
+        if (esDuenoSistema) {
+          try {
+            const { data: todasClinicas } = await supabase
+              .from('clinicas')
+              .select('id, nombre, nombre_corto')
+              .order('nombre')
+
+            if (todasClinicas && todasClinicas.length > 0) {
+              const misMap = new Map(empresasFinales.map((e) => [e.clinica_id, e]))
+              empresasFinales = todasClinicas.map((c) => {
+                const existente = misMap.get(c.id)
+                return {
+                  clinica_id: c.id,
+                  nombre: c.nombre,
+                  nombre_corto: c.nombre_corto || c.nombre,
+                  rol: existente?.rol || 'admin',
+                  activa: existente?.activa || false,
+                }
+              })
+              const tieneActiva = empresasFinales.some((e) => e.activa)
+              if (!tieneActiva && empresasFinales.length > 0) {
+                empresasFinales[0].activa = true
+              }
+            }
+          } catch {
+            // Degradar a mis_empresas sin romper
+          }
+        }
+
         if (isActive) {
-          setEmpresas(Array.isArray(listaEmpresas) ? (listaEmpresas as EmpresaDeUsuario[]) : [])
-          setEsDueno(!!filaDueno)
+          setEmpresas(empresasFinales)
+          setEsDueno(esDuenoSistema)
         }
 
         if (isActive) {
@@ -547,8 +581,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Cambiar de empresa recarga la app entera: así no queda en pantalla ni en
   // memoria ningún dato de la empresa anterior.
   const cambiarEmpresa = async (clinicaId: string) => {
+    if (esDueno && user?.email) {
+      try {
+        await supabase.rpc('agregar_a_empresa', {
+          p_clinica: clinicaId,
+          p_email: user.email.toLowerCase().trim(),
+          p_rol: 'admin',
+        })
+      } catch (e) {
+        logger.warn('No se pudo auto-vincular como admin (o ya pertenecía):', e)
+      }
+    }
     const { error } = await supabase.rpc('cambiar_empresa', { p_clinica: clinicaId })
     if (error) throw new Error(error.message)
+    try {
+      localStorage.removeItem('odonto-empresa-v1')
+    } catch (_e) {
+      // Navegador en modo privado
+    }
     window.location.assign('/')
   }
 

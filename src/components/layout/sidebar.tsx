@@ -161,9 +161,8 @@ export function Sidebar() {
             </Button>
           </div>
 
-          {/* Selector de empresa: solo para quien trabaja en más de una. Al
-              cambiar se recarga todo, así no queda nada de la anterior. */}
-          {empresas.length > 1 && !isCollapsed && (
+          {/* Selector de empresa: para quien trabaja en más de una o dueño del sistema. */}
+          {(empresas.length > 1 || esDueno) && !isCollapsed && empresas.length > 0 && (
             <div className="px-4 pt-3 relative z-10">
               <label htmlFor="selector-empresa" className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Trabajando en

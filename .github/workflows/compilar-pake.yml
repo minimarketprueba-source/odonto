@@ -1,0 +1,62 @@
+name: Compilar Odonto con Pake (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL de la aplicación web a empaquetar"
+        required: true
+        default: "https://odonto-pied.vercel.app"
+      app_name:
+        description: "Nombre de la aplicación"
+        required: true
+        default: "Odonto"
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    name: Compilar ejecutable Windows (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Instalar Pake CLI
+        run: npm install -g pake-cli
+
+      - name: Compilar aplicación con Pake
+        shell: pwsh
+        run: |
+          $url = "${{ github.event.inputs.url || 'https://odonto-pied.vercel.app' }}"
+          $name = "${{ github.event.inputs.app_name || 'Odonto' }}"
+          
+          pake-cli $url --name $name --width 1440 --height 920 --min-width 1024 --min-height 700 --icon public/mova-dent-icono.png
+
+      - name: Listar ejecutables generados
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Recurse -Include *.exe,*.msi | Select-Object FullName, Length
+
+      - name: Subir ejecutable a Artefactos de GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: Odonto-Windows-Pake
+          path: |
+            *.exe
+            *.msi
+            output/*.exe
+            output/*.msi
+          if-no-files-found: warn
+          retention-days: 30

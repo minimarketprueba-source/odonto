@@ -12,6 +12,7 @@
     "build:electron": "npm run type-check && cross-env VITE_ELECTRON=true vite build",
     "electron:dev": "concurrently -k \"cross-env VITE_ELECTRON=true vite\" \"wait-on tcp:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
     "electron:build:win": "npm run build:electron && electron-builder --win --x64",
+    "pake:build": "pake-cli https://odonto-pied.vercel.app --name Odonto --width 1440 --height 920 --min-width 1024 --min-height 700 --icon public/mova-dent-icono.png",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
