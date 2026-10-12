@@ -14,6 +14,7 @@ import {
 } from "@/lib/clinica";
 import { CLINICA_ID_UNICA_LEGADO } from "./pacientes";
 import { useAuth } from "@/context/auth-context";
+import { codigoDeAcceso, guardarCodigo } from "@/lib/codigo-acceso";
 
 export const empresaKeys = {
   all: ["empresa"] as const,
@@ -43,9 +44,44 @@ async function idEmpresaActiva(): Promise<string | null> {
   return (data as string | null) ?? null;
 }
 
+/**
+ * La marca para la pantalla de ingreso, sin sesión: la del consultorio cuyo
+ * código vino en el enlace (?c=) o quedó guardado en este equipo. null si no
+ * hay código, no existe, o la base todavía no tiene marca_publica.sql.
+ */
+async function marcaPublica(): Promise<DatosEmpresa | null> {
+  const codigo = codigoDeAcceso();
+  if (!codigo) return null;
+  const { data, error } = await supabase.rpc("marca_publica", { p_codigo: codigo });
+  if (error) return null; // sin la migración, o sin red: se usa lo guardado
+  const fila = (Array.isArray(data) ? data[0] : data) as Partial<DatosEmpresa> | undefined;
+  if (!fila) return null;
+  return {
+    ...EMPRESA_PREDETERMINADA,
+    nombre: fila.nombre?.trim() || EMPRESA_PREDETERMINADA.nombre,
+    nombre_corto: fila.nombre_corto?.trim() || EMPRESA_PREDETERMINADA.nombre_corto,
+    logo_url: fila.logo_url ?? null,
+    icono_url: fila.icono_url ?? null,
+    color_primario: normalizarColor(fila.color_primario),
+  };
+}
+
+/**
+ * Deja guardado en el equipo el código de la empresa activa, para que la
+ * próxima pantalla de ingreso muestre su logo aunque se entre sin enlace.
+ * Si la columna no existe todavía, no pasa nada.
+ */
+async function recordarCodigoDe(id: string): Promise<void> {
+  const { data } = await supabase.from("clinicas").select("codigo_acceso").eq("id", id).maybeSingle();
+  guardarCodigo((data as { codigo_acceso?: string | null } | null)?.codigo_acceso);
+}
+
 export async function fetchEmpresa(): Promise<DatosEmpresa> {
   const id = await idEmpresaActiva();
-  if (!id) return leerCache() ?? EMPRESA_PREDETERMINADA;
+  // Sin sesión (pantalla de ingreso): la del enlace del consultorio, o la
+  // última usada en este equipo, o la neutra.
+  if (!id) return (await marcaPublica()) ?? leerCache() ?? EMPRESA_PREDETERMINADA;
+  void recordarCodigoDe(id);
 
   const { data, error } = await supabase
     .from("clinicas")
@@ -257,5 +293,26 @@ function procesarImagen(
       img.src = lector.result as string;
     };
     lector.readAsDataURL(file);
+  });
+}
+
+/**
+ * El código de acceso de la empresa activa (para armar su enlace de ingreso).
+ * null si la base todavía no tiene marca_publica.sql.
+ */
+export function useCodigoAcceso() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: [...empresaKeys.all, "codigo", user?.id ?? null],
+    enabled: !!user,
+    queryFn: async (): Promise<string | null> => {
+      const id = await idEmpresaActiva();
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from("clinicas").select("codigo_acceso").eq("id", id).maybeSingle();
+      if (esColumnaInexistente(error)) return null;
+      if (error) throw new Error(`No se pudo leer el enlace de ingreso: ${error.message}`);
+      return (data as { codigo_acceso?: string | null } | null)?.codigo_acceso ?? null;
+    },
   });
 }

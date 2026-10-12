@@ -75,6 +75,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Aplicada 2026-10-02 |
 | `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | Aplicada 2026-10-12 (las 9 confirmadas) |
 | `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | Aplicada 2026-10-12 (4 reglas confirmadas) |
+| `marca_publica.sql` | Código de acceso por consultorio (`?c=movadent`) y `marca_publica()`: logo en la pantalla de ingreso para todos | **PENDIENTE de aplicar** |
 
 ---
 
@@ -478,16 +479,26 @@ genérico en el menú y la pestaña. Ahora (`src/lib/icono-desde-logo.ts`):
 - Probado en Chrome con los 3 logos de Mova Dent y 3 inventados (símbolo +
   nombre en JPG, solo texto, símbolo arriba), y la pantalla de acceso en los
   dos temas. Sin sesión no se pudo ver el menú lateral en vivo.
-- Lo que NO cambia: la pantalla de acceso muestra la marca recién en un equipo
-  donde alguien ya entró (caché `odonto-empresa-v1`); en uno nuevo, la neutra.
-  Es por multiempresa: antes de entrar no se sabe de qué consultorio es.
+- **Enlace de ingreso por consultorio** (`marca_publica.sql`,
+  `src/lib/codigo-acceso.ts`): el usuario mostró la pantalla de ingreso y
+  pidió que el logo salga "para todos". Antes salía solo en equipos donde
+  alguien ya había entrado (caché `odonto-empresa-v1`). Ahora cada consultorio
+  tiene `clinicas.codigo_acceso` (Mova Dent → `movadent`, generado sin
+  acentos y sin repetir por un trigger) y su enlace `/?c=movadent`.
+  `marca_publica(codigo)` (anon) devuelve SOLO nombre, logo, ícono y color con
+  el código EXACTO: no lista consultorios ni toca pacientes. El equipo recuerda
+  el código (`odonto-codigo-acceso`) y, al entrar, guarda el de la empresa
+  activa. El admin ve el enlace en Mantenimiento → Consultorio con "Copiar" y
+  "Enviar por WhatsApp". Probado en PGlite (códigos, comodines, anon no lista)
+  y en Chrome (equipo nuevo: neutra; con `?c=`: logo; visita siguiente sin
+  `?c=`: lo recuerda).
 
 ## Comandos
 
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (284 tests)
+npm run test:run     # Vitest una corrida (289 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql

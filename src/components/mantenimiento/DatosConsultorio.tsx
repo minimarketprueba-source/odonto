@@ -9,6 +9,7 @@ import { useEmpresa, useActualizarEmpresa, achicarLogo, achicarIcono } from "@/a
 import { usePermissions } from "@/hooks/use-permissions";
 import { lineaContacto, aclararColor, EMPRESA_PREDETERMINADA } from "@/lib/clinica";
 import { useIconoEmpresa } from "@/hooks/use-icono-empresa";
+import { EnlaceIngreso } from "./EnlaceIngreso";
 import { iconoDesdeLogo } from "@/lib/icono-desde-logo";
 
 /**
@@ -375,6 +376,8 @@ export function DatosConsultorio() {
           </p>
         </div>
       </div>
+
+      <EnlaceIngreso />
 
       <div className="flex justify-end">
         <Button onClick={handleGuardar} disabled={guardar.isPending || subiendo !== null}>

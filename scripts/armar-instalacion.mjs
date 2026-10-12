@@ -46,6 +46,8 @@ const ORDEN = [
   // Tiene que ir DESPUÉS de multiempresa: reemplaza la regla común que ese
   // archivo le da a liquidaciones_odontologos por una de solo administrador.
   'liquidaciones_solo_admin.sql',
+  // Código de acceso por consultorio y su marca pública (pantalla de ingreso).
+  'marca_publica.sql',
 ];
 
 // Datos de Mova Dent: sus precios y su nombre. Un consultorio nuevo arranca
