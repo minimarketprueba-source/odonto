@@ -9,6 +9,7 @@ import { useState } from "react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useEmpresa } from "@/api/empresa";
 import { ICONO_PREDETERMINADO } from "@/lib/clinica";
+import { salirComoDueno } from "@/api/empresas";
 import { useIconoEmpresa } from "@/hooks/use-icono-empresa";
 import { showSwal } from '@/components/ui/swal'
 
@@ -192,6 +193,43 @@ export function Sidebar() {
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* El dueño del sistema adentro de un consultorio (ingreso único): la
+              salida tiene que estar a la vista. Al salir pierde el acceso. */}
+          {esDueno && empresaActiva && !isCollapsed && (
+            <div className="px-4 pt-2 relative z-10">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2 border-amber-500/60 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                disabled={cambiando}
+                onClick={async () => {
+                  const r = await showSwal({
+                    icon: 'warning',
+                    title: 'Salir del consultorio',
+                    text: `Va a dejar de ver ${empresaActiva.nombre_corto}. Su ingreso a este consultorio era uno solo: no podrá volver a entrar.`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Salir',
+                    cancelButtonText: 'Seguir adentro',
+                  })
+                  if (!r.isConfirmed) return
+                  setCambiando(true)
+                  try {
+                    await salirComoDueno()
+                  } catch (error) {
+                    setCambiando(false)
+                    await showSwal({
+                      icon: 'error',
+                      title: 'No se pudo salir',
+                      text: error instanceof Error ? error.message : undefined,
+                    })
+                  }
+                }}
+              >
+                <LogOut className="h-4 w-4" /> Salir del consultorio
+              </Button>
             </div>
           )}
 

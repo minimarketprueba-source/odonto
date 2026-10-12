@@ -479,39 +479,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.rpc('mis_empresas'),
           supabase.from('sistema_duenos').select('user_id').eq('user_id', user.id).maybeSingle(),
         ])
-        let empresasFinales: EmpresaDeUsuario[] = Array.isArray(listaEmpresas)
+        // Solo las empresas donde la persona trabaja de verdad. El dueño del
+        // sistema NO ve todas en el selector: entra a cada una UNA vez con el
+        // botón «Entrar» de la pantalla Empresas (dueno_ingreso_unico.sql).
+        const empresasFinales: EmpresaDeUsuario[] = Array.isArray(listaEmpresas)
           ? (listaEmpresas as EmpresaDeUsuario[])
           : []
         const esDuenoSistema = !!filaDueno
-
-        if (esDuenoSistema) {
-          try {
-            const { data: todasClinicas } = await supabase
-              .from('clinicas')
-              .select('id, nombre, nombre_corto')
-              .order('nombre')
-
-            if (todasClinicas && todasClinicas.length > 0) {
-              const misMap = new Map(empresasFinales.map((e) => [e.clinica_id, e]))
-              empresasFinales = todasClinicas.map((c) => {
-                const existente = misMap.get(c.id)
-                return {
-                  clinica_id: c.id,
-                  nombre: c.nombre,
-                  nombre_corto: c.nombre_corto || c.nombre,
-                  rol: existente?.rol || 'admin',
-                  activa: existente?.activa || false,
-                }
-              })
-              const tieneActiva = empresasFinales.some((e) => e.activa)
-              if (!tieneActiva && empresasFinales.length > 0) {
-                empresasFinales[0].activa = true
-              }
-            }
-          } catch {
-            // Degradar a mis_empresas sin romper
-          }
-        }
 
         if (isActive) {
           setEmpresas(empresasFinales)
@@ -549,9 +523,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logger.error('Error al iniciar sesión:', error)
       throw error
     }
+    // Si es el dueño del sistema y dejó abierta una visita a un consultorio
+    // (cerró el navegador sin cerrar sesión), termina acá: el ingreso es uno
+    // solo. Para cualquier otra persona no hace nada.
+    await supabase.rpc('dueno_salir_empresas').then(() => undefined, () => undefined)
   }
 
   const logout = async () => {
+    // El dueño del sistema termina su visita al consultorio al cerrar sesión.
+    if (esDueno) {
+      await supabase.rpc('dueno_salir_empresas').then(() => undefined, () => undefined)
+    }
     const signOutPromise = supabase.auth.signOut()
     const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000))
     const result = await Promise.race([signOutPromise, timeout])
@@ -581,17 +563,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Cambiar de empresa recarga la app entera: así no queda en pantalla ni en
   // memoria ningún dato de la empresa anterior.
   const cambiarEmpresa = async (clinicaId: string) => {
-    if (esDueno && user?.email) {
-      try {
-        await supabase.rpc('agregar_a_empresa', {
-          p_clinica: clinicaId,
-          p_email: user.email.toLowerCase().trim(),
-          p_rol: 'admin',
-        })
-      } catch (e) {
-        logger.warn('No se pudo auto-vincular como admin (o ya pertenecía):', e)
-      }
-    }
     const { error } = await supabase.rpc('cambiar_empresa', { p_clinica: clinicaId })
     if (error) throw new Error(error.message)
     try {

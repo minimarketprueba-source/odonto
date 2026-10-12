@@ -192,6 +192,15 @@ Deno.serve(async (req: Request) => {
       existenteId = existenteProfile.id;
     }
 
+    // El dueño del sistema no se suma a sí mismo por acá: entra a cada
+    // consultorio UNA vez con dueno_entrar_empresa() (dueno_ingreso_unico.sql).
+    if (existenteId && existenteId === callerId && esDueno) {
+      return responder(
+        { error: "El dueño del sistema entra a un consultorio con el botón «Entrar» (una sola vez)." },
+        403
+      );
+    }
+
     // Si ya existe, solo se suma a esta empresa sin tocar su contraseña
     if (existenteId) {
       const { error: errSumar } = await admin.from("user_roles").upsert(

@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Building2, Plus, ShieldCheck, UserPlus, Users, Settings, LogIn, Loader2, CheckCircle2, Phone } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/auth-context'
-import { useCrearEmpresa, useDarAdministrador, useEmpresasDelSistema, entrarAEmpresa, type EmpresaDelSistema } from '@/api/empresas'
+import { useCrearEmpresa, useDarAdministrador, useEmpresasDelSistema, useIngresosDueno, entrarAEmpresa, type EmpresaDelSistema } from '@/api/empresas'
+import Swal from 'sweetalert2'
 import { ModalEditarEmpresa } from '@/components/empresas/ModalEditarEmpresa'
 
 // Solo para el dueño del sistema (la ruta lo exige). Acá se crean empresas, se
@@ -18,7 +19,7 @@ import { ModalEditarEmpresa } from '@/components/empresas/ModalEditarEmpresa'
 const VACIO = { nombre: '', nombreCorto: '', adminEmail: '', adminPassword: '' }
 
 export default function Empresas() {
-  const { user, empresas: misEmpresas } = useAuth()
+  const { empresas: misEmpresas, esDueno } = useAuth()
   const { data: empresas = [], isLoading, error } = useEmpresasDelSistema()
   const crear = useCrearEmpresa()
   const darAdmin = useDarAdministrador()
@@ -27,6 +28,9 @@ export default function Empresas() {
   const [paraAdmin, setParaAdmin] = useState<EmpresaDelSistema | null>(null)
   const [paraEditar, setParaEditar] = useState<EmpresaDelSistema | null>(null)
   const [entrandoId, setEntrandoId] = useState<string | null>(null)
+  // Cuáles consultorios ya usó el dueño (entra a cada uno una sola vez).
+  const { data: ingresos = [] } = useIngresosDueno(esDueno)
+  const ingresoDe = (clinicaId: string) => ingresos.find((i) => i.clinica_id === clinicaId)
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
 
@@ -79,10 +83,29 @@ export default function Empresas() {
     }
   }
 
-  const handleEntrarEmpresa = async (clinicaId: string) => {
+  const handleEntrarEmpresa = async (empresa: EmpresaDelSistema) => {
+    const abierto = ingresoDe(empresa.clinica_id)
+    // Volver a una visita que sigue abierta no gasta nada: no se pregunta.
+    if (!abierto) {
+      const respuesta = await Swal.fire({
+        icon: 'warning',
+        title: `¿Entrar a ${empresa.nombre_corto || empresa.nombre}?`,
+        html:
+          'Puede entrar a cada consultorio <b>una sola vez</b>, para dejarlo configurado. ' +
+          'Mientras esté adentro va a ver todo, incluidos los pacientes.<br><br>' +
+          'La visita termina cuando cierre sesión o apriete <b>«Salir del consultorio»</b> ' +
+          'en el menú. Después ya no podrá volver a entrar a este consultorio.',
+        showCancelButton: true,
+        confirmButtonText: 'Entrar ahora',
+        cancelButtonText: 'Cancelar',
+        focusCancel: true,
+      })
+      if (!respuesta.isConfirmed) return
+    }
+    const clinicaId = empresa.clinica_id
     setEntrandoId(clinicaId)
     try {
-      await entrarAEmpresa(clinicaId, user?.email)
+      await entrarAEmpresa(clinicaId)
     } catch (err) {
       setEntrandoId(null)
       toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a la empresa.')
@@ -163,6 +186,8 @@ export default function Empresas() {
             {empresas.map((e) => {
               const esActiva = e.clinica_id === idEmpresaActiva
               const imagenMarca = e.icono_url || e.logo_url
+              const ingreso = ingresoDe(e.clinica_id)
+              const ingresoUsado = !!ingreso?.salio_at
 
               return (
                 <div
@@ -227,21 +252,30 @@ export default function Empresas() {
 
                   {/* Botones de acción */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
-                    {/* Botón Entrar / Cambiar */}
-                    <Button
-                      size="sm"
-                      variant={esActiva ? 'secondary' : 'default'}
-                      disabled={esActiva || entrandoId === e.clinica_id}
-                      className="gap-1.5"
-                      onClick={() => handleEntrarEmpresa(e.clinica_id)}
-                    >
-                      {entrandoId === e.clinica_id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <LogIn className="h-3.5 w-3.5" />
-                      )}
-                      {esActiva ? 'Activa ahora' : 'Entrar a empresa'}
-                    </Button>
+                    {/* Botón Entrar: una sola vez por consultorio (la base lo hace cumplir). */}
+                    {ingresoUsado ? (
+                      <span
+                        className="rounded-md border border-dashed px-2.5 py-1 text-xs text-muted-foreground"
+                        title="El dueño del sistema entra a cada consultorio una sola vez."
+                      >
+                        Ingreso usado el {new Date(ingreso!.entro_at).toLocaleDateString('es-PY')}
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant={esActiva ? 'secondary' : 'default'}
+                        disabled={esActiva || entrandoId === e.clinica_id}
+                        className="gap-1.5"
+                        onClick={() => handleEntrarEmpresa(e)}
+                      >
+                        {entrandoId === e.clinica_id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <LogIn className="h-3.5 w-3.5" />
+                        )}
+                        {esActiva ? 'Adentro ahora' : ingreso ? 'Volver (visita abierta)' : 'Entrar (una vez)'}
+                      </Button>
+                    )}
 
                     {/* Botón Editar datos y logos */}
                     <Button

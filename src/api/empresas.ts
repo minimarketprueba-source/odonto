@@ -107,33 +107,65 @@ export async function actualizarEmpresaPorId(input: ActualizarEmpresaPorIdInput)
   if (error) throw new Error(`No se pudieron guardar los datos: ${error.message}`);
 }
 
-/**
- * Permite al dueño del sistema ingresar y cambiar la empresa activa para trabajar
- * en ella como administrador.
- */
-export async function entrarAEmpresa(clinicaId: string, emailUsuario?: string | null): Promise<void> {
-  if (emailUsuario) {
-    try {
-      await supabase.rpc("agregar_a_empresa", {
-        p_clinica: clinicaId,
-        p_email: emailUsuario.trim().toLowerCase(),
-        p_rol: "admin",
-      });
-    } catch {
-      // Si ya pertenecía o si la función no es necesaria, continuamos
-    }
-  }
-
-  const { error } = await supabase.rpc("cambiar_empresa", { p_clinica: clinicaId });
-  if (error) throw new Error(`No se pudo cambiar de empresa: ${error.message}`);
-
-  // Limpiar caché local y recargar para que toda la app se active con la empresa elegida
+function limpiarMarcaYCambiarA(ruta: string): void {
   try {
     localStorage.removeItem("odonto-empresa-v1");
-  } catch (_e) {
+  } catch {
     // Modo privado o sin permisos de storage
   }
-  window.location.reload();
+  window.location.assign(ruta);
+}
+
+/** La base sin dueno_ingreso_unico.sql: la función no existe. */
+function faltaMigracionIngreso(code?: string): boolean {
+  return code === "PGRST202" || code === "42883";
+}
+
+/**
+ * El dueño del sistema entra a un consultorio como administrador, UNA sola
+ * vez por consultorio (decisión del usuario, 2026-10-12). La base lleva la
+ * cuenta y rechaza un segundo ingreso: no alcanza con esconder el botón.
+ * La visita termina con salirComoDueno(), al cerrar sesión o al volver a
+ * iniciar sesión. Ver supabase/migrations/dueno_ingreso_unico.sql.
+ */
+export async function entrarAEmpresa(clinicaId: string): Promise<void> {
+  const { error } = await supabase.rpc("dueno_entrar_empresa", { p_clinica: clinicaId });
+  if (faltaMigracionIngreso(error?.code)) {
+    throw new Error(
+      "Falta aplicar supabase/migrations/dueno_ingreso_unico.sql en Supabase para poder entrar a un consultorio."
+    );
+  }
+  if (error) throw new Error(error.message);
+  limpiarMarcaYCambiarA("/");
+}
+
+/** Termina la visita del dueño al consultorio y vuelve a la pantalla Empresas. */
+export async function salirComoDueno(): Promise<void> {
+  const { error } = await supabase.rpc("dueno_salir_empresas");
+  if (error && !faltaMigracionIngreso(error.code)) throw new Error(error.message);
+  limpiarMarcaYCambiarA("/empresas");
+}
+
+export interface IngresoDueno {
+  clinica_id: string;
+  entro_at: string;
+  salio_at: string | null;
+}
+
+/** Los ingresos del dueño: cuáles ya usó (salio_at) y cuál tiene abierto. */
+export function useIngresosDueno(habilitado: boolean) {
+  return useQuery({
+    queryKey: [...clave, "ingresos"],
+    enabled: habilitado,
+    queryFn: async (): Promise<IngresoDueno[]> => {
+      const { data, error } = await supabase
+        .from("dueno_ingresos")
+        .select("clinica_id, entro_at, salio_at");
+      // Sin la migración la tabla no existe: no hay ingresos que mostrar.
+      if (error) return [];
+      return (data as IngresoDueno[]) ?? [];
+    },
+  });
 }
 
 /**

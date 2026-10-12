@@ -76,6 +76,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | Aplicada 2026-10-12 (las 9 confirmadas) |
 | `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | Aplicada 2026-10-12 (4 reglas confirmadas) |
 | `marca_publica.sql` | Código de acceso por consultorio (`?c=movadent`) y `marca_publica()`: logo en la pantalla de ingreso para todos | Aplicada 2026-10-12 (movadent, sonrisas; probada en vivo) |
+| `dueno_ingreso_unico.sql` | El dueño entra a cada consultorio UNA vez (`dueno_entrar_empresa` / `dueno_salir_empresas`); redefine `agregar_a_empresa` | **PENDIENTE de aplicar** |
 
 ---
 
@@ -379,6 +380,33 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   calcular la producción de Liquidaciones (vía `medicos.user_id`), pero falta
   que el usuario decida a quién se le atribuye cada procedimiento.
 
+### El dueño entra a cada consultorio UNA vez (2026-10-12) — LEER
+
+Cambia la decisión del 2026-10-02 ("el dueño no ve pacientes"). Otra sesión
+agregó un botón "Entrar" en Empresas y el selector del menú, que sumaban al
+dueño como admin PERMANENTE de cualquier consultorio. El usuario eligió
+"una vez por consultorio" (para dejarlo configurado). Cómo quedó:
+
+- `dueno_ingreso_unico.sql`: tabla `dueno_ingresos` y dos funciones.
+  `dueno_entrar_empresa(id)` lo suma como admin y anota el ingreso; un
+  segundo ingreso al mismo consultorio lo RECHAZA LA BASE.
+  `dueno_salir_empresas()` le quita el rol y cierra la visita.
+- La visita termina al apretar "Salir del consultorio" (menú lateral, solo
+  para el dueño adentro de uno), al cerrar sesión (`logout`) o, a más tardar,
+  al volver a iniciar sesión (`login`).
+- `agregar_a_empresa()` y `create-user` ya no dejan que el dueño se sume a sí
+  mismo (si no, la regla se salteaba).
+- El selector del menú vuelve a mostrar solo las empresas donde la persona es
+  miembro (la otra sesión le mostraba todas al dueño y lo sumaba al elegir).
+- Si el dueño ya era miembro por otra vía (lo sumó el admin del consultorio),
+  entrar no gasta el ingreso y salir no le quita ese rol.
+- La migración QUITA las membresías que el dueño tuviera sin ingreso abierto
+  (las del botón anterior).
+- Probado en PGlite (0.3.16; las versiones 0.2.17 y 0.3.4 se caen con
+  cualquier RAISE de plpgsql): no puede sumarse solo; entra y ve 1 paciente;
+  sale y ve 0; segundo ingreso rechazado; otro consultorio sí; un admin común
+  no puede usar la entrada del dueño.
+
 ### Edge Functions: cambio de otra sesión, corregido (2026-10-12)
 
 Otra sesión reemplazó en `create-user` y `update-user-password` las consultas
@@ -400,6 +428,7 @@ eligió conservar ese enfoque y corregir los problemas (opción A):
 - ⚠️ La regla de "empresa activa" queda REPETIDA en la base y en las dos
   funciones (comentado en el código): si cambia en `multiempresa.sql`,
   cambiarla también acá. Mismo orden de desempate que `mi_clinica_id()`.
+- `create-user` además rechaza que el dueño se sume a sí mismo.
 - **Commiteadas pero NO publicadas en Supabase**: hay que pegarlas en el panel
   (Edge Functions → cada una → Edit → pegar → Deploy).
 
