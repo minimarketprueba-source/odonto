@@ -82,6 +82,7 @@ import { formatDateDisplay } from '@/lib/utils'
 import { useEvoluciones } from '@/api/evoluciones'
 import { toast } from 'sonner'
 import Swal from 'sweetalert2'
+import { controlarPago, controlarProcedimiento } from '@/lib/cobros'
 import { useEmpresa } from '@/api/empresa'
 
 export default function FichaPaciente() {
@@ -506,9 +507,11 @@ export default function FichaPaciente() {
     if (!selectedPre) return
 
     // Manda el importe escrito; si se dejó vacío, el de la tarifa.
-    const costoFinal = selCosto.trim() !== '' ? Number(selCosto) : selectedPre.costo
-    if (!Number.isFinite(costoFinal) || costoFinal < 0) {
-      toast.error('El importe no es válido.')
+    const costoFinal = selCosto.trim() !== '' ? Number(selCosto) : Number(selectedPre.costo)
+    const descuento = selDescuento ? Number(selDescuento) : 0
+    const control = controlarProcedimiento(costoFinal, descuento)
+    if (control.tipo === 'error') {
+      toast.error(control.mensaje)
       return
     }
 
@@ -519,7 +522,7 @@ export default function FichaPaciente() {
         pieza: selPieza ? Number(selPieza) : null,
         cara: selCara || null,
         costo: costoFinal,
-        descuento: selDescuento ? Number(selDescuento) : 0,
+        descuento,
         estado: 'pendiente',
       })
 
@@ -537,12 +540,31 @@ export default function FichaPaciente() {
   // Record Payment
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activePresupuestoId || !pagoMonto) return
+    if (!activePresupuestoId || !pagoMonto || addPago.isPending) return
+
+    const monto = Number(pagoMonto)
+    const control = controlarPago(monto, saldoPendiente, totalCotizado)
+    if (control.tipo === 'error') {
+      toast.error(control.mensaje)
+      return
+    }
+    if (control.tipo === 'confirmar') {
+      const respuesta = await Swal.fire({
+        title: control.titulo,
+        text: control.mensaje,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, registrar',
+        cancelButtonText: 'Corregir el monto',
+        focusCancel: true,
+      })
+      if (!respuesta.isConfirmed) return
+    }
 
     try {
       await addPago.mutateAsync({
         presupuesto_id: activePresupuestoId,
-        monto: Number(pagoMonto),
+        monto,
         tipo_pago: pagoMetodo,
         comentario: pagoComentario || null,
         fecha: fechaHoyISO(),

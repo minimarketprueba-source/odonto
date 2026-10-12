@@ -3,14 +3,18 @@ import { QueryClient } from '@tanstack/react-query'
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Tiempo que los datos se consideran "frescos" (5 minutos)
-      staleTime: 5 * 60 * 1000,
+      // Tiempo que los datos se consideran "frescos". Era 5 minutos y sin
+      // refrescar al volver a la ventana: si los avisos en vivo no llegaban,
+      // recepción podía mirar una agenda o un saldo de hace rato.
+      staleTime: 60 * 1000,
       // Tiempo que los datos inactivos permanecen en cache (30 minutos)
       gcTime: 30 * 60 * 1000,
       // Reintentar máximo 2 veces en caso de error
       retry: 2,
-      // Refetch cuando la ventana recupera el foco
-      refetchOnWindowFocus: false,
+      // Al volver a la ventana se releen solo los datos de más de un minuto.
+      // Es la red de seguridad por si los avisos en vivo no llegan (ver
+      // use-realtime-subscriptions.ts y la migración tiempo_real.sql).
+      refetchOnWindowFocus: true,
       // Refetch cuando se reconecta a internet
       refetchOnReconnect: true,
     },

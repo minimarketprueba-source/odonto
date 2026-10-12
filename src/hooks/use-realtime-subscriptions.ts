@@ -19,16 +19,36 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/query-client";
 
-export const CANAL_REALTIME = "sanidad-realtime-events";
+export const CANAL_REALTIME = "odonto-tiempo-real";
 
-/** Qué cachés se invalidan cuando cambia cada tabla. */
-const TABLAS: { tabla: string; claves: (keys: typeof queryKeys) => readonly (readonly unknown[])[] }[] = [
-  { tabla: "fichas_rac", claves: (k) => [k.rac.all, k.consultas.all] },
-  { tabla: "citas", claves: (k) => [k.citas.all, k.listaEspera.all] },
-  { tabla: "lista_espera", claves: (k) => [k.listaEspera.all] },
-  { tabla: "atenciones_enfermeria", claves: (k) => [k.enfermeria.all, k.consultas.all] },
-  { tabla: "internaciones", claves: (k) => [k.enfermeria.all] },
-  { tabla: "consultas", claves: (k) => [k.consultas.all, k.citas.all] },
+/**
+ * Qué cachés se invalidan cuando cambia cada tabla.
+ *
+ * OJO: SOLO tablas que existen en esta base. Hasta el 2026-10-12 la lista era
+ * la del sistema policial (fichas_rac, lista_espera, atenciones_enfermeria,
+ * internaciones, consultas): de las seis solo existía `citas`, y Supabase
+ * rechaza el canal ENTERO si una de las tablas pedidas no existe, así que no
+ * llegaba ningún aviso. Recepción cobraba y la pantalla del odontólogo seguía
+ * mostrando el saldo viejo.
+ *
+ * Además cada tabla tiene que estar en la publicación `supabase_realtime`
+ * (migración `tiempo_real.sql`); si no, el canal conecta pero no avisa nada.
+ */
+export const TABLAS_EN_VIVO: {
+  tabla: string;
+  claves: (keys: typeof queryKeys) => readonly (readonly unknown[])[];
+}[] = [
+  { tabla: "citas", claves: (k) => [k.citas.all] },
+  { tabla: "pacientes", claves: (k) => [k.pacientes.all] },
+  // Presupuestos, sus procedimientos y pagos, odontograma, anamnesis,
+  // imágenes y consentimientos cuelgan todos de ["odontologia"].
+  { tabla: "presupuestos", claves: () => [["odontologia"]] },
+  { tabla: "presupuesto_detalles", claves: () => [["odontologia"]] },
+  { tabla: "pagos_presupuesto", claves: () => [["odontologia"]] },
+  { tabla: "odontograma_registros", claves: () => [["odontologia"]] },
+  { tabla: "evoluciones_clinicas", claves: (k) => [["evoluciones"], k.procedimientos.all] },
+  { tabla: "periodontogramas", claves: () => [["periodontogramas"]] },
+  { tabla: "recetas", claves: (k) => [k.recetas.all] },
 ];
 
 // --- Canal compartido -------------------------------------------------------
@@ -46,7 +66,7 @@ function setConectado(estado: boolean) {
 function abrirCanal(queryClient: QueryClient) {
   if (canal) return;
   const nuevo = supabase.channel(CANAL_REALTIME);
-  for (const { tabla, claves } of TABLAS) {
+  for (const { tabla, claves } of TABLAS_EN_VIVO) {
     nuevo.on("postgres_changes", { event: "*", schema: "public", table: tabla }, () => {
       for (const queryKey of claves(queryKeys)) {
         queryClient.invalidateQueries({ queryKey });

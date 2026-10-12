@@ -73,6 +73,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `marca_mova_dent_icono.sql` | **Solo Mova Dent**: guarda su ícono en su base (el de fábrica pasó a ser genérico) | Aplicada 2026-10-02 (por API) |
 | `reparar_cuentas_rotas.sql` | Pone '' en columnas de `auth.users` que estaban en NULL (cuentas creadas con INSERT directo) | Aplicada 2026-10-02 |
 | `multiempresa.sql` | Varias empresas en una sola base: `clinica_id` obligatorio en todo, reglas por empresa, `sistema_duenos` | Aplicada 2026-10-02 |
+| `tiempo_real.sql` | Agrega las 9 tablas dentales a la publicación `supabase_realtime` (avisos en vivo entre computadoras) | **PENDIENTE de aplicar** |
 
 ---
 
@@ -308,11 +309,20 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
 - `handleDbError` de `odontologia.ts` decía "la tabla no existe" también
   cuando faltaba una columna (trampa 5). Ahora usa `src/lib/esquema.ts`.
 
-Quedaron anotados para después: el tiempo real escucha tablas del sistema
-policial y no las dentales; el rol `asistente` lo aceptan la base y
-`create-user` pero la app no; recepción ve Liquidaciones; los cobros no
-avisan de pago en 0, descuento mayor al importe o pago mayor al saldo; logos de
-la Policía y de Mova Dent sin uso en `public/`.
+- **Avisos en vivo** (`use-realtime-subscriptions.ts`): se escuchaban 6 tablas
+  del sistema policial y solo `citas` existía; Supabase rechaza el canal ENTERO
+  si falta una, así que probablemente nunca llegó ningún aviso. Ahora escucha
+  las 9 dentales (`TABLAS_EN_VIVO`) y la migración `tiempo_real.sql` las agrega a
+  la publicación `supabase_realtime` (ninguna migración lo hacía). Una prueba
+  controla que cada tabla escuchada exista y esté en esa migración.
+  Red de seguridad: `staleTime` 1 minuto y `refetchOnWindowFocus: true`.
+- **Cobros** (`src/lib/cobros.ts`): rechaza pago de 0 y descuento mayor al
+  importe; un pago mayor al saldo o sobre un plan sin procedimientos pide
+  confirmación diciendo cuánto sobra (no se bloquea: la seña es un caso real).
+
+Quedaron anotados para después: el rol `asistente` lo aceptan la base y
+`create-user` pero la app no; recepción ve Liquidaciones; logos de la Policía y
+de Mova Dent sin uso en `public/`.
 
 ## Cefalometría (revisado el 2026-09-30)
 
@@ -367,7 +377,7 @@ Chrome del sistema vía Playwright.
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (229 tests)
+npm run test:run     # Vitest una corrida (258 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql

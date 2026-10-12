@@ -40,6 +40,9 @@ const ORDEN = [
   // reglas de acceso y funciones de permisos que dejaron los anteriores (que
   // son de cuando había una sola empresa).
   'multiempresa.sql',
+  // No toca reglas de acceso (solo habilita los avisos en vivo), así que puede
+  // ir después de multiempresa sin romper la condición de arriba.
+  'tiempo_real.sql',
 ];
 
 // Datos de Mova Dent: sus precios y su nombre. Un consultorio nuevo arranca
