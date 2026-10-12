@@ -9,6 +9,7 @@ import { useState } from "react"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useEmpresa } from "@/api/empresa";
 import { ICONO_PREDETERMINADO } from "@/lib/clinica";
+import { useIconoEmpresa } from "@/hooks/use-icono-empresa";
 import { showSwal } from '@/components/ui/swal'
 
 // Helper para obtener la ruta correcta del logo
@@ -32,6 +33,7 @@ export function Sidebar() {
   const [cambiando, setCambiando] = useState(false)
   const empresaActiva = empresas.find((e) => e.activa)
   const empresa = useEmpresa()
+  const icono = useIconoEmpresa(empresa)
   // Nombre real de la persona, si lo cargó en Mi perfil o tiene ficha de
   // odontólogo. Si no hay ninguno, se cae al correo.
   const { data: perfil } = usePerfilProfesional(user)
@@ -125,7 +127,7 @@ export function Sidebar() {
                   de acceso y los impresos. */}
               <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
                 <img
-                  src={empresa.icono_url || getLogoPath()}
+                  src={icono === ICONO_PREDETERMINADO ? getLogoPath() : icono}
                   alt={empresa.nombre}
                   className="w-full h-full object-cover"
                 />

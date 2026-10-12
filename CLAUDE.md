@@ -453,12 +453,41 @@ Los íconos cuadrados se generaron midiendo la muela sobre un canvas
 hay Pillow ni ImageMagick en este equipo: para procesar imágenes se usa el
 Chrome del sistema vía Playwright.
 
+### La marca es igual para TODOS los consultorios (2026-10-12)
+
+El usuario pidió que "la presentación del logo quede para todos, no solo para
+Mova Dent". Mova Dent tenía su ícono recortado a mano y cargado con una
+migración exclusiva; cualquier otro consultorio con logo veía el diente
+genérico en el menú y la pestaña. Ahora (`src/lib/icono-desde-logo.ts`):
+
+- **El ícono se arma solo desde el logo**: busca el símbolo (primer bloque
+  separado por una franja vacía, a la izquierda o arriba, con forma de
+  símbolo) y lo recorta. Con el logo de Mova Dent encuentra exactamente
+  x 0..118, y 2..123, lo mismo que se midió a mano. Logo de solo texto → la
+  INICIAL del consultorio sobre su color (se saltea "Clínica", "Dr."…).
+- **Fondo**: si el logo trae fondo propio, ese color; si es transparente, el
+  que más contraste (cociente WCAG): logo claro → `#0f172a`, oscuro → blanco.
+- `useIconoEmpresa()`: ícono subido > armado desde el logo > genérico. Lo usan
+  el menú lateral y la pestaña. En Mantenimiento → Consultorio se ve la vista
+  previa y **se guarda al apretar Guardar**, así es igual en todos los
+  equipos. Al cambiar el logo, si el ícono era el armado del anterior se
+  rehace; uno subido a mano no se toca.
+- **Pantalla de acceso**: `usePlacaLogo()` pone el logo sobre una placa que
+  contraste. El cian de Mova Dent se lavaba en el tema claro ("DENT" casi no
+  se leía); un logo oscuro desaparecería en el tema oscuro.
+- Probado en Chrome con los 3 logos de Mova Dent y 3 inventados (símbolo +
+  nombre en JPG, solo texto, símbolo arriba), y la pantalla de acceso en los
+  dos temas. Sin sesión no se pudo ver el menú lateral en vivo.
+- Lo que NO cambia: la pantalla de acceso muestra la marca recién en un equipo
+  donde alguien ya entró (caché `odonto-empresa-v1`); en uno nuevo, la neutra.
+  Es por multiempresa: antes de entrar no se sabe de qué consultorio es.
+
 ## Comandos
 
 ```bash
 npm run dev          # Vite (puerto 5173)
 npm run build        # tsc && vite build (el type-check bloquea el build)
-npm run test:run     # Vitest una corrida (271 tests)
+npm run test:run     # Vitest una corrida (284 tests)
 npm run lint         # eslint --max-warnings 0
 npm run type-check   # tsc --noEmit
 npm run instalacion  # regenera supabase/instalacion_completa.sql

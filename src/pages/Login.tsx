@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth, DEMO_USERS } from '@/context/auth-context'
 import { useEmpresa } from '@/api/empresa'
+import { usePlacaLogo } from '@/hooks/use-icono-empresa'
 
 /**
  * Traduce los errores de Supabase Auth a algo que se entienda y que diga qué
@@ -43,6 +44,9 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const empresa = useEmpresa()
+  // Placa que contraste con el logo: uno claro (como el cian de Mova Dent) se
+  // lavaba en el tema claro; uno oscuro desaparecería en el tema oscuro.
+  const placaLogo = usePlacaLogo(empresa.logo_url)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,7 +92,12 @@ export default function LoginPage() {
               entrada de cualquier consultorio. */}
           <CardTitle className="mb-1">
             {empresa.logo_url ? (
-              <img src={empresa.logo_url} alt={empresa.nombre} className="mx-auto h-14 w-auto sm:h-16" />
+              <span
+                className={placaLogo ? 'mx-auto inline-block rounded-xl px-4 py-2 shadow-sm ring-1 ring-black/5' : 'contents'}
+                style={placaLogo ? { backgroundColor: placaLogo } : undefined}
+              >
+                <img src={empresa.logo_url} alt={empresa.nombre} className="mx-auto h-14 w-auto sm:h-16" />
+              </span>
             ) : (
               <span className="block text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
                 {empresa.nombre_corto}

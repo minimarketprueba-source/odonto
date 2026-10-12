@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useEmpresa, useActualizarEmpresa, achicarLogo, achicarIcono } from "@/api/empresa";
 import { usePermissions } from "@/hooks/use-permissions";
 import { lineaContacto, aclararColor, EMPRESA_PREDETERMINADA } from "@/lib/clinica";
-import { ICONO_PREDETERMINADO } from "@/lib/clinica";
+import { useIconoEmpresa } from "@/hooks/use-icono-empresa";
+import { iconoDesdeLogo } from "@/lib/icono-desde-logo";
 
 /**
  * Los datos que salen impresos en todo lo que se le entrega al paciente:
@@ -35,6 +36,14 @@ export function DatosConsultorio() {
   const [color, setColor] = useState(empresa.color_primario);
   const [subiendo, setSubiendo] = useState<"logo" | "icono" | null>(null);
 
+  // Sin ícono propio, el que se armaría desde el logo (y que se guarda al
+  // apretar Guardar). Se ve en la vista previa tal como va a quedar.
+  const vistaIcono = useIconoEmpresa({
+    ...empresa,
+    nombre, nombre_corto: nombreCorto, color_primario: color, logo_url: logo, icono_url: icono,
+  });
+  const iconoAutomatico = !icono && !!logo;
+
   // La consulta llega después del primer dibujado: cuando contesta, se rellena
   // el formulario. Sin esto los campos quedarían con los valores por omisión.
   useEffect(() => {
@@ -53,8 +62,19 @@ export function DatosConsultorio() {
     if (!archivo) return;
     setSubiendo(cual);
     try {
-      if (cual === "logo") setLogo(await achicarLogo(archivo));
-      else setIcono(await achicarIcono(archivo));
+      if (cual === "logo") {
+        const nuevo = await achicarLogo(archivo);
+        // Si el ícono actual es el que se había armado desde el logo ANTERIOR,
+        // se descarta para que se arme del nuevo. Uno subido a mano no se toca.
+        // (Mismo logo y mismo navegador dan exactamente la misma imagen.)
+        if (icono && logo) {
+          const armadoDelAnterior = await iconoDesdeLogo(logo, { nombre: nombreCorto || nombre, color });
+          if (armadoDelAnterior === icono) setIcono(null);
+        }
+        setLogo(nuevo);
+      } else {
+        setIcono(await achicarIcono(archivo));
+      }
       // Todavía NO está guardado: se avisa para que no se vaya de la pantalla
       // creyendo que ya quedó.
       await showSwalInfo(
@@ -75,10 +95,16 @@ export function DatosConsultorio() {
       return;
     }
     try {
+      // Con logo y sin ícono propio, se guarda el armado desde el logo: así lo
+      // ven igual todos los usuarios del consultorio, en cualquier equipo, sin
+      // volver a armarlo cada vez.
+      const iconoFinal = icono ??
+        (logo ? await iconoDesdeLogo(logo, { nombre: nombreCorto || nombre, color }) : null);
       await guardar.mutateAsync({
         nombre, nombre_corto: nombreCorto, ruc, direccion, telefono, email,
-        logo_url: logo, icono_url: icono, color_primario: color,
+        logo_url: logo, icono_url: iconoFinal, color_primario: color,
       });
+      if (iconoFinal && !icono) setIcono(iconoFinal);
       await showSwalSuccess(
         "Los datos del consultorio se guardaron. Ya salen en los impresos y en la pantalla de acceso."
       );
@@ -245,13 +271,13 @@ export function DatosConsultorio() {
           <div className="flex h-20 items-center gap-3">
             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-slate-900">
               <img
-                src={icono || ICONO_PREDETERMINADO}
+                src={vistaIcono}
                 alt="Ícono del consultorio"
                 className="h-full w-full object-cover"
               />
             </div>
             <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md border bg-slate-900">
-              <img src={icono || ICONO_PREDETERMINADO} alt="" className="h-full w-full object-cover" />
+              <img src={vistaIcono} alt="" className="h-full w-full object-cover" />
             </div>
           </div>
           <input
@@ -278,9 +304,9 @@ export function DatosConsultorio() {
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Va en el menú lateral y en la pestaña del navegador. Si la imagen no es
-            cuadrada se recorta el centro. Se ve chiquito: conviene un símbolo, no el
-            nombre escrito.
+            {iconoAutomatico
+              ? "Armado automáticamente a partir del logo (su símbolo o, si es solo texto, la inicial). Se guarda con «Guardar datos». Puede subir otro si prefiere."
+              : "Va en el menú lateral y en la pestaña del navegador. Si no sube uno, se arma solo a partir del logo. Se ve chiquito: conviene un símbolo, no el nombre escrito."}
           </p>
         </div>
       </div>
