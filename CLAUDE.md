@@ -372,6 +372,38 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   `api/lista-espera.ts`, `api/index.ts`, `lib/utils/imc-utils.ts`,
   `types/peso.ts`. Quedan componentes de `ui/` sin usar: son de la plantilla
   shadcn y no llegan al sitio.
+- **`presupuesto_detalles.realizado_por` ya se llena solo** (trigger de
+  `historial_procedimientos_y_archivos.sql`, desde el 2026-09-30) con la CUENTA
+  que marcó "realizado", que puede ser recepción y no quien atendió. Sirve para
+  calcular la producción de Liquidaciones (vía `medicos.user_id`), pero falta
+  que el usuario decida a quién se le atribuye cada procedimiento.
+
+### ⚠️ Edge Functions con cambios SIN commitear de otra sesión (2026-10-12)
+
+`create-user` y `update-user-password` aparecieron modificadas a las 13:39 por
+alguien que no era esta sesión, y no se tocaron (no se sabe si ya se pegaron
+en el panel de Supabase). El cambio reemplaza las consultas a la base
+(`mi_clinica_id()`, `es_odonto_admin()`) por la misma lógica copiada a mano con
+el cliente admin. Revisión:
+
+1. **Grave — `create-user` busca la cuenta existente con
+   `.ilike("email", email)`.** En `ilike`, `_` y `%` son comodines:
+   `juan_perez@x.com` coincide con `juanXperez@x.com`. Un admin que crea
+   `a_b@x.com` puede terminar SUMANDO A SU EMPRESA, con el rol elegido, a otra
+   persona que ya tenía cuenta. Usar `.eq("email", email)` (los correos se
+   guardan en minúsculas) o escapar `\`, `%` y `_`.
+2. Se quitó el borrado de la cuenta cuando falla asignar el rol: queda una
+   cuenta que entra y ve "Sin acceso". Antes se deshacía.
+3. Si la cuenta existe en `auth.users` sin perfil, la vincula buscándola con
+   `listUsers()`, que devuelve solo la primera página (50): con más usuarios
+   no la encuentra.
+4. La lógica de "empresa activa" y "estado activo" queda copiada en tres
+   lugares (la base y las dos funciones): si un día cambia en la base, las
+   funciones quedan desfasadas sin que nada avise.
+5. `update-user-password` deja pasar al dueño del sistema en el primer control,
+   pero lo frena después (no tiene empresa activa): no rompe nada, solo no
+   funciona.
+6. Siguen aceptando contraseñas de 6 caracteres (la app pide 8).
 
 ## Cefalometría (revisado el 2026-09-30)
 
