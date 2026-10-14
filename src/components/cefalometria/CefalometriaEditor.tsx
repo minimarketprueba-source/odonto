@@ -98,6 +98,12 @@ export function CefalometriaEditor({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  // La guía no debe tapar una referencia anatómica. Se puede llevar a
+  // cualquier zona libre del visor desde su barra superior.
+  const [guiaPosicion, setGuiaPosicion] = useState<{ x: number; y: number } | null>(null);
+  const [moviendoGuia, setMoviendoGuia] = useState(false);
+  const [inicioMovimientoGuia, setInicioMovimientoGuia] = useState({ x: 0, y: 0 });
+  const [guiaVisible, setGuiaVisible] = useState(true);
 
   // Punto seleccionado para colocar o inspeccionar
   // Asistente de marcado: guía punto por punto en el orden de Ricketts (o por
@@ -137,6 +143,7 @@ export function CefalometriaEditor({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const guiaRef = useRef<HTMLDivElement>(null);
   // Punto bajo el mouse: muestra un cartel con su nombre y qué es.
   const [hoverPunto, setHoverPunto] = useState<{ id: string; x: number; y: number } | null>(null);
   const mostrarCartel = (id: string, e: React.MouseEvent) => {
@@ -242,6 +249,18 @@ export function CefalometriaEditor({
 
   // Movimiento del ratón (arrastrar punto o paneo)
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (moviendoGuia) {
+      const contenedor = containerRef.current;
+      const guia = guiaRef.current;
+      if (!contenedor || !guia) return;
+      const caja = contenedor.getBoundingClientRect();
+      setGuiaPosicion({
+        x: Math.max(0, Math.min(caja.width - guia.offsetWidth, e.clientX - caja.left - inicioMovimientoGuia.x)),
+        y: Math.max(0, Math.min(caja.height - guia.offsetHeight, e.clientY - caja.top - inicioMovimientoGuia.y)),
+      });
+      return;
+    }
+
     if (arrastrandoPuntoId) {
       const coords = getCoordenadaImagen(e.clientX, e.clientY);
       if (coords) {
@@ -265,6 +284,7 @@ export function CefalometriaEditor({
 
   // Fin de arrastre
   const handleMouseUp = () => {
+    if (moviendoGuia) setMoviendoGuia(false);
     if (arrastrandoPuntoId) {
       setArrastrandoPuntoId(null);
       setPuntoArrastrePos(null);
@@ -276,10 +296,31 @@ export function CefalometriaEditor({
 
   // Inicio de paneo
   const handlePanStart = (e: React.MouseEvent) => {
-    if (e.button === 0 && e.target === containerRef.current) {
+    // El clic normal sigue colocando puntos. Para recorrer una imagen ampliada,
+    // use Shift + arrastre o el botón central, incluso sobre la radiografía.
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+      e.preventDefault();
       setIsPanning(true);
       setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
+  };
+
+  const handleZoomRueda = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!srcImagen) return;
+    e.preventDefault();
+    const paso = e.deltaY < 0 ? 0.15 : -0.15;
+    setZoom((actual) => Math.max(0.4, Math.min(3.5, Number((actual + paso).toFixed(2)))));
+  };
+
+  const handleInicioMovimientoGuia = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 || !containerRef.current || !guiaRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cajaContenedor = containerRef.current.getBoundingClientRect();
+    const cajaGuia = guiaRef.current.getBoundingClientRect();
+    setGuiaPosicion({ x: cajaGuia.left - cajaContenedor.left, y: cajaGuia.top - cajaContenedor.top });
+    setInicioMovimientoGuia({ x: e.clientX - cajaGuia.left, y: e.clientY - cajaGuia.top });
+    setMoviendoGuia(true);
   };
 
   // Cambiar imagen de radiografía desde disco
@@ -607,6 +648,8 @@ export function CefalometriaEditor({
           onMouseDown={handlePanStart}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onWheel={handleZoomRueda}
           className="flex-1 bg-black relative overflow-hidden flex items-center justify-center cursor-crosshair"
           style={{ touchAction: 'none' }}
         >
@@ -638,10 +681,25 @@ export function CefalometriaEditor({
                 setPan({ x: 0, y: 0 });
               }}
               className="h-7 w-7 text-slate-200 hover:bg-slate-800 hover:text-white text-[10px] font-bold"
-              title="Restablecer vista 100%"
+              title="Restablecer vista 100% y posición"
             >
               1:1
             </Button>
+            <span className="px-0.5 text-center text-[9px] font-medium text-slate-400" title="Use la rueda del mouse para acercar o alejar">
+              {Math.round(zoom * 100)}%
+            </span>
+            {!guiaVisible && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setGuiaVisible(true)}
+                className="h-7 w-7 text-cyan-300 hover:bg-slate-800 hover:text-white text-[10px] font-bold"
+                title="Mostrar guía de marcado"
+                aria-label="Mostrar guía de marcado"
+              >
+                ?
+              </Button>
+            )}
             <div className="h-px bg-slate-700 my-0.5" />
             <Button
               variant="ghost"
@@ -685,7 +743,7 @@ export function CefalometriaEditor({
           })()}
 
           {/* Asistente: qué punto toca, qué es y dónde buscarlo */}
-          {!modoCalibracion && srcImagen && (() => {
+          {!modoCalibracion && srcImagen && guiaVisible && (() => {
             const def = PUNTOS_CEFALOMETRICOS.find((p) => p.id === puntoActivoId);
             const hechos = secuencia.filter((id) => puntos[id]).length;
             const posicion = def ? secuencia.indexOf(def.id) : -1;
@@ -695,11 +753,30 @@ export function CefalometriaEditor({
               setPuntoActivoId(secuencia[(posicion + paso + n) % n]);
             };
             return (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(640px,calc(100%-6rem))] rounded-xl border border-cyan-500/40 bg-slate-900/95 px-4 py-2.5 text-xs shadow-2xl backdrop-blur">
+              <div
+                ref={guiaRef}
+                className={`absolute z-30 w-[min(640px,calc(100%-6rem))] rounded-xl border border-cyan-500/40 bg-slate-900/95 px-4 py-2.5 text-xs shadow-2xl backdrop-blur ${moviendoGuia ? 'cursor-grabbing' : ''}`}
+                style={
+                  guiaPosicion
+                    ? { left: guiaPosicion.x, top: guiaPosicion.y }
+                    : { left: '50%', top: '0.75rem', transform: 'translateX(-50%)' }
+                }
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-cyan-300">
-                    {guiaRicketts ? 'Guía Ricketts' : 'Todos los puntos'} · {hechos} de {secuencia.length}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onMouseDown={handleInicioMovimientoGuia}
+                      className="flex h-6 w-6 flex-shrink-0 cursor-grab items-center justify-center rounded text-cyan-300 hover:bg-slate-800 hover:text-white active:cursor-grabbing"
+                      title="Arrastre para mover la guía y despejar la radiografía"
+                      aria-label="Mover guía"
+                    >
+                      <Move className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-semibold text-cyan-300">
+                      {guiaRicketts ? 'Guía Ricketts' : 'Todos los puntos'} · {hechos} de {secuencia.length}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1">
                     <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-slate-300 hover:bg-slate-800"
                       onClick={() => irA(-1)} disabled={!def}>
@@ -716,6 +793,15 @@ export function CefalometriaEditor({
                       }}
                       title="Cambiar entre los puntos de Ricketts y todos los puntos">
                       {guiaRicketts ? 'Ver todos' : 'Solo Ricketts'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                      onClick={() => setGuiaVisible(false)}
+                      title="Ocultar la guía para ver y marcar la radiografía"
+                    >
+                      Ocultar
                     </Button>
                   </div>
                 </div>
@@ -816,7 +902,8 @@ export function CefalometriaEditor({
               style={{ overflow: 'visible', pointerEvents: 'all' }}
               onMouseDown={(e) => {
                 // Solo el botón izquierdo: el derecho es para borrar un punto.
-                if (e.button === 0) handleCanvasClick(e);
+                // Shift + arrastre queda reservado para desplazar la vista.
+                if (e.button === 0 && !e.shiftKey) handleCanvasClick(e);
               }}
             >
               {/* Superficie de captura: responde al primer clic sobre cualquier
