@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, Shield, Stethoscope, UserCheck, Sparkles, CheckCircle2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { useAuth, DEMO_USERS } from '@/context/auth-context'
+import { useAuth } from '@/context/auth-context'
 import { useEmpresa } from '@/api/empresa'
 import { usePlacaLogo } from '@/hooks/use-icono-empresa'
 
@@ -34,6 +34,22 @@ function mensajeErrorLogin(err: unknown): string {
   }
   return texto || 'No se pudo iniciar sesión.'
 }
+
+/**
+ * Accesos rápidos, SOLO en la versión de desarrollo (localhost): en el sitio
+ * publicado mostrarían a cualquiera los correos de las cuentas.
+ * Son las cuentas que existen de verdad en Supabase (Authentication → Users,
+ * 2026-10-14). Antes había un "admin@odonto.com" que no existe: la
+ * administradora de Mova Dent es karynair91@gmail.com.
+ */
+const ACCESOS_PRUEBA = [
+  { etiqueta: 'Odontólogo', email: 'medico@odonto.com', Icono: Stethoscope, color: 'text-teal-400' },
+  { etiqueta: 'Administradora', email: 'karynair91@gmail.com', Icono: Shield, color: 'text-cyan-400' },
+  { etiqueta: 'Recepción', email: 'recepcion@odonto.com', Icono: UserCheck, color: 'text-emerald-400' },
+  { etiqueta: 'Asistente dental', email: 'asistente@odonto.com', Icono: CheckCircle2, color: 'text-sky-400' },
+  { etiqueta: 'Superadmin Mova Dent', email: 'superadmin2@odonto.com', Icono: Shield, color: 'text-violet-400' },
+  { etiqueta: 'Dueño del sistema', email: 'superadmin1@odonto.com', Icono: Shield, color: 'text-amber-400' },
+]
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -66,14 +82,11 @@ export default function LoginPage() {
   // Completa SOLO el correo y deja el cursor en la contraseña. Antes ponía
   // "123456", la contraseña de prueba de agosto: desde que se cambiaron las
   // contraseñas reales (2026-08-05) ningún botón podía entrar y parecían rotos.
-  const fillDemoUser = (roleKey: string) => {
-    const demo = DEMO_USERS[roleKey]
-    if (demo) {
-      setEmail(demo.email)
-      setPassword('')
-      setError(null)
-      document.getElementById('password')?.focus()
-    }
+  const elegirCuenta = (correo: string) => {
+    setEmail(correo)
+    setPassword('')
+    setError(null)
+    document.getElementById('password')?.focus()
   }
 
   return (
@@ -210,43 +223,23 @@ export default function LoginPage() {
               <p className="-mt-2 mb-3 text-center text-[11px] text-muted-foreground">
                 Completan el correo; escriba la contraseña real de esa cuenta.
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fillDemoUser('medico')}
-                  className="h-9 justify-start gap-2 border-border bg-background/40 text-xs text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Stethoscope className="h-3.5 w-3.5 text-teal-400" />
-                  Odontólogo
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fillDemoUser('admin')}
-                  className="h-9 justify-start gap-2 border-border bg-background/40 text-xs text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Shield className="h-3.5 w-3.5 text-cyan-400" />
-                  Administrador
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fillDemoUser('recepcion')}
-                  className="h-9 justify-start gap-2 border-border bg-background/40 text-xs text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
-                >
-                  <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
-                  Recepción
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fillDemoUser('enfermeria')}
-                  className="h-9 justify-start gap-2 border-border bg-background/40 text-xs text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5 text-sky-400" />
-                  Asistente Dental
-                </Button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {ACCESOS_PRUEBA.map(({ etiqueta, email: correo, Icono, color }) => (
+                  <Button
+                    key={correo}
+                    type="button"
+                    variant="outline"
+                    onClick={() => elegirCuenta(correo)}
+                    title={correo}
+                    className="h-auto justify-start gap-2 border-border bg-background/40 py-2 text-left text-xs text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                  >
+                    <Icono className={`h-4 w-4 shrink-0 ${color}`} />
+                    <span className="min-w-0">
+                      <span className="block font-semibold">{etiqueta}</span>
+                      <span className="block truncate font-normal text-muted-foreground">{correo}</span>
+                    </span>
+                  </Button>
+                ))}
               </div>
             </div>
           )}

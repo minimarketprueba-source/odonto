@@ -48,33 +48,6 @@ export const ROLES_CLINICA = [
   'enfermeria',
 ]
 
-export const DEMO_USERS: Record<string, { email: string; name: string; role: string; user_id: string }> = {
-  medico: {
-    email: 'medico@odonto.com',
-    name: 'Dr. Carlos Odontólogo',
-    role: 'medico',
-    user_id: '00000000-0000-4000-a000-000000000001',
-  },
-  admin: {
-    email: 'admin@odonto.com',
-    name: 'Dra. María Administradora',
-    role: 'admin',
-    user_id: '00000000-0000-4000-a000-000000000002',
-  },
-  recepcion: {
-    email: 'recepcion@odonto.com',
-    name: 'Lic. Ana Recepción',
-    role: 'recepcion',
-    user_id: '00000000-0000-4000-a000-000000000003',
-  },
-  enfermeria: {
-    email: 'asistente@odonto.com',
-    name: 'Asist. Juan Dentales',
-    role: 'enfermeria',
-    user_id: '00000000-0000-4000-a000-000000000004',
-  },
-}
-
 /**
  * Roles que la pantalla de Usuarios puede asignar, con su nombre visible.
  */
