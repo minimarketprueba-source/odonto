@@ -77,7 +77,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | Aplicada 2026-10-12 (4 reglas confirmadas) |
 | `marca_publica.sql` | Código de acceso por consultorio (`?c=movadent`) y `marca_publica()`: logo en la pantalla de ingreso para todos | Aplicada 2026-10-12 (movadent, sonrisas; probada en vivo) |
 | `dueno_ingreso_unico.sql` | El dueño entra a cada consultorio UNA vez (`dueno_entrar_empresa` / `dueno_salir_empresas`); redefine `agregar_a_empresa` | Aplicada 2026-10-12 (0 membresías del dueño; funciones cerradas a anon) |
-| `dueno_ingreso_permanente.sql` | Corrige la anterior: al entrar, el dueño queda como admin PERMANENTE; `dueno_salir_empresas()` sin efecto | **PENDIENTE de aplicar** |
+| `dueno_ingreso_permanente.sql` | Corrige la anterior: al entrar, el dueño queda como admin PERMANENTE; `dueno_salir_empresas()` sin efecto; anota ingresos faltantes | Aplicada 2026-10-14 (Sonrisas admin, sin ingreso anotado: entró por la create-user vieja). Falta re-correrla para anotarlo |
 
 ---
 

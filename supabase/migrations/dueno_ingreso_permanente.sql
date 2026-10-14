@@ -68,6 +68,16 @@ RETURNS INTEGER LANGUAGE SQL SECURITY DEFINER SET search_path = public AS $$
     SELECT 0;
 $$;
 
+-- Si el dueño ya es miembro de un consultorio sin ingreso anotado (entró por
+-- otro camino, por ejemplo la versión vieja de create-user que todavía lo
+-- dejaba sumarse solo), se anota ahora: cuenta como su ingreso a ese
+-- consultorio, y si después lo sacan no puede volver solo.
+INSERT INTO public.dueno_ingresos (user_id, clinica_id)
+SELECT r.user_id, r.clinica_id
+FROM public.user_roles r
+JOIN public.sistema_duenos d ON d.user_id = r.user_id
+ON CONFLICT (user_id, clinica_id) DO NOTHING;
+
 REVOKE ALL ON FUNCTION public.dueno_entrar_empresa(UUID), public.dueno_salir_empresas() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.dueno_entrar_empresa(UUID), public.dueno_salir_empresas() TO authenticated;
 
