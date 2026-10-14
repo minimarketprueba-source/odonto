@@ -31,6 +31,7 @@ export default function Empresas() {
   // Cuáles consultorios ya usó el dueño (entra a cada uno una sola vez).
   const { data: ingresos = [] } = useIngresosDueno(esDueno)
   const ingresoDe = (clinicaId: string) => ingresos.find((i) => i.clinica_id === clinicaId)
+  const esMiembro = (clinicaId: string) => misEmpresas.some((m) => m.clinica_id === clinicaId)
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
 
@@ -84,17 +85,16 @@ export default function Empresas() {
   }
 
   const handleEntrarEmpresa = async (empresa: EmpresaDelSistema) => {
-    const abierto = ingresoDe(empresa.clinica_id)
-    // Volver a una visita que sigue abierta no gasta nada: no se pregunta.
-    if (!abierto) {
+    // Si ya es miembro (entró antes), solo se cambia de consultorio: no se pregunta.
+    if (!esMiembro(empresa.clinica_id)) {
       const respuesta = await Swal.fire({
         icon: 'warning',
         title: `¿Entrar a ${empresa.nombre_corto || empresa.nombre}?`,
         html:
-          'Puede entrar a cada consultorio <b>una sola vez</b>, para dejarlo configurado. ' +
-          'Mientras esté adentro va a ver todo, incluidos los pacientes.<br><br>' +
-          'La visita termina cuando cierre sesión o apriete <b>«Salir del consultorio»</b> ' +
-          'en el menú. Después ya no podrá volver a entrar a este consultorio.',
+          'Va a quedar como <b>administrador</b> de este consultorio, y va a ver todo, ' +
+          'incluidos los pacientes.<br><br>' +
+          'Puede usar este botón <b>una sola vez</b> por consultorio: si después el ' +
+          'administrador del consultorio lo saca, no podrá volver a entrar solo.',
         showCancelButton: true,
         confirmButtonText: 'Entrar ahora',
         cancelButtonText: 'Cancelar',
@@ -187,7 +187,8 @@ export default function Empresas() {
               const esActiva = e.clinica_id === idEmpresaActiva
               const imagenMarca = e.icono_url || e.logo_url
               const ingreso = ingresoDe(e.clinica_id)
-              const ingresoUsado = !!ingreso?.salio_at
+              // Usó su ingreso y hoy no es miembro (lo sacaron): ya no puede entrar.
+              const ingresoUsado = !!ingreso && !esMiembro(e.clinica_id)
 
               return (
                 <div
@@ -273,7 +274,7 @@ export default function Empresas() {
                         ) : (
                           <LogIn className="h-3.5 w-3.5" />
                         )}
-                        {esActiva ? 'Adentro ahora' : ingreso ? 'Volver (visita abierta)' : 'Entrar (una vez)'}
+                        {esActiva ? 'Adentro ahora' : esMiembro(e.clinica_id) ? 'Ir al consultorio' : 'Entrar (una vez)'}
                       </Button>
                     )}
 

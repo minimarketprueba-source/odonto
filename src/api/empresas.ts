@@ -125,8 +125,9 @@ function faltaMigracionIngreso(code?: string): boolean {
  * El dueño del sistema entra a un consultorio como administrador, UNA sola
  * vez por consultorio (decisión del usuario, 2026-10-12). La base lleva la
  * cuenta y rechaza un segundo ingreso: no alcanza con esconder el botón.
- * La visita termina con salirComoDueno(), al cerrar sesión o al volver a
- * iniciar sesión. Ver supabase/migrations/dueno_ingreso_unico.sql.
+ * Al entrar queda como administrador PERMANENTE de ese consultorio, igual que
+ * cualquier administrador (aclarado por el usuario el 2026-10-14). Si después
+ * lo sacan, no puede volver a entrar solo. Ver dueno_ingreso_permanente.sql.
  */
 export async function entrarAEmpresa(clinicaId: string): Promise<void> {
   const { error } = await supabase.rpc("dueno_entrar_empresa", { p_clinica: clinicaId });
@@ -139,20 +140,13 @@ export async function entrarAEmpresa(clinicaId: string): Promise<void> {
   limpiarMarcaYCambiarA("/");
 }
 
-/** Termina la visita del dueño al consultorio y vuelve a la pantalla Empresas. */
-export async function salirComoDueno(): Promise<void> {
-  const { error } = await supabase.rpc("dueno_salir_empresas");
-  if (error && !faltaMigracionIngreso(error.code)) throw new Error(error.message);
-  limpiarMarcaYCambiarA("/empresas");
-}
-
 export interface IngresoDueno {
   clinica_id: string;
   entro_at: string;
   salio_at: string | null;
 }
 
-/** Los ingresos del dueño: cuáles ya usó (salio_at) y cuál tiene abierto. */
+/** Los consultorios a los que el dueño ya usó su ingreso. */
 export function useIngresosDueno(habilitado: boolean) {
   return useQuery({
     queryKey: [...clave, "ingresos"],

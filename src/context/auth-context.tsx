@@ -496,17 +496,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logger.error('Error al iniciar sesión:', error)
       throw error
     }
-    // Si es el dueño del sistema y dejó abierta una visita a un consultorio
-    // (cerró el navegador sin cerrar sesión), termina acá: el ingreso es uno
-    // solo. Para cualquier otra persona no hace nada.
-    await supabase.rpc('dueno_salir_empresas').then(() => undefined, () => undefined)
   }
 
   const logout = async () => {
-    // El dueño del sistema termina su visita al consultorio al cerrar sesión.
-    if (esDueno) {
-      await supabase.rpc('dueno_salir_empresas').then(() => undefined, () => undefined)
-    }
     const signOutPromise = supabase.auth.signOut()
     const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000))
     const result = await Promise.race([signOutPromise, timeout])

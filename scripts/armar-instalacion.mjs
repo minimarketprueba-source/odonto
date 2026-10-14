@@ -50,6 +50,8 @@ const ORDEN = [
   'marca_publica.sql',
   // El dueño entra a cada consultorio una sola vez (redefine agregar_a_empresa).
   'dueno_ingreso_unico.sql',
+  // Corrige la anterior: al entrar, el dueño queda como admin permanente.
+  'dueno_ingreso_permanente.sql',
 ];
 
 // Datos de Mova Dent: sus precios y su nombre. Un consultorio nuevo arranca

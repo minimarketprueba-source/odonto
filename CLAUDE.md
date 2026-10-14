@@ -77,6 +77,7 @@ Se aplican pegándolas en el SQL Editor del panel de Supabase; todas son idempot
 | `liquidaciones_solo_admin.sql` | Liquidaciones de honorarios: solo el administrador lee y escribe (reemplaza la regla común de multiempresa) | Aplicada 2026-10-12 (4 reglas confirmadas) |
 | `marca_publica.sql` | Código de acceso por consultorio (`?c=movadent`) y `marca_publica()`: logo en la pantalla de ingreso para todos | Aplicada 2026-10-12 (movadent, sonrisas; probada en vivo) |
 | `dueno_ingreso_unico.sql` | El dueño entra a cada consultorio UNA vez (`dueno_entrar_empresa` / `dueno_salir_empresas`); redefine `agregar_a_empresa` | Aplicada 2026-10-12 (0 membresías del dueño; funciones cerradas a anon) |
+| `dueno_ingreso_permanente.sql` | Corrige la anterior: al entrar, el dueño queda como admin PERMANENTE; `dueno_salir_empresas()` sin efecto | **PENDIENTE de aplicar** |
 
 ---
 
@@ -381,6 +382,15 @@ Guía: `docs/INSTALAR-NUEVO-CONSULTORIO.md`.
   que el usuario decida a quién se le atribuye cada procedimiento.
 
 ### El dueño entra a cada consultorio UNA vez (2026-10-12) — LEER
+
+> **Corregido el 2026-10-14** (`dueno_ingreso_permanente.sql`): el usuario
+> aclaró que al entrar el dueño tiene que quedar como **administrador normal y
+> permanente** de ese consultorio. Ya no hay visita que se cierre: se quitó el
+> botón "Salir del consultorio" y la salida automática en login/logout, y
+> `dueno_salir_empresas()` quedó sin efecto. Sigue valiendo "una vez": si el
+> admin del consultorio lo saca, no puede volver a entrar solo. Lo de abajo
+> describe la versión anterior. Probado en PGlite: entra y ve; "salir" no
+> quita nada; vuelve sin gastar; sacado por el admin, no puede volver.
 
 Cambia la decisión del 2026-10-02 ("el dueño no ve pacientes"). Otra sesión
 agregó un botón "Entrar" en Empresas y el selector del menú, que sumaban al
