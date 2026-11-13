@@ -40,6 +40,9 @@ export interface MedicionResultado {
   esqueletica?: boolean;
   /** A qué análisis pertenece: se agrupan así en la pantalla y en el informe. */
   analisis?: 'Ricketts' | 'Steiner' | 'Tweed';
+  /** Campo de Ricketts (I al VI) y número de factor (1 al 33). */
+  campo?: string;
+  factorNumero?: number;
 }
 
 export type TipoEstudioCefalometrico =

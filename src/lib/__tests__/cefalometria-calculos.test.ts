@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularAnalisisCefalometrico } from '../cefalometria-calculos';
+import { calcularAnalisisCefalometrico, calcularSintesisRicketts } from '../cefalometria-calculos';
 import type { CoordenadaPunto, PuntosCefalometricosMap } from '@/types/cefalometria';
 
 // Coordenadas de imagen: x hacia la derecha, y hacia ABAJO, como en la pantalla.
@@ -193,5 +193,61 @@ describe('análisis de Ricketts', () => {
     );
     expect(r.find((m) => m.sigla === 'ANB')?.analisis).toBe('Steiner');
     expect(r.find((m) => m.sigla === 'Ángulo facial')?.analisis).toBe('Ricketts');
+  });
+
+  it('calcula los 33 factores completos de Ricketts y genera síntesis VERT para plan de tratamiento', () => {
+    const completos: PuntosCefalometricosMap = {
+      S: { x: 350, y: 280 },
+      N: { x: 750, y: 280 },
+      Ba: { x: 250, y: 480 },
+      Po: { x: 200, y: 400 },
+      Or: { x: 650, y: 400 },
+      Pt: { x: 500, y: 360 },
+      DC: { x: 300, y: 460 },
+      Xi: { x: 420, y: 580 },
+      ANS: { x: 730, y: 490 },
+      PNS: { x: 480, y: 490 },
+      A: { x: 720, y: 530 },
+      U6D: { x: 570, y: 580 },
+      L6D: { x: 600, y: 620 },
+      U6C: { x: 590, y: 595 },
+      L6C: { x: 590, y: 605 },
+      PmO: { x: 660, y: 600 },
+      U3C: { x: 675, y: 595 },
+      L3C: { x: 695, y: 605 },
+      U1A: { x: 680, y: 510 },
+      U1I: { x: 730, y: 615 },
+      L1I: { x: 705, y: 590 },
+      L1A: { x: 670, y: 710 },
+      B: { x: 690, y: 690 },
+      PM: { x: 705, y: 720 },
+      Pog: { x: 710, y: 750 },
+      Gn: { x: 700, y: 780 },
+      Me: { x: 680, y: 790 },
+      Go: { x: 380, y: 690 },
+      Pn: { x: 850, y: 460 },
+      UL: { x: 800, y: 560 },
+      Em: { x: 790, y: 590 },
+      LL: { x: 810, y: 625 },
+      Pog_b: { x: 790, y: 750 },
+    };
+
+    const res = calcularAnalisisCefalometrico(completos, { distanciaRealMm: 10, pixelesPorMm: 10 });
+    const factores = res.filter((m) => m.factorNumero != null).map((m) => m.factorNumero);
+    expect(factores).toHaveLength(33);
+    for (let i = 1; i <= 33; i++) {
+      expect(factores).toContain(i);
+    }
+
+    // Verificar medidas dentarias sobre plano oclusal horizontal
+    expect(res.find((m) => m.sigla === 'Relación molar')?.valor).toBe(-3);
+    expect(res.find((m) => m.sigla === 'Relación canina')?.valor).toBe(-2);
+    expect(res.find((m) => m.sigla === 'Overjet')?.valor).toBe(2.5);
+    expect(res.find((m) => m.sigla === 'Overbite')?.valor).toBe(2.5);
+
+    const sintesis = calcularSintesisRicketts(res);
+    expect(sintesis.factoresMedidos).toBe(33);
+    expect(sintesis.vert).not.toBeNull();
+    expect(sintesis.biotipo).not.toMatch(/Pendiente/);
   });
 });

@@ -4,6 +4,7 @@ import {
   SECUENCIA_RICKETTS,
   SEGMENTOS_CEFALOMETRICOS,
   calcularAnalisisCefalometrico,
+  calcularSintesisRicketts,
   distanciaPuntos,
 } from '@/lib/cefalometria-calculos';
 import {
@@ -93,11 +94,10 @@ export function CefalometriaEditor({
   const [contraste, setContraste] = useState(100);
   const [invertirColor, setInvertirColor] = useState(false);
 
-  // Vista (Zoom y Pan)
+  // Vista (Zoom y desplazamiento)
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const [startPan, setStartPan] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   // La guía no debe tapar una referencia anatómica. Se puede llevar a
   // cualquier zona libre del visor desde su barra superior.
   const [guiaPosicion, setGuiaPosicion] = useState<{ x: number; y: number } | null>(null);
@@ -143,6 +143,7 @@ export function CefalometriaEditor({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const guiaRef = useRef<HTMLDivElement>(null);
   // Punto bajo el mouse: muestra un cartel con su nombre y qué es.
   const [hoverPunto, setHoverPunto] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -187,6 +188,10 @@ export function CefalometriaEditor({
   const mediciones = useMemo(() => {
     return calcularAnalisisCefalometrico(puntos, calibracion);
   }, [puntos, calibracion]);
+
+  const sintesisRicketts = useMemo(() => {
+    return calcularSintesisRicketts(mediciones);
+  }, [mediciones]);
 
   // Manejo de clic sobre el lienzo (colocar punto o calibración)
   const handleCanvasClick = (e: React.MouseEvent<SVGElement>) => {
@@ -274,11 +279,9 @@ export function CefalometriaEditor({
       return;
     }
 
-    if (isPanning) {
-      setPan({
-        x: e.clientX - startPan.x,
-        y: e.clientY - startPan.y,
-      });
+    if (isPanning && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = startPan.scrollLeft - (e.clientX - startPan.x);
+      scrollContainerRef.current.scrollTop = startPan.scrollTop - (e.clientY - startPan.y);
     }
   };
 
@@ -296,17 +299,25 @@ export function CefalometriaEditor({
 
   // Inicio de paneo
   const handlePanStart = (e: React.MouseEvent) => {
-    // El clic normal sigue colocando puntos. Para recorrer una imagen ampliada,
-    // use Shift + arrastre o el botón central, incluso sobre la radiografía.
+    // El clic normal sigue colocando puntos. Para recorrer la imagen arrastrando,
+    // use Shift + arrastre o el botón central, además de las barras de scroll.
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       e.preventDefault();
+      const scroller = scrollContainerRef.current;
       setIsPanning(true);
-      setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      setStartPan({
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: scroller?.scrollLeft ?? 0,
+        scrollTop: scroller?.scrollTop ?? 0,
+      });
     }
   };
 
   const handleZoomRueda = (e: React.WheelEvent<HTMLDivElement>) => {
     if (!srcImagen) return;
+    // La rueda normal desplaza el scroll; Ctrl/Cmd + rueda (o gesto de pinza) hace zoom.
+    if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     const paso = e.deltaY < 0 ? 0.15 : -0.15;
     setZoom((actual) => Math.max(0.4, Math.min(3.5, Number((actual + paso).toFixed(2)))));
@@ -650,8 +661,7 @@ export function CefalometriaEditor({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onWheel={handleZoomRueda}
-          className="flex-1 bg-black relative overflow-hidden flex items-center justify-center cursor-crosshair"
-          style={{ touchAction: 'none' }}
+          className={`flex-1 bg-black relative overflow-hidden ${isPanning ? 'cursor-grabbing' : 'cursor-crosshair'}`}
         >
           {/* Controles flotantes sobre el visor */}
           <div className="absolute top-4 left-4 z-30 flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-xl">
@@ -678,14 +688,17 @@ export function CefalometriaEditor({
               size="icon"
               onClick={() => {
                 setZoom(1);
-                setPan({ x: 0, y: 0 });
+                if (scrollContainerRef.current) {
+                  scrollContainerRef.current.scrollLeft = 0;
+                  scrollContainerRef.current.scrollTop = 0;
+                }
               }}
               className="h-7 w-7 text-slate-200 hover:bg-slate-800 hover:text-white text-[10px] font-bold"
               title="Restablecer vista 100% y posición"
             >
               1:1
             </Button>
-            <span className="px-0.5 text-center text-[9px] font-medium text-slate-400" title="Use la rueda del mouse para acercar o alejar">
+            <span className="px-0.5 text-center text-[9px] font-medium text-slate-400" title="Use Ctrl + rueda del mouse para acercar o alejar">
               {Math.round(zoom * 100)}%
             </span>
             {!guiaVisible && (
@@ -857,43 +870,55 @@ export function CefalometriaEditor({
             </div>
           )}
 
-          {/* CONTENEDOR TRANSFORMABLE CON ZOOM Y PAN */}
+          {/* CONTENEDOR CON SCROLL BIDIRECCIONAL Y ZOOM */}
           <div
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: 'center center',
-              transition: isPanning ? 'none' : 'transform 0.05s ease-out',
-            }}
-            className="relative inline-block"
+            ref={scrollContainerRef}
+            className="w-full h-full overflow-auto flex"
           >
-            {/* Imagen Radiográfica con filtros CSS en tiempo real */}
-            {!srcImagen && (
-              <div className="w-[600px] max-w-full h-[400px] flex items-center justify-center text-slate-400 text-sm">
-                {errorImagen
-                  ? 'No se pudo abrir la radiografía. Revise la conexión.'
-                  : imagenUrl
-                  ? 'Cargando radiografía…'
-                  : 'Este registro todavía no tiene radiografía: use «Cambiar imagen» para cargarla.'}
-              </div>
-            )}
-            <img
-              ref={imgRef}
-              src={srcImagen || undefined}
-              crossOrigin="anonymous"
-              alt="Teleradiografía lateral de cráneo"
-              onLoad={handleImageLoad}
-              style={{
-                filter: `brightness(${brillo}%) contrast(${contraste}%) ${
-                  invertirColor ? 'invert(100%)' : ''
-                }`,
-                maxWidth: '850px',
-                height: 'auto',
-                display: srcImagen ? 'block' : 'none',
-                userSelect: 'none',
-                pointerEvents: 'none',
-              }}
-              className="rounded shadow-2xl"
-            />
+            <div className="m-auto p-6 flex-shrink-0">
+              <div
+                style={
+                  srcImagen
+                    ? {
+                        width: Math.round(Math.min(imgDimensions.width, 850) * zoom),
+                        height: Math.round(
+                          Math.min(imgDimensions.width, 850) *
+                            (imgDimensions.height / Math.max(imgDimensions.width, 1)) *
+                            zoom
+                        ),
+                      }
+                    : undefined
+                }
+                className="relative inline-block"
+              >
+                {/* Imagen Radiográfica con filtros CSS en tiempo real */}
+                {!srcImagen && (
+                  <div className="w-[600px] max-w-full h-[400px] flex items-center justify-center text-slate-400 text-sm">
+                    {errorImagen
+                      ? 'No se pudo abrir la radiografía. Revise la conexión.'
+                      : imagenUrl
+                      ? 'Cargando radiografía…'
+                      : 'Este registro todavía no tiene radiografía: use «Cambiar imagen» para cargarla.'}
+                  </div>
+                )}
+                <img
+                  ref={imgRef}
+                  src={srcImagen || undefined}
+                  crossOrigin="anonymous"
+                  alt="Teleradiografía lateral de cráneo"
+                  onLoad={handleImageLoad}
+                  style={{
+                    filter: `brightness(${brillo}%) contrast(${contraste}%) ${
+                      invertirColor ? 'invert(100%)' : ''
+                    }`,
+                    width: '100%',
+                    height: '100%',
+                    display: srcImagen ? 'block' : 'none',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
+                  }}
+                  className="rounded shadow-2xl"
+                />
 
             {/* Capa SVG sobrepuesta para trazar líneas y puntos anatómicos */}
             <svg
@@ -1035,6 +1060,8 @@ export function CefalometriaEditor({
                 );
               })}
             </svg>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1354,41 +1381,119 @@ export function CefalometriaEditor({
                   </div>
                   {!calibracion.pixelesPorMm && (
                     <p className="rounded-md border border-amber-700/50 bg-amber-950/40 p-2 text-[11px] text-amber-300">
-                      Sin calibrar: faltan las medidas en milímetros (convexidad, incisivos a A-Pog,
-                      labios a la línea E). Calibre con la regla de la radiografía.
+                      Sin calibrar: faltan los factores en milímetros de Ricketts (relación molar/canina,
+                      overjet/overbite, A6-PTV, convexidad, incisivos a A-Pog, labios, CC-N, Go-CF, Xi-PM).
+                      Calibre con la regla de la radiografía.
                     </p>
                   )}
 
+                  {/* Síntesis Ricketts 33 Factores para Plan de Tratamiento */}
+                  <div className="p-3 rounded-xl bg-slate-800/80 border border-cyan-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-cyan-300 text-xs">
+                        Ricketts · 33 Factores
+                      </span>
+                      <Badge variant="outline" className="text-[10px] border-cyan-500/40 text-cyan-200">
+                        {sintesisRicketts.factoresMedidos} / {sintesisRicketts.totalFactores}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 text-[11px]">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400">Biotipo (VERT):</span>
+                        <span className="font-semibold text-slate-100 text-right">
+                          {sintesisRicketts.vert !== null
+                            ? `${sintesisRicketts.biotipo} (${sintesisRicketts.vert > 0 ? '+' : ''}${sintesisRicketts.vert})`
+                            : sintesisRicketts.biotipo}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400">Clase esquelética:</span>
+                        <span className="font-semibold text-slate-100 text-right">
+                          {sintesisRicketts.claseEsqueletica}
+                        </span>
+                      </div>
+                    </div>
+                    {sintesisRicketts.sugerenciasPlan.length > 0 && (
+                      <div className="pt-1.5 border-t border-slate-700/60 space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                          Orientación Plan de Tratamiento
+                        </p>
+                        <ul className="space-y-1 text-[11px] text-slate-300 list-disc pl-3.5">
+                          {sintesisRicketts.sugerenciasPlan.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
                   {(['Ricketts', 'Steiner', 'Tweed'] as const).map((grupo) => {
-                    const delGrupo = mediciones.filter((m) => (m.analisis ?? 'Ricketts') === grupo);
+                    const delGrupo = mediciones
+                      .filter((m) => (m.analisis ?? 'Ricketts') === grupo)
+                      .sort((a, b) => (a.factorNumero ?? 99) - (b.factorNumero ?? 99));
                     if (!delGrupo.length) return null;
+
+                    const campos =
+                      grupo === 'Ricketts'
+                        ? [
+                            'Campo I · Problema Dentario',
+                            'Campo II · Relación Maxilo-Mandibular',
+                            'Campo III · Dentoesquelético',
+                            'Campo IV · Problema Estético',
+                            'Campo V · Relación Craneofacial',
+                            'Campo VI · Estructuras Internas',
+                          ]
+                        : [null];
+
                     return (
                   <div key={grupo} className="space-y-2">
-                    <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300">{grupo}</p>
-                    {delGrupo.map((m, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-lg bg-slate-800/70 border border-slate-700/60 space-y-1"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-slate-200">{m.sigla}</span>
-                          <span className="text-base font-extrabold text-primary font-mono">
-                            {m.valor} {m.unidad}
-                          </span>
+                    <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300">
+                      {grupo} {grupo === 'Ricketts' ? `(${delGrupo.length}/33)` : ''}
+                    </p>
+                    {campos.map((campoNombre) => {
+                      const items = campoNombre
+                        ? delGrupo.filter((m) => m.campo === campoNombre)
+                        : delGrupo;
+                      if (!items.length) return null;
+                      return (
+                        <div key={campoNombre ?? grupo} className="space-y-1.5">
+                          {campoNombre && (
+                            <p className="text-[10px] font-semibold text-slate-400 pt-1">
+                              {campoNombre}
+                            </p>
+                          )}
+                          {items.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="p-2.5 rounded-lg bg-slate-800/70 border border-slate-700/60 space-y-1"
+                            >
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="font-bold text-slate-200">
+                                  {m.factorNumero ? (
+                                    <span className="text-cyan-400 font-mono mr-1">#{m.factorNumero}</span>
+                                  ) : null}
+                                  {m.sigla}
+                                </span>
+                                <span className="text-base font-extrabold text-primary font-mono flex-shrink-0">
+                                  {m.valor} {m.unidad}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400">{m.nombre}</p>
+                              <div className="flex justify-between items-center pt-1 border-t border-slate-700/40 text-[10px] gap-2">
+                                <span className="text-slate-400">Norma: {m.norma}</span>
+                                <span
+                                  className={`font-semibold text-right ${
+                                    Math.abs(m.desviacion || 0) > 3 ? 'text-amber-400' : 'text-emerald-400'
+                                  }`}
+                                >
+                                  {m.interpretacion || 'Normal'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-[11px] text-slate-400">{m.nombre}</p>
-                        <div className="flex justify-between items-center pt-1 border-t border-slate-700/40 text-[10px]">
-                          <span className="text-slate-400">Norma: {m.norma}</span>
-                          <span
-                            className={`font-semibold ${
-                              Math.abs(m.desviacion || 0) > 3 ? 'text-amber-400' : 'text-emerald-400'
-                            }`}
-                          >
-                            {m.interpretacion || 'Normal'}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                     );
                   })}
