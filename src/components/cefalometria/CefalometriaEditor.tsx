@@ -1,9 +1,13 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   PUNTOS_CEFALOMETRICOS,
+  PUNTOS_FRONTAL_RICKETTS,
   SECUENCIA_RICKETTS,
+  SECUENCIA_FRONTAL_RICKETTS,
   SEGMENTOS_CEFALOMETRICOS,
+  SEGMENTOS_FRONTAL_RICKETTS,
   calcularAnalisisCefalometrico,
+  calcularAnalisisFrontalRicketts,
   calcularSintesisRicketts,
   distanciaPuntos,
 } from '@/lib/cefalometria-calculos';
@@ -29,6 +33,7 @@ import {
   Printer,
   PenLine,
   Eye,
+  Undo2,
   Move,
   FileCheck,
   ChevronRight,
@@ -86,6 +91,10 @@ export function CefalometriaEditor({
   const [calibracion, setCalibracion] = useState<CalibracionRegla>(
     estudio.calibracion || { distanciaRealMm: 10 }
   );
+  const [distanciaInput, setDistanciaInput] = useState<string>(
+    String(estudio.calibracion?.distanciaRealMm || 10)
+  );
+  const [historialPuntos, setHistorialPuntos] = useState<string[]>([]);
   const [modoCalibracion, setModoCalibracion] = useState(false);
   const [pasoCalibracion, setPasoCalibracion] = useState<1 | 2>(1);
 
@@ -110,10 +119,15 @@ export function CefalometriaEditor({
   // todos los puntos si se apaga). Cada clic coloca el punto que toca y pasa
   // solo al siguiente que falte. No coloca nada por su cuenta: cada punto lo
   // marca el profesional sobre ESTA radiografía.
+  const esFrontal = estudio.tipo === 'radiografia_pa';
+  const catalogoPuntos = esFrontal ? PUNTOS_FRONTAL_RICKETTS : PUNTOS_CEFALOMETRICOS;
+  const catalogoSegmentos = esFrontal ? SEGMENTOS_FRONTAL_RICKETTS : SEGMENTOS_CEFALOMETRICOS;
+  const secuenciaRicketts = esFrontal ? SECUENCIA_FRONTAL_RICKETTS : SECUENCIA_RICKETTS;
+
   const [guiaRicketts, setGuiaRicketts] = useState(true);
   const secuencia = useMemo(
-    () => (guiaRicketts ? SECUENCIA_RICKETTS : PUNTOS_CEFALOMETRICOS.map((p) => p.id)),
-    [guiaRicketts]
+    () => (guiaRicketts ? secuenciaRicketts : catalogoPuntos.map((p) => p.id)),
+    [guiaRicketts, secuenciaRicketts, catalogoPuntos]
   );
   const siguienteSinMarcar = (desde: string | null, marcados: PuntosCefalometricosMap): string => {
     const i = desde ? secuencia.indexOf(desde) : -1;
@@ -121,7 +135,7 @@ export function CefalometriaEditor({
     return orden.find((id) => !marcados[id]) ?? '';
   };
   const [puntoActivoId, setPuntoActivoId] = useState<string>(
-    () => SECUENCIA_RICKETTS.find((id) => !(estudio.puntos || {})[id]) ?? ''
+    () => secuenciaRicketts.find((id) => !(estudio.puntos || {})[id]) ?? ''
   );
   const [mostrarEtiquetas, setMostrarEtiquetas] = useState(true);
   const [mostrarLineas, setMostrarLineas] = useState(true);
@@ -165,11 +179,73 @@ export function CefalometriaEditor({
     // Ahora cada punto lo coloca el profesional; la plantilla es opcional.
   };
 
+  // Sincronizar estado local cuando cambia el estudio activo
+  useEffect(() => {
+    setImagenUrl(estudio.imagen_url || '');
+    setPuntos(estudio.puntos || {});
+    setCalibracion(estudio.calibracion || { distanciaRealMm: 10 });
+    setDistanciaInput(String(estudio.calibracion?.distanciaRealMm || 10));
+    setHistorialPuntos([]);
+    setModoCalibracion(false);
+    setPasoCalibracion(1);
+    setZoom(1);
+    setFiltroTipoPunto('todos');
+    setGuardadoStatus('guardado');
+    setPuntoActivoId(secuenciaRicketts.find((id) => !(estudio.puntos || {})[id]) ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estudio.id]);
+
+  const deshacerUltimoPunto = useCallback(() => {
+    setHistorialPuntos((prev) => {
+      if (!prev.length) return prev;
+      const ultimoId = prev[prev.length - 1];
+      setPuntos((actuales) => {
+        const copia = { ...actuales };
+        delete copia[ultimoId];
+        return copia;
+      });
+      setPuntoActivoId(ultimoId);
+      setGuardadoStatus('cambios');
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (historialPuntos.length > 0) {
+          e.preventDefault();
+          deshacerUltimoPunto();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [historialPuntos.length, deshacerUltimoPunto]);
+
+  // Listener nativo no-pasivo para zoom con Ctrl/Cmd + rueda sin advertencia de navegador
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!srcImagen) return;
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const paso = e.deltaY < 0 ? 0.15 : -0.15;
+      setZoom((actual) => Math.max(0.4, Math.min(3.5, Number((actual + paso).toFixed(2)))));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [srcImagen]);
+
   // Convertir coordenadas de pantalla (clientX, clientY) a coordenadas reales de la imagen
   const getCoordenadaImagen = useCallback(
     (clientX: number, clientY: number): CoordenadaPunto | null => {
       if (!imgRef.current) return null;
       const rect = imgRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return null;
       const xRel = clientX - rect.left;
       const yRel = clientY - rect.top;
 
@@ -186,8 +262,10 @@ export function CefalometriaEditor({
 
   // Cálculos cefalométricos en vivo
   const mediciones = useMemo(() => {
-    return calcularAnalisisCefalometrico(puntos, calibracion);
-  }, [puntos, calibracion]);
+    return esFrontal
+      ? calcularAnalisisFrontalRicketts(puntos, calibracion)
+      : calcularAnalisisCefalometrico(puntos, calibracion);
+  }, [esFrontal, puntos, calibracion]);
 
   const sintesisRicketts = useMemo(() => {
     return calcularSintesisRicketts(mediciones);
@@ -208,6 +286,10 @@ export function CefalometriaEditor({
       } else {
         const pA = calibracion.puntoA || coords;
         const distPx = distanciaPuntos(pA, coords);
+        if (distPx < 5) {
+          toast.warning('Los dos puntos están demasiado cerca. Marque los extremos de la regla.');
+          return;
+        }
         const distReal = calibracion.distanciaRealMm || 10;
         const pxPorMm = distPx / distReal;
 
@@ -228,6 +310,7 @@ export function CefalometriaEditor({
     if (puntoActivoId) {
       const nuevos = { ...puntos, [puntoActivoId]: coords };
       setPuntos(nuevos);
+      setHistorialPuntos((prev) => [...prev.filter((id) => id !== puntoActivoId), puntoActivoId]);
       setGuardadoStatus('cambios');
 
       const siguiente = siguienteSinMarcar(puntoActivoId, nuevos);
@@ -245,6 +328,8 @@ export function CefalometriaEditor({
 
   // Inicio de arrastre de un punto
   const handlePointMouseDown = (id: string, e: React.MouseEvent) => {
+    // Shift + clic o botón central queda reservado para desplazarse (paneo)
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) return;
     e.stopPropagation();
     setArrastrandoPuntoId(id);
     setPuntoActivoId(id);
@@ -314,15 +399,6 @@ export function CefalometriaEditor({
     }
   };
 
-  const handleZoomRueda = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (!srcImagen) return;
-    // La rueda normal desplaza el scroll; Ctrl/Cmd + rueda (o gesto de pinza) hace zoom.
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    const paso = e.deltaY < 0 ? 0.15 : -0.15;
-    setZoom((actual) => Math.max(0.4, Math.min(3.5, Number((actual + paso).toFixed(2)))));
-  };
-
   const handleInicioMovimientoGuia = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (e.button !== 0 || !containerRef.current || !guiaRef.current) return;
     e.preventDefault();
@@ -373,15 +449,14 @@ export function CefalometriaEditor({
 
   const handleIniciarDigitalizacion = () => {
     setModoCalibracion(false);
-    setGuiaRicketts(true);
-    setPuntoActivoId(SECUENCIA_RICKETTS.find((id) => !puntos[id]) ?? '');
+    setPuntoActivoId(secuencia.find((id) => !puntos[id]) ?? '');
     setTabDerecho('puntos');
 
-    const faltantes = SECUENCIA_RICKETTS.filter((id) => !puntos[id]).length;
+    const faltantes = secuencia.filter((id) => !puntos[id]).length;
     if (faltantes) {
-      toast.info(`Digitalización Ricketts iniciada: faltan ${faltantes} puntos.`);
+      toast.info(`Digitalización iniciada: faltan ${faltantes} puntos.`);
     } else {
-      toast.success('Los puntos de Ricketts ya están completos. Revise el diagnóstico.');
+      toast.success('Todos los puntos de la guía están completos. Revise el diagnóstico.');
       setTabDerecho('analisis');
     }
   };
@@ -396,7 +471,7 @@ export function CefalometriaEditor({
         puntos,
         calibracion,
         mediciones,
-        progreso: 'digitalizacion',
+        progreso: estudio.progreso ?? 'digitalizacion',
         updated_at: new Date().toISOString(),
       };
       const guardado = await onGuardar(actualizado);
@@ -423,7 +498,7 @@ export function CefalometriaEditor({
     });
     if (!isConfirmed) return;
     const sugeridos: PuntosCefalometricosMap = {};
-    PUNTOS_CEFALOMETRICOS.forEach((p) => {
+    catalogoPuntos.forEach((p) => {
       if (p.sugerido) {
         sugeridos[p.id] = {
           x: Math.round(p.sugerido.x * imgDimensions.width),
@@ -453,7 +528,7 @@ export function CefalometriaEditor({
     ctx.drawImage(img, 0, 0);
     // Grosor proporcional al tamaño de la imagen, así se ve igual en papel.
     const k = Math.max(1, ancho / 800);
-    SEGMENTOS_CEFALOMETRICOS.forEach((seg) => {
+    catalogoSegmentos.forEach((seg) => {
       const p1 = puntos[seg.de];
       const p2 = puntos[seg.a];
       if (!p1 || !p2) return;
@@ -467,7 +542,7 @@ export function CefalometriaEditor({
     });
     ctx.setLineDash([]);
     ctx.font = `bold ${Math.round(10 * k)}px Arial`;
-    PUNTOS_CEFALOMETRICOS.forEach((def) => {
+    catalogoPuntos.forEach((def) => {
       const p = puntos[def.id];
       if (!p) return;
       ctx.fillStyle = def.color || '#3b82f6';
@@ -518,9 +593,9 @@ export function CefalometriaEditor({
 
   // Puntos filtrados según la selección
   const puntosFiltrados = useMemo(() => {
-    if (filtroTipoPunto === 'todos') return PUNTOS_CEFALOMETRICOS;
-    return PUNTOS_CEFALOMETRICOS.filter((p) => p.tipo === filtroTipoPunto);
-  }, [filtroTipoPunto]);
+    if (filtroTipoPunto === 'todos') return catalogoPuntos;
+    return catalogoPuntos.filter((p) => p.tipo === filtroTipoPunto);
+  }, [filtroTipoPunto, catalogoPuntos]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-4.5rem)] bg-slate-950 text-slate-100 overflow-hidden select-none">
@@ -660,7 +735,6 @@ export function CefalometriaEditor({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onWheel={handleZoomRueda}
           className={`flex-1 bg-black relative overflow-hidden ${isPanning ? 'cursor-grabbing' : 'cursor-crosshair'}`}
         >
           {/* Controles flotantes sobre el visor */}
@@ -732,11 +806,21 @@ export function CefalometriaEditor({
             >
               ABC
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={historialPuntos.length === 0}
+              onClick={deshacerUltimoPunto}
+              className="h-7 w-7 text-slate-200 hover:bg-slate-800 hover:text-white disabled:opacity-30"
+              title="Deshacer último punto (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </Button>
           </div>
 
           {/* Cartel del punto bajo el mouse */}
           {hoverPunto && !arrastrandoPuntoId && (() => {
-            const def = PUNTOS_CEFALOMETRICOS.find((p) => p.id === hoverPunto.id);
+            const def = catalogoPuntos.find((p) => p.id === hoverPunto.id);
             if (!def) return null;
             const ancho = containerRef.current?.clientWidth ?? 0;
             const izquierda = hoverPunto.x + 290 > ancho ? hoverPunto.x - 284 : hoverPunto.x + 14;
@@ -757,7 +841,7 @@ export function CefalometriaEditor({
 
           {/* Asistente: qué punto toca, qué es y dónde buscarlo */}
           {!modoCalibracion && srcImagen && guiaVisible && (() => {
-            const def = PUNTOS_CEFALOMETRICOS.find((p) => p.id === puntoActivoId);
+            const def = catalogoPuntos.find((p) => p.id === puntoActivoId);
             const hechos = secuencia.filter((id) => puntos[id]).length;
             const posicion = def ? secuencia.indexOf(def.id) : -1;
             const irA = (paso: number) => {
@@ -861,7 +945,7 @@ export function CefalometriaEditor({
             <div className="absolute bottom-4 left-4 z-30 bg-slate-900/90 border border-primary p-2 rounded-lg shadow-2xl flex items-center gap-3">
               <div className="text-xs">
                 <span className="font-bold text-primary text-sm">
-                  {PUNTOS_CEFALOMETRICOS.find((p) => p.id === arrastrandoPuntoId)?.simbolo || arrastrandoPuntoId}
+                  {catalogoPuntos.find((p) => p.id === arrastrandoPuntoId)?.simbolo || arrastrandoPuntoId}
                 </span>
                 <p className="text-[11px] text-slate-300">
                   X: {puntoArrastrePos.x}px | Y: {puntoArrastrePos.y}px
@@ -905,7 +989,7 @@ export function CefalometriaEditor({
                   ref={imgRef}
                   src={srcImagen || undefined}
                   crossOrigin="anonymous"
-                  alt="Teleradiografía lateral de cráneo"
+                  alt={esFrontal ? 'Radiografía frontal (PA)' : 'Teleradiografía lateral de cráneo'}
                   onLoad={handleImageLoad}
                   style={{
                     filter: `brightness(${brillo}%) contrast(${contraste}%) ${
@@ -945,7 +1029,7 @@ export function CefalometriaEditor({
 
               {/* Líneas y Planos Cefalométricos */}
               {mostrarLineas &&
-                SEGMENTOS_CEFALOMETRICOS.map((seg) => {
+                catalogoSegmentos.map((seg) => {
                   const p1 = puntos[seg.de];
                   const p2 = puntos[seg.a];
                   if (!p1 || !p2) return null;
@@ -994,7 +1078,7 @@ export function CefalometriaEditor({
               )}
 
               {/* Puntos Cefalométricos Interactivos */}
-              {PUNTOS_CEFALOMETRICOS.map((def) => {
+              {catalogoPuntos.map((def) => {
                 const pos = puntos[def.id];
                 if (!pos) return null;
 
@@ -1108,7 +1192,7 @@ export function CefalometriaEditor({
               {tabDerecho === 'herramientas' && (
                 <>
                   {/* Botones superiores estilo WebCeph */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid gap-2 ${esFrontal ? 'grid-cols-1' : 'grid-cols-2'}`}>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1117,14 +1201,17 @@ export function CefalometriaEditor({
                     >
                       <Move className="w-3.5 h-3.5 text-blue-400" /> Modificar
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRestablecerPuntos}
-                      className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1.5 h-9"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Plantilla guía
-                    </Button>
+                    {!esFrontal && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!srcImagen}
+                        onClick={handleRestablecerPuntos}
+                        className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1.5 h-9"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Plantilla guía
+                      </Button>
+                    )}
                   </div>
 
                   {/* Sección Calibración Milimétrica */}
@@ -1153,19 +1240,34 @@ export function CefalometriaEditor({
                         type="number"
                         min="1"
                         max="100"
-                        value={calibracion.distanciaRealMm}
-                        onChange={(e) =>
+                        value={distanciaInput}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setDistanciaInput(raw);
+                          const val = Number(raw);
+                          if (val > 0) {
+                            setCalibracion((prev) => ({
+                              ...prev,
+                              distanciaRealMm: val,
+                            }));
+                          }
+                        }}
+                        onBlur={() => {
+                          const val = Number(distanciaInput);
+                          const corregido = val > 0 ? val : 10;
+                          setDistanciaInput(String(corregido));
                           setCalibracion((prev) => ({
                             ...prev,
-                            distanciaRealMm: Number(e.target.value) || 10,
-                          }))
-                        }
+                            distanciaRealMm: corregido,
+                          }));
+                        }}
                         className="h-8 bg-slate-900 border-slate-700 text-xs w-24 text-center font-bold"
                       />
                       <span className="text-slate-400 text-xs">mm</span>
 
                       <Button
                         size="sm"
+                        disabled={!srcImagen}
                         onClick={() => {
                           setModoCalibracion(true);
                           setPasoCalibracion(1);
@@ -1248,6 +1350,7 @@ export function CefalometriaEditor({
                   </div>
 
                   {/* Resumen Rápido Diagnóstico */}
+                  {!esFrontal && (
                   <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/50 space-y-2">
                     <span className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
                       <FileCheck className="w-3.5 h-3.5 text-primary" /> Diagnóstico Esquelético Principal
@@ -1281,6 +1384,7 @@ export function CefalometriaEditor({
                       );
                     })()}
                   </div>
+                  )}
                 </>
               )}
 
@@ -1289,7 +1393,7 @@ export function CefalometriaEditor({
                 <div className="space-y-3">
                   {/* Filtro por categoría */}
                   <div className="flex gap-1 bg-slate-800 p-1 rounded-lg">
-                    {(['todos', 'esqueletico', 'dental', 'blando'] as const).map((cat) => (
+                    {(esFrontal ? (['todos', 'esqueletico', 'dental'] as const) : (['todos', 'esqueletico', 'dental', 'blando'] as const)).map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setFiltroTipoPunto(cat)}
@@ -1381,53 +1485,64 @@ export function CefalometriaEditor({
                   </div>
                   {!calibracion.pixelesPorMm && (
                     <p className="rounded-md border border-amber-700/50 bg-amber-950/40 p-2 text-[11px] text-amber-300">
-                      Sin calibrar: faltan los factores en milímetros de Ricketts (relación molar/canina,
-                      overjet/overbite, A6-PTV, convexidad, incisivos a A-Pog, labios, CC-N, Go-CF, Xi-PM).
-                      Calibre con la regla de la radiografía.
+                      {esFrontal
+                        ? 'Sin calibrar: faltan los factores en milímetros del análisis frontal (relación molar, dimensiones transversales, línea media y plano oclusal). Calibre con la regla de la radiografía.'
+                        : 'Sin calibrar: faltan los factores en milímetros (relación molar/canina, overjet/overbite, A6-PTV, convexidad, incisivos a A-Pog, labios, McNamara, Wits, CC-N, Go-CF, Xi-PM). Calibre con la regla de la radiografía.'}
                     </p>
                   )}
 
-                  {/* Síntesis Ricketts 33 Factores para Plan de Tratamiento */}
-                  <div className="p-3 rounded-xl bg-slate-800/80 border border-cyan-500/30 space-y-2">
-                    <div className="flex items-center justify-between">
+                  {/* Síntesis Ricketts (Lateral 33 Factores o Frontal 18 Factores) */}
+                  {!esFrontal ? (
+                    <div className="p-3 rounded-xl bg-slate-800/80 border border-cyan-500/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-cyan-300 text-xs">
+                          Ricketts · 33 Factores
+                        </span>
+                        <Badge variant="outline" className="text-[10px] border-cyan-500/40 text-cyan-200">
+                          {sintesisRicketts.factoresMedidos} / {sintesisRicketts.totalFactores}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Biotipo (VERT):</span>
+                          <span className="font-semibold text-slate-100 text-right">
+                            {sintesisRicketts.vert !== null
+                              ? `${sintesisRicketts.biotipo} (${sintesisRicketts.vert > 0 ? '+' : ''}${sintesisRicketts.vert})`
+                              : sintesisRicketts.biotipo}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Clase esquelética:</span>
+                          <span className="font-semibold text-slate-100 text-right">
+                            {sintesisRicketts.claseEsqueletica}
+                          </span>
+                        </div>
+                      </div>
+                      {sintesisRicketts.sugerenciasPlan.length > 0 && (
+                        <div className="pt-1.5 border-t border-slate-700/60 space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                            Orientación Plan de Tratamiento
+                          </p>
+                          <ul className="space-y-1 text-[11px] text-slate-300 list-disc pl-3.5">
+                            {sintesisRicketts.sugerenciasPlan.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-slate-800/80 border border-cyan-500/30 flex items-center justify-between">
                       <span className="font-bold text-cyan-300 text-xs">
-                        Ricketts · 33 Factores
+                        Ricketts Frontal · 18 Factores
                       </span>
                       <Badge variant="outline" className="text-[10px] border-cyan-500/40 text-cyan-200">
-                        {sintesisRicketts.factoresMedidos} / {sintesisRicketts.totalFactores}
+                        {mediciones.length} / 18
                       </Badge>
                     </div>
-                    <div className="space-y-1 text-[11px]">
-                      <div className="flex justify-between gap-2">
-                        <span className="text-slate-400">Biotipo (VERT):</span>
-                        <span className="font-semibold text-slate-100 text-right">
-                          {sintesisRicketts.vert !== null
-                            ? `${sintesisRicketts.biotipo} (${sintesisRicketts.vert > 0 ? '+' : ''}${sintesisRicketts.vert})`
-                            : sintesisRicketts.biotipo}
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-slate-400">Clase esquelética:</span>
-                        <span className="font-semibold text-slate-100 text-right">
-                          {sintesisRicketts.claseEsqueletica}
-                        </span>
-                      </div>
-                    </div>
-                    {sintesisRicketts.sugerenciasPlan.length > 0 && (
-                      <div className="pt-1.5 border-t border-slate-700/60 space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                          Orientación Plan de Tratamiento
-                        </p>
-                        <ul className="space-y-1 text-[11px] text-slate-300 list-disc pl-3.5">
-                          {sintesisRicketts.sugerenciasPlan.map((s, i) => (
-                            <li key={i}>{s}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
-                  {(['Ricketts', 'Steiner', 'Tweed'] as const).map((grupo) => {
+                  {(['Ricketts', 'Ricketts Frontal', 'McNamara', 'Steiner', 'Tweed', 'Wits'] as const).map((grupo) => {
                     const delGrupo = mediciones
                       .filter((m) => (m.analisis ?? 'Ricketts') === grupo)
                       .sort((a, b) => (a.factorNumero ?? 99) - (b.factorNumero ?? 99));
@@ -1443,12 +1558,20 @@ export function CefalometriaEditor({
                             'Campo V · Relación Craneofacial',
                             'Campo VI · Estructuras Internas',
                           ]
+                        : grupo === 'Ricketts Frontal'
+                        ? [
+                            'Campo I · Problemas Dentarios',
+                            'Campo II · Problemas Esqueléticos',
+                            'Campo III · Problemas Dento-Esqueléticos',
+                            'Campo V · Relación Craneofacial',
+                            'Campo VI · Estructuras Internas',
+                          ]
                         : [null];
 
                     return (
                   <div key={grupo} className="space-y-2">
                     <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-                      {grupo} {grupo === 'Ricketts' ? `(${delGrupo.length}/33)` : ''}
+                      {grupo} {grupo === 'Ricketts' ? `(${delGrupo.filter((m) => m.factorNumero != null).length}/33)` : grupo === 'Ricketts Frontal' ? `(${delGrupo.length}/18)` : ''}
                     </p>
                     {campos.map((campoNombre) => {
                       const items = campoNombre
@@ -1483,7 +1606,9 @@ export function CefalometriaEditor({
                                 <span className="text-slate-400">Norma: {m.norma}</span>
                                 <span
                                   className={`font-semibold text-right ${
-                                    Math.abs(m.desviacion || 0) > 3 ? 'text-amber-400' : 'text-emerald-400'
+                                    (m.enNorma !== undefined ? !m.enNorma : Math.abs(m.desviacion || 0) > 3)
+                                      ? 'text-amber-400'
+                                      : 'text-emerald-400'
                                   }`}
                                 >
                                   {m.interpretacion || 'Normal'}

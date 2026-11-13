@@ -679,6 +679,7 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '82° (± 2°)',
       desviacion: desv,
+      enNorma: Math.abs(desv) <= 2,
       interpretacion:
         desv > 2 ? 'Prognatismo maxilar' : desv < -2 ? 'Retrognatismo maxilar' : 'Normoposición maxilar',
       esqueletica: true,
@@ -698,6 +699,7 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '80° (± 2°)',
       desviacion: desv,
+      enNorma: Math.abs(desv) <= 2,
       interpretacion:
         desv > 2 ? 'Prognatismo mandibular' : desv < -2 ? 'Retrognatismo mandibular' : 'Normoposición mandibular',
       esqueletica: true,
@@ -717,6 +719,7 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '2° (± 2°)',
       desviacion: Number((anb - 2).toFixed(1)),
+      enNorma: anb >= 0 && anb <= 4,
       interpretacion:
         anb > 4
           ? 'Clase II Esquelética'
@@ -740,6 +743,7 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '25° (± 3°)',
       desviacion: desv,
+      enNorma: Math.abs(desv) <= 3,
       interpretacion:
         desv > 3
           ? 'Hiperdivergente (Mordida abierta / Dolicofacial)'
@@ -750,7 +754,7 @@ export function calcularAnalisisCefalometrico(
     });
   }
 
-  // 5. Eje Facial de Ricketts: Pt-Gn respecto a Ba-N. Es el ángulo posterior
+  // 5. Eje Facial de Ricketts (Factor 20): Pt-Gn respecto a Ba-N. Es el ángulo posterior
   // inferior (entre Pt→Gn y N→Ba): crece cuando el mentón va hacia adelante.
   if (Pt && Gn && Ba && N) {
     const ejeFacial = anguloEntreVectores(Pt, Gn, N, Ba);
@@ -760,17 +764,18 @@ export function calcularAnalisisCefalometrico(
       tipo: 'angulo',
       valor: Number(ejeFacial.toFixed(1)),
       unidad: '°',
-      norma: '90° (± 3°)',
+      norma: '90° (± 3,5°)',
       desviacion: Number((ejeFacial - 90).toFixed(1)),
+      enNorma: Math.abs(ejeFacial - 90) <= 3.5,
       interpretacion:
-        ejeFacial > 93
+        ejeFacial > 93.5
           ? 'Crecimiento horizontal / Cierre'
-          : ejeFacial < 87
+          : ejeFacial < 86.5
           ? 'Crecimiento vertical / Apertura'
           : 'Crecimiento equilibrado',
       esqueletica: true,
       campo: 'Campo V · Relación Craneofacial',
-      factorNumero: 21,
+      factorNumero: 20,
     });
   }
 
@@ -790,6 +795,7 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '90° (± 3°)',
       desviacion: desv,
+      enNorma: Math.abs(desv) <= 3,
       interpretacion:
         desv > 3 ? 'Proinclinación inferior' : desv < -3 ? 'Retroinclinación inferior' : 'Normoinclinación inferior',
       esqueletica: false,
@@ -800,7 +806,7 @@ export function calcularAnalisisCefalometrico(
   if (U1A && U1I && L1A && L1I) {
     // Ángulo entre los dos ejes, cada uno de ápice a borde incisal.
     const interinc = anguloEntreVectores(U1A, U1I, L1A, L1I);
-    const norma = 131;
+    const norma = 130;
     const desv = Number((interinc - norma).toFixed(1));
     resultados.push({
       nombre: 'Ángulo Interincisivo (U1 - L1)',
@@ -808,10 +814,11 @@ export function calcularAnalisisCefalometrico(
       tipo: 'angulo',
       valor: Number(interinc.toFixed(1)),
       unidad: '°',
-      norma: '131° (± 5°)',
+      norma: '130° (± 6°)',
       desviacion: desv,
+      enNorma: Math.abs(desv) <= 6,
       interpretacion:
-        desv < -5 ? 'Biproinclinación dentaria' : desv > 5 ? 'Biretroinclinación dentaria' : 'Inclinación normal',
+        desv < -6 ? 'Biproinclinación dentaria' : desv > 6 ? 'Biretroinclinación dentaria' : 'Inclinación normal',
       esqueletica: false,
       campo: 'Campo I · Problema Dentario',
       factorNumero: 6,
@@ -829,6 +836,7 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '22° (± 2°)',
       desviacion: Number((u1na - 22).toFixed(1)),
+      enNorma: u1na >= 20 && u1na <= 24,
       interpretacion: u1na > 24 ? 'Proinclinado' : u1na < 20 ? 'Retroinclinado' : 'Normal',
       esqueletica: false,
     });
@@ -845,12 +853,13 @@ export function calcularAnalisisCefalometrico(
       unidad: '°',
       norma: '25° (± 2°)',
       desviacion: Number((l1nb - 25).toFixed(1)),
+      enNorma: l1nb >= 23 && l1nb <= 27,
       interpretacion: l1nb > 27 ? 'Proinclinado' : l1nb < 23 ? 'Retroinclinado' : 'Normal',
       esqueletica: false,
     });
   }
 
-  // 10. Labio Superior a Línea E de Ricketts (Factor 17)
+  // 10. Labio Superior a Línea E de Ricketts (complementario)
   // Positivo = labio por delante de la línea E; negativo = por detrás.
   if (Pn && Pog_b && UL && pxPorMm) {
     const distUL = sentido * distanciaPuntoALinea(UL, Pn, Pog_b, pxPorMm);
@@ -860,24 +869,25 @@ export function calcularAnalisisCefalometrico(
       tipo: 'distancia',
       valor: Number(distUL.toFixed(1)),
       desviacion: Number((distUL + 4).toFixed(1)),
+      enNorma: distUL >= -6 && distUL <= -2,
       unidad: 'mm',
       norma: '-4 mm (± 2 mm)',
       interpretacion: distUL > -2 ? 'Labio superior protrusivo' : distUL < -6 ? 'Labio superior retrusivo' : 'Perfil armónico',
       esqueletica: false,
       campo: 'Campo IV · Problema Estético',
-      factorNumero: 17,
     });
   }
 
-  // 11. Labio Inferior a Línea E de Ricketts (Factor 16)
+  // 11. Labio Inferior a Línea E de Ricketts (Factor 16: Protrusión Labial)
   if (Pn && Pog_b && LL && pxPorMm) {
     const distLL = sentido * distanciaPuntoALinea(LL, Pn, Pog_b, pxPorMm);
     resultados.push({
-      nombre: 'Labio Inferior a Línea E (Ricketts)',
+      nombre: 'Protrusión Labial (Labio Inferior a Línea E)',
       sigla: 'LL-E (mm)',
       tipo: 'distancia',
       valor: Number(distLL.toFixed(1)),
       desviacion: Number((distLL + 2).toFixed(1)),
+      enNorma: distLL >= -4 && distLL <= 0,
       unidad: 'mm',
       norma: '-2 mm (± 2 mm)',
       interpretacion: distLL > 0 ? 'Labio inferior protrusivo' : distLL < -4 ? 'Labio inferior retrusivo' : 'Perfil armónico',
@@ -894,14 +904,19 @@ export function calcularAnalisisCefalometrico(
   // aumenta ~1° cada 3 años): la interpretación es orientativa y la decide el
   // profesional.
   const empujar = (
-    m: Omit<MedicionResultado, 'desviacion' | 'interpretacion'> & { normaValor: number; tolerancia: number },
+    m: Omit<MedicionResultado, 'desviacion' | 'enNorma' | 'interpretacion'> & {
+      normaValor: number;
+      tolerancia: number;
+    },
     textos: [mas: string, menos: string, normal: string]
   ) => {
     const { normaValor, tolerancia, ...resto } = m;
     const desv = Number((m.valor - normaValor).toFixed(1));
+    const enNorma = Math.abs(desv) <= tolerancia;
     resultados.push({
       ...resto,
       desviacion: desv,
+      enNorma,
       interpretacion: desv > tolerancia ? textos[0] : desv < -tolerancia ? textos[1] : textos[2],
     });
   };
@@ -1062,25 +1077,25 @@ export function calcularAnalisisCefalometrico(
   // Incisivo inferior respecto de A-Pog: posición (mm) e inclinación (°).
   if (L1I && A && Pog && pxPorMm) {
     empujar(
-      { nombre: 'Incisivo inferior a A-Pog (protrusión)', sigla: 'L1-APog (mm)', tipo: 'distancia',
+      { nombre: 'Protrusión del Incisivo Inferior (L1 a A-Pog)', sigla: 'L1-APog (mm)', tipo: 'distancia',
         valor: Number((sentido * distanciaPuntoALinea(L1I, A, Pog, pxPorMm)).toFixed(1)), unidad: 'mm',
-        norma: '1 mm (± 2 mm)', normaValor: 1, tolerancia: 2, esqueletica: false,
+        norma: '1 mm (± 2,2 mm)', normaValor: 1, tolerancia: 2.2, esqueletica: false,
         campo: 'Campo III · Dentoesquelético', factorNumero: 10 },
       ['Incisivo inferior protruido', 'Incisivo inferior retruido', 'Posición normal']
     );
   }
   if (U1I && A && Pog && pxPorMm) {
     empujar(
-      { nombre: 'Incisivo superior a A-Pog (protrusión)', sigla: 'U1-APog (mm)', tipo: 'distancia',
+      { nombre: 'Protrusión del Incisivo Superior (U1 a A-Pog)', sigla: 'U1-APog (mm)', tipo: 'distancia',
         valor: Number((sentido * distanciaPuntoALinea(U1I, A, Pog, pxPorMm)).toFixed(1)), unidad: 'mm',
-        norma: '3,5 mm (± 2 mm)', normaValor: 3.5, tolerancia: 2, esqueletica: false,
+        norma: '3,5 mm (± 2,3 mm)', normaValor: 3.5, tolerancia: 2.3, esqueletica: false,
         campo: 'Campo III · Dentoesquelético', factorNumero: 11 },
       ['Incisivo superior protruido', 'Incisivo superior retruido', 'Posición normal']
     );
   }
   if (L1A && L1I && A && Pog) {
     empujar(
-      { nombre: 'Inclinación del incisivo inferior a A-Pog', sigla: 'L1-APog (°)', tipo: 'angulo',
+      { nombre: 'Inclinación del Incisivo Inferior (L1 a A-Pog)', sigla: 'L1-APog (°)', tipo: 'angulo',
         valor: Number(anguloEntreLineas(L1A, L1I, A, Pog).toFixed(1)), unidad: '°',
         norma: '22° (± 4°)', normaValor: 22, tolerancia: 4, esqueletica: false,
         campo: 'Campo III · Dentoesquelético', factorNumero: 12 },
@@ -1089,7 +1104,7 @@ export function calcularAnalisisCefalometrico(
   }
   if (U1A && U1I && A && Pog) {
     empujar(
-      { nombre: 'Inclinación del incisivo superior a A-Pog', sigla: 'U1-APog (°)', tipo: 'angulo',
+      { nombre: 'Inclinación del Incisivo Superior (U1 a A-Pog)', sigla: 'U1-APog (°)', tipo: 'angulo',
         valor: Number(anguloEntreLineas(U1A, U1I, A, Pog).toFixed(1)), unidad: '°',
         norma: '28° (± 4°)', normaValor: 28, tolerancia: 4, esqueletica: false,
         campo: 'Campo III · Dentoesquelético', factorNumero: 13 },
@@ -1100,26 +1115,26 @@ export function calcularAnalisisCefalometrico(
   if (Xi && poPost && dirPOAbajo && pxPorMm) {
     empujar(
       {
-        nombre: 'Plano oclusal a rama mandibular (PO a Xi)',
+        nombre: 'Plano Oclusal a la Rama (PO a Xi)',
         sigla: 'PO-Xi',
         tipo: 'distancia',
         valor: Number(proyeccionEnMm(poPost, Xi, dirPOAbajo, pxPorMm).toFixed(1)),
         unidad: 'mm',
-        norma: '0 mm (± 3 mm)',
-        normaValor: 0,
+        norma: '3,5 mm (± 3 mm)',
+        normaValor: 3.5,
         tolerancia: 3,
         esqueletica: false,
         campo: 'Campo III · Dentoesquelético',
         factorNumero: 14,
       },
-      ['Plano oclusal alto respecto a Xi', 'Plano oclusal bajo respecto a Xi', 'Plano oclusal centrado en Xi']
+      ['Plano oclusal alto respecto a Xi', 'Plano oclusal bajo respecto a Xi', 'Plano oclusal en norma']
     );
   }
 
   if (poPost && poAnt && Xi && PM) {
     empujar(
       {
-        nombre: 'Inclinación del plano oclusal (PO a Xi-PM)',
+        nombre: 'Inclinación del Plano Oclusal (PO a Xi-PM)',
         sigla: 'PO-XiPM',
         tipo: 'angulo',
         valor: Number(anguloEntreLineas(poPost, poAnt, Xi, PM).toFixed(1)),
@@ -1139,7 +1154,7 @@ export function calcularAnalisisCefalometrico(
   if (ANS && Em && pxPorMm) {
     empujar(
       {
-        nombre: 'Longitud del labio superior (ANS a Em)',
+        nombre: 'Largura del Labio Superior (ANS a Em)',
         sigla: 'Long. labio sup.',
         tipo: 'distancia',
         valor: Number((distanciaPuntos(ANS, Em) / pxPorMm).toFixed(1)),
@@ -1149,7 +1164,7 @@ export function calcularAnalisisCefalometrico(
         tolerancia: 2,
         esqueletica: false,
         campo: 'Campo IV · Problema Estético',
-        factorNumero: 18,
+        factorNumero: 17,
       },
       ['Labio superior largo', 'Labio superior corto (sonrisa gingival)', 'Longitud labial normal']
     );
@@ -1158,17 +1173,17 @@ export function calcularAnalisisCefalometrico(
   if (Em && poPost && dirPOAbajo && pxPorMm) {
     empujar(
       {
-        nombre: 'Comisura labial a plano oclusal (Em a PO)',
+        nombre: 'Punto de Unión Interlabial (Em a PO)',
         sigla: 'Em-PO',
         tipo: 'distancia',
         valor: Number(proyeccionEnMm(poPost, Em, dirPOAbajo, pxPorMm).toFixed(1)),
         unidad: 'mm',
-        norma: '-3,5 mm (± 1,5 mm)',
-        normaValor: -3.5,
-        tolerancia: 1.5,
+        norma: '-3 mm (± 2 mm)',
+        normaValor: -3,
+        tolerancia: 2,
         esqueletica: false,
         campo: 'Campo IV · Problema Estético',
-        factorNumero: 19,
+        factorNumero: 18,
       },
       ['Plano oclusal alto / poca exposición incisiva', 'Plano oclusal bajo / sobreexposición', 'Exposición labial armónica']
     );
@@ -1178,10 +1193,10 @@ export function calcularAnalisisCefalometrico(
   // Ángulo facial (profundidad facial): Frankfort con N-Pog.
   if (Po && Or && N && Pog) {
     empujar(
-      { nombre: 'Ángulo facial (profundidad facial)', sigla: 'Ángulo facial', tipo: 'angulo',
+      { nombre: 'Profundidad Facial (Ángulo Facial)', sigla: 'Ángulo facial', tipo: 'angulo',
         valor: Number(anguloEntreVectores(Po, Or, Pog, N).toFixed(1)), unidad: '°',
         norma: '87° (± 3°)', normaValor: 87, tolerancia: 3, esqueletica: true,
-        campo: 'Campo V · Relación Craneofacial', factorNumero: 20 },
+        campo: 'Campo V · Relación Craneofacial', factorNumero: 19 },
       ['Mandíbula adelantada (tendencia Clase III)', 'Mandíbula retruida (tendencia Clase II)', 'Posición mandibular normal']
     );
   }
@@ -1189,7 +1204,7 @@ export function calcularAnalisisCefalometrico(
   if (N && Pog && Go && Me) {
     empujar(
       {
-        nombre: 'Cono facial (N-Pog a Go-Me)',
+        nombre: 'Cono Facial (N-Pog a Go-Me)',
         sigla: 'Cono facial',
         tipo: 'angulo',
         valor: Number(anguloEntreLineas(N, Pog, Go, Me).toFixed(1)),
@@ -1199,30 +1214,19 @@ export function calcularAnalisisCefalometrico(
         tolerancia: 3.5,
         esqueletica: true,
         campo: 'Campo V · Relación Craneofacial',
-        factorNumero: 22,
+        factorNumero: 21,
       },
       ['Cono facial cerrado (braquifacial)', 'Cono facial abierto (dolicofacial)', 'Cono facial normal']
-    );
-  }
-
-  // Plano mandibular respecto a Frankfort (la versión de Ricketts).
-  if (Po && Or && Go && Me) {
-    empujar(
-      { nombre: 'Ángulo del plano mandibular (Ricketts)', sigla: 'Plano mandibular', tipo: 'angulo',
-        valor: Number(anguloEntreLineas(Po, Or, Go, Me).toFixed(1)), unidad: '°',
-        norma: '26° (± 4°)', normaValor: 26, tolerancia: 4, esqueletica: true,
-        campo: 'Campo V · Relación Craneofacial', factorNumero: 23 },
-      ['Dolicofacial (crecimiento vertical)', 'Braquifacial (crecimiento horizontal)', 'Mesofacial']
     );
   }
 
   // Profundidad maxilar: Frankfort con N-A.
   if (Po && Or && N && A) {
     empujar(
-      { nombre: 'Profundidad maxilar', sigla: 'Prof. maxilar', tipo: 'angulo',
+      { nombre: 'Profundidad Maxilar', sigla: 'Prof. maxilar', tipo: 'angulo',
         valor: Number(anguloEntreVectores(Po, Or, A, N).toFixed(1)), unidad: '°',
         norma: '90° (± 3°)', normaValor: 90, tolerancia: 3, esqueletica: true,
-        campo: 'Campo V · Relación Craneofacial', factorNumero: 24 },
+        campo: 'Campo V · Relación Craneofacial', factorNumero: 22 },
       ['Maxilar adelantado', 'Maxilar retruido', 'Maxilar bien ubicado']
     );
   }
@@ -1230,7 +1234,7 @@ export function calcularAnalisisCefalometrico(
   if (N && cf && A) {
     empujar(
       {
-        nombre: 'Altura maxilar (N-CF-A)',
+        nombre: 'Altura Maxilar (N-CF-A)',
         sigla: 'Altura maxilar',
         tipo: 'angulo',
         valor: Number(anguloEntre3Puntos(N, cf, A).toFixed(1)),
@@ -1240,7 +1244,7 @@ export function calcularAnalisisCefalometrico(
         tolerancia: 3,
         esqueletica: true,
         campo: 'Campo V · Relación Craneofacial',
-        factorNumero: 25,
+        factorNumero: 23,
       },
       ['Maxilar descendido verticalmente', 'Maxilar ascendido', 'Altura maxilar normal']
     );
@@ -1254,7 +1258,7 @@ export function calcularAnalisisCefalometrico(
     while (diffDeg < -180) diffDeg += 360;
     empujar(
       {
-        nombre: 'Inclinación del plano palatino (PP a FH)',
+        nombre: 'Plano Palatal (PP a FH)',
         sigla: 'Plano palatino',
         tipo: 'angulo',
         valor: Number((sentido * diffDeg).toFixed(1)),
@@ -1264,9 +1268,20 @@ export function calcularAnalisisCefalometrico(
         tolerancia: 3.5,
         esqueletica: true,
         campo: 'Campo V · Relación Craneofacial',
-        factorNumero: 26,
+        factorNumero: 24,
       },
       ['Plano palatino inclinado hacia abajo', 'Plano palatino inclinado hacia arriba (mordida abierta)', 'Plano palatino normal']
+    );
+  }
+
+  // Plano mandibular respecto a Frankfort (la versión de Ricketts).
+  if (Po && Or && Go && Me) {
+    empujar(
+      { nombre: 'Plano Mandibular (Ricketts)', sigla: 'Plano mandibular', tipo: 'angulo',
+        valor: Number(anguloEntreLineas(Po, Or, Go, Me).toFixed(1)), unidad: '°',
+        norma: '26° (± 4°)', normaValor: 26, tolerancia: 4, esqueletica: true,
+        campo: 'Campo V · Relación Craneofacial', factorNumero: 25 },
+      ['Dolicofacial (crecimiento vertical)', 'Braquifacial (crecimiento horizontal)', 'Mesofacial']
     );
   }
 
@@ -1274,10 +1289,10 @@ export function calcularAnalisisCefalometrico(
   // Deflexión craneal: Ba-N con Frankfort.
   if (Ba && N && Po && Or) {
     empujar(
-      { nombre: 'Deflexión craneal (Ba-N / Frankfort)', sigla: 'Deflexión craneal', tipo: 'angulo',
+      { nombre: 'Deflexión Craneana (Ba-N / Frankfort)', sigla: 'Deflexión craneal', tipo: 'angulo',
         valor: Number(anguloEntreLineas(Ba, N, Po, Or).toFixed(1)), unidad: '°',
         norma: '27° (± 3°)', normaValor: 27, tolerancia: 3, esqueletica: true,
-        campo: 'Campo VI · Estructuras Internas', factorNumero: 27 },
+        campo: 'Campo VI · Estructuras Internas', factorNumero: 26 },
       ['Base de cráneo favorece Clase III', 'Base de cráneo favorece Clase II', 'Deflexión craneal normal']
     );
   }
@@ -1285,7 +1300,7 @@ export function calcularAnalisisCefalometrico(
   if (cc && N && pxPorMm) {
     empujar(
       {
-        nombre: 'Longitud craneal anterior (CC-N)',
+        nombre: 'Longitud Craneal Anterior (CC-N)',
         sigla: 'CC-N',
         tipo: 'distancia',
         valor: Number((distanciaPuntos(cc, N) / pxPorMm).toFixed(1)),
@@ -1295,7 +1310,7 @@ export function calcularAnalisisCefalometrico(
         tolerancia: 2.5,
         esqueletica: true,
         campo: 'Campo VI · Estructuras Internas',
-        factorNumero: 28,
+        factorNumero: 27,
       },
       ['Base craneal anterior larga', 'Base craneal anterior corta', 'Longitud craneal normal']
     );
@@ -1304,7 +1319,7 @@ export function calcularAnalisisCefalometrico(
   if (Go && cf && pxPorMm) {
     empujar(
       {
-        nombre: 'Altura facial posterior (Go-CF)',
+        nombre: 'Altura Facial Posterior (Go-CF)',
         sigla: 'Go-CF',
         tipo: 'distancia',
         valor: Number((distanciaPuntos(Go, cf) / pxPorMm).toFixed(1)),
@@ -1314,19 +1329,38 @@ export function calcularAnalisisCefalometrico(
         tolerancia: 3.3,
         esqueletica: true,
         campo: 'Campo VI · Estructuras Internas',
-        factorNumero: 29,
+        factorNumero: 28,
       },
       ['Rama mandibular larga (braquifacial)', 'Rama mandibular corta (dolicofacial)', 'Altura facial posterior normal']
+    );
+  }
+
+  if (Ba && N && Xi && PM) {
+    empujar(
+      {
+        nombre: 'Altura Facial Total (Ba-N a Xi-PM)',
+        sigla: 'Altura facial total',
+        tipo: 'angulo',
+        valor: Number(anguloEntreVectores(Ba, N, Xi, PM).toFixed(1)),
+        unidad: '°',
+        norma: '60° (± 3°)',
+        normaValor: 60,
+        tolerancia: 3,
+        esqueletica: true,
+        campo: 'Campo VI · Estructuras Internas',
+        factorNumero: 29,
+      },
+      ['Altura facial total aumentada (dolicofacial)', 'Altura facial total disminuida (braquifacial)', 'Altura facial total normal']
     );
   }
 
   if (Po && Or && cf && Xi) {
     empujar(
       {
-        nombre: 'Posición de la rama (FH a CF-Xi)',
+        nombre: 'Posición de la Rama (FH a CF-Xi)',
         sigla: 'Posición rama',
         tipo: 'angulo',
-        valor: Number(anguloEntreLineas(Po, Or, cf, Xi).toFixed(1)),
+        valor: Number(anguloEntreVectores(Or, Po, cf, Xi).toFixed(1)),
         unidad: '°',
         norma: '76° (± 3°)',
         normaValor: 76,
@@ -1342,26 +1376,26 @@ export function calcularAnalisisCefalometrico(
   if (Po && Pt && dirFH && pxPorMm) {
     empujar(
       {
-        nombre: 'Localización del Porion (Po a PTV)',
+        nombre: 'Posición de la ATM (Po a PTV)',
         sigla: 'Po-PTV',
         tipo: 'distancia',
         valor: Number(proyeccionEnMm(Pt, Po, dirFH, pxPorMm).toFixed(1)),
         unidad: 'mm',
-        norma: '-39 mm (± 2,2 mm)',
-        normaValor: -39,
-        tolerancia: 2.2,
+        norma: '-31 mm (± 2 mm)',
+        normaValor: -31,
+        tolerancia: 2,
         esqueletica: true,
         campo: 'Campo VI · Estructuras Internas',
         factorNumero: 31,
       },
-      ['Cavidad glenoidea adelantada', 'Cavidad glenoidea posterior', 'Localización del Porion normal']
+      ['ATM adelantada (tendencia Clase III)', 'ATM posterior (tendencia Clase II)', 'Posición de ATM normal']
     );
   }
 
   // Arco mandibular: eje del cóndilo (DC-Xi) con el cuerpo (Xi-PM).
   if (DC && Xi && PM) {
     empujar(
-      { nombre: 'Arco mandibular (DC-Xi / Xi-PM)', sigla: 'Arco mandibular', tipo: 'angulo',
+      { nombre: 'Arco Mandibular (DC-Xi / Xi-PM)', sigla: 'Arco mandibular', tipo: 'angulo',
         valor: Number((180 - anguloEntre3Puntos(DC, Xi, PM)).toFixed(1)), unidad: '°',
         norma: '26° (± 4°)', normaValor: 26, tolerancia: 4, esqueletica: true,
         campo: 'Campo VI · Estructuras Internas', factorNumero: 32 },
@@ -1372,7 +1406,7 @@ export function calcularAnalisisCefalometrico(
   if (Xi && PM && pxPorMm) {
     empujar(
       {
-        nombre: 'Longitud del cuerpo mandibular (Xi-PM)',
+        nombre: 'Longitud Cuerpo Mandibular (Xi-PM)',
         sigla: 'Xi-PM',
         tipo: 'distancia',
         valor: Number((distanciaPuntos(Xi, PM) / pxPorMm).toFixed(1)),
@@ -1385,6 +1419,95 @@ export function calcularAnalisisCefalometrico(
         factorNumero: 33,
       },
       ['Cuerpo mandibular largo (tendencia Clase III)', 'Cuerpo mandibular corto (tendencia Clase II)', 'Longitud mandibular normal']
+    );
+  }
+
+  // ================================================================
+  // MCNAMARA, STEINER EXTRA Y WITS (Hoja Post-grado UAP)
+  // ================================================================
+  // McNamara: perpendicular a Frankfort pasando por Nasion (N-perp).
+  if (Po && Or && N && A && dirFH && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Línea McNamara – Punto A (N-perp a A)',
+        sigla: 'McNamara-A',
+        tipo: 'distancia',
+        valor: Number(proyeccionEnMm(N, A, dirFH, pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '0 mm (± 1 mm)',
+        normaValor: 0,
+        tolerancia: 1,
+        esqueletica: true,
+      },
+      ['Protrusión maxilar', 'Retrusión maxilar', 'Maxilar en norma']
+    );
+  }
+  if (Po && Or && N && Pog && dirFH && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Línea McNamara – a Pog. (N-perp a Pog)',
+        sigla: 'McNamara-Pog',
+        tipo: 'distancia',
+        valor: Number(proyeccionEnMm(N, Pog, dirFH, pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '-4 a 0 mm (jóvenes -8 a -6)',
+        normaValor: -2,
+        tolerancia: 2,
+        esqueletica: true,
+      },
+      ['Prognatismo mandibular', 'Retrognatismo mandibular', 'Mandíbula en norma']
+    );
+  }
+
+  // Steiner adicionales: Go-Gn-Sn (32°) y 1-Plano Maxilar (110°)
+  if (S && N && Go && Gn) {
+    empujar(
+      {
+        nombre: 'Go-Gn a Base Craneal (Steiner)',
+        sigla: 'Go-Gn-Sn',
+        tipo: 'angulo',
+        valor: Number(anguloEntreLineas(S, N, Go, Gn).toFixed(1)),
+        unidad: '°',
+        norma: '32° (± 4°)',
+        normaValor: 32,
+        tolerancia: 4,
+        esqueletica: true,
+      },
+      ['Patrón hiperdivergente', 'Patrón hipodivergente', 'Crecimiento vertical normal']
+    );
+  }
+  if (U1A && U1I && ANS && PNS) {
+    empujar(
+      {
+        nombre: 'Incisivo Superior a Plano Maxilar (1-PP)',
+        sigla: '1-Plano Maxilar',
+        tipo: 'angulo',
+        valor: Number(anguloEntreVectores(U1A, U1I, ANS, PNS).toFixed(1)),
+        unidad: '°',
+        norma: '110° (± 5°)',
+        normaValor: 110,
+        tolerancia: 5,
+        esqueletica: false,
+      },
+      ['Incisivo superior proinclinado', 'Incisivo superior retroinclinado', 'Inclinación normal']
+    );
+  }
+
+  // Wits (AO - BO sobre el plano oclusal funcional)
+  if (A && B && dirPO && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Evaluación de Wits (AO - BO sobre PO)',
+        sigla: 'Wits',
+        tipo: 'distancia',
+        valor: Number(proyeccionEnMm(B, A, dirPO, pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '-1 mm (± 2 mm)',
+        normaValor: -1,
+        tolerancia: 2,
+        esqueletica: true,
+      },
+      ['Clase II esquelética (Wits)', 'Clase III esquelética (Wits)', 'Clase I esquelética (Wits)']
     );
   }
 
@@ -1495,8 +1618,13 @@ const ANALISIS_DE: Record<string, MedicionResultado['analisis']> = {
   ANB: 'Steiner',
   '1-NA (°)': 'Steiner',
   '1-NB (°)': 'Steiner',
+  'Go-Gn-Sn': 'Steiner',
+  '1-Plano Maxilar': 'Steiner',
   FMA: 'Tweed',
   IMPA: 'Tweed',
+  'McNamara-A': 'McNamara',
+  'McNamara-Pog': 'McNamara',
+  Wits: 'Wits',
 };
 
 /**
@@ -1509,3 +1637,395 @@ export const SECUENCIA_RICKETTS: string[] = [
   'U1A', 'U1I', 'L1I', 'L1A', 'B', 'PM', 'Pog', 'Gn', 'Me', 'Go',
   'Pn', 'UL', 'Em', 'LL', 'Pog_b',
 ];
+
+// ==========================================
+// ANÁLISIS FRONTAL DE RICKETTS (18 FACTORES)
+// ==========================================
+
+export const PUNTOS_FRONTAL_RICKETTS: DefinicionPunto[] = [
+  { id: 'Z_izq', simbolo: 'ZL', nombre: 'Zigomático Izquierdo', descripcion: 'Sutura frontozigomática en el reborde orbitario externo izquierdo.', tipo: 'esqueletico', color: '#3b82f6' },
+  { id: 'Z_der', simbolo: 'ZR', nombre: 'Zigomático Derecho', descripcion: 'Sutura frontozigomática en el reborde orbitario externo derecho.', tipo: 'esqueletico', color: '#3b82f6' },
+  { id: 'ZA_izq', simbolo: 'ZAL', nombre: 'Arco Cigomático Izquierdo', descripcion: 'Punto más lateral del arco cigomático izquierdo.', tipo: 'esqueletico', color: '#06b6d4' },
+  { id: 'ZA_der', simbolo: 'ZAR', nombre: 'Arco Cigomático Derecho', descripcion: 'Punto más lateral del arco cigomático derecho.', tipo: 'esqueletico', color: '#06b6d4' },
+  { id: 'Cg', simbolo: 'Cg', nombre: 'Crista Galli', descripcion: 'Centro superior de la apófisis Crista Galli (eje medio craneal).', tipo: 'esqueletico', color: '#8b5cf6' },
+  { id: 'NC_izq', simbolo: 'NCL', nombre: 'Cavidad Nasal Izquierda', descripcion: 'Punto más lateral de la apertura piriforme nasal izquierda.', tipo: 'esqueletico', color: '#10b981' },
+  { id: 'NC_der', simbolo: 'NCR', nombre: 'Cavidad Nasal Derecha', descripcion: 'Punto más lateral de la apertura piriforme nasal derecha.', tipo: 'esqueletico', color: '#10b981' },
+  { id: 'ANS_f', simbolo: 'ANS', nombre: 'Espina Nasal Anterior', descripcion: 'Centro de la espina nasal anterior en proyección frontal.', tipo: 'esqueletico', color: '#14b8a6' },
+  { id: 'J_izq', simbolo: 'JL', nombre: 'Proceso Yugal Izquierdo', descripcion: 'Intersección de la tuberosidad maxilar y el proceso cigomático izquierdo.', tipo: 'esqueletico', color: '#f59e0b' },
+  { id: 'J_der', simbolo: 'JR', nombre: 'Proceso Yugal Derecho', descripcion: 'Intersección de la tuberosidad maxilar y el proceso cigomático derecho.', tipo: 'esqueletico', color: '#f59e0b' },
+  { id: 'Ag_izq', simbolo: 'AgL', nombre: 'Antegonion Izquierdo', descripcion: 'Escotadura antegonial en el borde inferior mandibular izquierdo.', tipo: 'esqueletico', color: '#ef4444' },
+  { id: 'Ag_der', simbolo: 'AgR', nombre: 'Antegonion Derecho', descripcion: 'Escotadura antegonial en el borde inferior mandibular derecho.', tipo: 'esqueletico', color: '#ef4444' },
+  { id: 'Me_f', simbolo: 'Me', nombre: 'Mentoniano Frontal', descripcion: 'Centro del borde inferior de la sínfisis mentoniana.', tipo: 'esqueletico', color: '#22c55e' },
+  { id: 'U6_izq', simbolo: 'A6L', nombre: '1er Molar Sup. Izquierdo', descripcion: 'Contorno vestibular más prominente del 1er molar superior izquierdo.', tipo: 'dental', color: '#38bdf8' },
+  { id: 'U6_der', simbolo: 'A6R', nombre: '1er Molar Sup. Derecho', descripcion: 'Contorno vestibular más prominente del 1er molar superior derecho.', tipo: 'dental', color: '#38bdf8' },
+  { id: 'L6_izq', simbolo: 'B6L', nombre: '1er Molar Inf. Izquierdo', descripcion: 'Contorno vestibular más prominente del 1er molar inferior izquierdo.', tipo: 'dental', color: '#fb7185' },
+  { id: 'L6_der', simbolo: 'B6R', nombre: '1er Molar Inf. Derecho', descripcion: 'Contorno vestibular más prominente del 1er molar inferior derecho.', tipo: 'dental', color: '#fb7185' },
+  { id: 'L3_izq', simbolo: 'B3L', nombre: 'Canino Inf. Izquierdo', descripcion: 'Vértice cuspídeo del canino inferior izquierdo.', tipo: 'dental', color: '#f472b6' },
+  { id: 'L3_der', simbolo: 'B3R', nombre: 'Canino Inf. Derecho', descripcion: 'Vértice cuspídeo del canino inferior derecho.', tipo: 'dental', color: '#f472b6' },
+  { id: 'U1M', simbolo: 'U1M', nombre: 'Línea Media Incisiva Sup.', descripcion: 'Punto interproximal entre los incisivos centrales superiores.', tipo: 'dental', color: '#facc15' },
+  { id: 'L1M', simbolo: 'L1M', nombre: 'Línea Media Incisiva Inf.', descripcion: 'Punto interproximal entre los incisivos centrales inferiores.', tipo: 'dental', color: '#facc15' },
+];
+
+export const SEGMENTOS_FRONTAL_RICKETTS: SegmentoCefalometrico[] = [
+  { id: 'ZZ', de: 'Z_izq', a: 'Z_der', color: '#3b82f6', grosor: 2, etiqueta: 'Plano Z' },
+  { id: 'ZAgL', de: 'Z_izq', a: 'Ag_izq', color: '#ef4444', grosor: 1.5, etiqueta: 'Frontal Izq.' },
+  { id: 'ZAgR', de: 'Z_der', a: 'Ag_der', color: '#ef4444', grosor: 1.5, etiqueta: 'Frontal Der.' },
+  { id: 'CgANS', de: 'Cg', a: 'ANS_f', color: '#8b5cf6', dash: true, grosor: 1.5 },
+  { id: 'ANSMe', de: 'ANS_f', a: 'Me_f', color: '#22c55e', dash: true, grosor: 1.5 },
+  { id: 'JJ', de: 'J_izq', a: 'J_der', color: '#f59e0b', dash: true, grosor: 1.5 },
+  { id: 'AgAg', de: 'Ag_izq', a: 'Ag_der', color: '#ef4444', dash: true, grosor: 1.5 },
+  { id: 'ZAZA', de: 'ZA_izq', a: 'ZA_der', color: '#06b6d4', dash: true, grosor: 1 },
+  { id: 'NCNC', de: 'NC_izq', a: 'NC_der', color: '#10b981', dash: true, grosor: 1 },
+  { id: 'OclF', de: 'L6_izq', a: 'L6_der', color: '#facc15', grosor: 1.5, etiqueta: 'Plano Oclusal' },
+];
+
+export const SECUENCIA_FRONTAL_RICKETTS: string[] = PUNTOS_FRONTAL_RICKETTS.map((p) => p.id);
+
+export function calcularAnalisisFrontalRicketts(
+  puntos: PuntosCefalometricosMap,
+  calibracion: CalibracionRegla
+): MedicionResultado[] {
+  const resultados: MedicionResultado[] = [];
+  const pxPorMm = calibracion.pixelesPorMm;
+
+  const empujar = (
+    m: Omit<MedicionResultado, 'desviacion' | 'enNorma' | 'interpretacion'> & {
+      normaValor: number;
+      tolerancia: number;
+    },
+    textos: [mas: string, menos: string, normal: string]
+  ) => {
+    const { normaValor, tolerancia, ...resto } = m;
+    const desv = Number((m.valor - normaValor).toFixed(1));
+    const enNorma = Math.abs(desv) <= tolerancia;
+    resultados.push({
+      ...resto,
+      analisis: 'Ricketts Frontal',
+      desviacion: desv,
+      enNorma,
+      interpretacion: desv > tolerancia ? textos[0] : desv < -tolerancia ? textos[1] : textos[2],
+    });
+  };
+
+  const Z_izq = puntos['Z_izq'];
+  const Z_der = puntos['Z_der'];
+  const ZA_izq = puntos['ZA_izq'];
+  const ZA_der = puntos['ZA_der'];
+  const Cg = puntos['Cg'];
+  const NC_izq = puntos['NC_izq'];
+  const NC_der = puntos['NC_der'];
+  const ANS_f = puntos['ANS_f'];
+  const J_izq = puntos['J_izq'];
+  const J_der = puntos['J_der'];
+  const Ag_izq = puntos['Ag_izq'];
+  const Ag_der = puntos['Ag_der'];
+  const Me_f = puntos['Me_f'];
+  const U6_izq = puntos['U6_izq'];
+  const U6_der = puntos['U6_der'];
+  const L6_izq = puntos['L6_izq'];
+  const L6_der = puntos['L6_der'];
+  const L3_izq = puntos['L3_izq'];
+  const L3_der = puntos['L3_der'];
+  const U1M = puntos['U1M'];
+  const L1M = puntos['L1M'];
+
+  // Campo I: Problemas Dentarios (Relación molar izq. y der.)
+  if (Z_izq && Z_der && pxPorMm) {
+    const ladosMolar = [
+      { u6: U6_izq, l6: L6_izq, dir: vectorUnitario(Z_der, Z_izq), etiqueta: 'izquierda', sigla: 'izq.', num: 1 },
+      { u6: U6_der, l6: L6_der, dir: vectorUnitario(Z_izq, Z_der), etiqueta: 'derecha', sigla: 'der.', num: 2 },
+    ] as const;
+    ladosMolar.forEach(({ u6, l6, dir, etiqueta, sigla, num }) => {
+      if (!u6 || !l6 || !dir) return;
+      empujar(
+        {
+          nombre: `Relación molar ${etiqueta}`,
+          sigla: `Rel. molar ${sigla}`,
+          tipo: 'distancia',
+          valor: Number(proyeccionEnMm(l6, u6, dir, pxPorMm).toFixed(1)),
+          unidad: 'mm',
+          norma: '1,5 mm (± 1,5 mm)',
+          normaValor: 1.5,
+          tolerancia: 1.5,
+          campo: 'Campo I · Problemas Dentarios',
+          factorNumero: num,
+        },
+        [`Resalte vestibular aumentado ${sigla}`, `Mordida cruzada posterior ${sigla}`, 'Relación transversal normal']
+      );
+    });
+  }
+  if (L6_izq && L6_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión transversal intermolar inferior',
+        sigla: 'Intermolar inf.',
+        tipo: 'distancia',
+        valor: Number((distanciaPuntos(L6_izq, L6_der) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '55,0 mm (± 2,0 mm)',
+        normaValor: 55,
+        tolerancia: 2,
+        campo: 'Campo I · Problemas Dentarios',
+        factorNumero: 3,
+      },
+      ['Arcada inferior ancha', 'Compresión molar inferior', 'Anchura intermolar normal']
+    );
+  }
+  if (L3_izq && L3_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión transversal intercanina inferior',
+        sigla: 'Intercanina inf.',
+        tipo: 'distancia',
+        valor: Number((distanciaPuntos(L3_izq, L3_der) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '27,5 mm (± 3,2 mm)',
+        normaValor: 27.5,
+        tolerancia: 3.2,
+        campo: 'Campo I · Problemas Dentarios',
+        factorNumero: 4,
+      },
+      ['Distancia intercanina aumentada', 'Compresión intercanina inferior', 'Anchura intercanina normal']
+    );
+  }
+  if (U1M && L1M && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Línea mediana dentaria',
+        sigla: 'Línea media dent.',
+        tipo: 'distancia',
+        valor: Number((Math.abs(U1M.x - L1M.x) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '0 mm (± 1,5 mm)',
+        normaValor: 0,
+        tolerancia: 1.5,
+        campo: 'Campo I · Problemas Dentarios',
+        factorNumero: 5,
+      },
+      ['Desviación de línea media dentaria', 'Desviación de línea media dentaria', 'Líneas medias coincidentes']
+    );
+  }
+
+  // Campo II: Problemas Esqueléticos (Max-Mand izq. y der.)
+  if (pxPorMm) {
+    const ladosMaxMand = [
+      { j: J_izq, z: Z_izq, ag: Ag_izq, etiqueta: 'izquierda', sigla: 'izq.', num: 6 },
+      { j: J_der, z: Z_der, ag: Ag_der, etiqueta: 'derecha', sigla: 'der.', num: 7 },
+    ] as const;
+    ladosMaxMand.forEach(({ j, z, ag, etiqueta, sigla, num }) => {
+      if (!j || !z || !ag) return;
+      empujar(
+        {
+          nombre: `Dimensión transversal maxilo-mandibular ${etiqueta}`,
+          sigla: `Max-Mand ${sigla}`,
+          tipo: 'distancia',
+          valor: Number(Math.abs(distanciaPuntoALinea(j, z, ag, pxPorMm)).toFixed(1)),
+          unidad: 'mm',
+          norma: '10,0 mm (± 1,5 mm)',
+          normaValor: 10,
+          tolerancia: 1.5,
+          esqueletica: true,
+          campo: 'Campo II · Problemas Esqueléticos',
+          factorNumero: num,
+        },
+        [`Compresión maxilar esquelética ${sigla}`, `Maxilar ancho ${sigla}`, `Relación transversal normal ${sigla}`]
+      );
+    });
+  }
+  if (Cg && ANS_f && Me_f) {
+    empujar(
+      {
+        nombre: 'Línea mediana maxilo-mandibular',
+        sigla: 'Línea media esq.',
+        tipo: 'angulo',
+        valor: Number(anguloEntreLineas(Cg, ANS_f, ANS_f, Me_f).toFixed(1)),
+        unidad: '°',
+        norma: '0° (± 2,0°)',
+        normaValor: 0,
+        tolerancia: 2,
+        esqueletica: true,
+        campo: 'Campo II · Problemas Esqueléticos',
+        factorNumero: 8,
+      },
+      ['Asimetría mandibular esquelética', 'Asimetría mandibular esquelética', 'Simetría esquelética normal']
+    );
+  }
+
+  // Campo III: Problemas Dento-Esqueléticos (L6-Rama izq. y der.)
+  if (pxPorMm) {
+    const ladosL6Rama = [
+      { l6: L6_izq, z: Z_izq, ag: Ag_izq, etiqueta: 'izquierda', sigla: 'izq.', num: 9 },
+      { l6: L6_der, z: Z_der, ag: Ag_der, etiqueta: 'derecha', sigla: 'der.', num: 10 },
+    ] as const;
+    ladosL6Rama.forEach(({ l6, z, ag, etiqueta, sigla, num }) => {
+      if (!l6 || !z || !ag) return;
+      empujar(
+        {
+          nombre: `Molar inferior a la rama ${etiqueta}`,
+          sigla: `L6-Rama ${sigla}`,
+          tipo: 'distancia',
+          valor: Number(Math.abs(distanciaPuntoALinea(l6, z, ag, pxPorMm)).toFixed(1)),
+          unidad: 'mm',
+          norma: '13 mm (± 1,7 mm)',
+          normaValor: 13,
+          tolerancia: 1.7,
+          campo: 'Campo III · Problemas Dento-Esqueléticos',
+          factorNumero: num,
+        },
+        [`Molar lingualizado ${sigla}`, `Molar vestibularizado ${sigla}`, `Posición molar normal ${sigla}`]
+      );
+    });
+  }
+  if (L1M && ANS_f && Me_f && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dientes a la línea mediana maxilo-mandibular',
+        sigla: 'L1-Línea media',
+        tipo: 'distancia',
+        valor: Number(Math.abs(distanciaPuntoALinea(L1M, ANS_f, Me_f, pxPorMm)).toFixed(1)),
+        unidad: 'mm',
+        norma: '0 mm (± 1,5 mm)',
+        normaValor: 0,
+        tolerancia: 1.5,
+        campo: 'Campo III · Problemas Dento-Esqueléticos',
+        factorNumero: 11,
+      },
+      ['Desviación dentaria respecto a base ósea', 'Desviación dentaria respecto a base ósea', 'Centrado en base ósea']
+    );
+  }
+  if (L6_izq && L6_der && Z_izq && Z_der && pxPorMm) {
+    const d1 = Math.abs(distanciaPuntoALinea(L6_izq, Z_izq, Z_der, pxPorMm));
+    const d2 = Math.abs(distanciaPuntoALinea(L6_der, Z_izq, Z_der, pxPorMm));
+    empujar(
+      {
+        nombre: 'Inclinación del plano oclusal',
+        sigla: 'Plano oclusal (mm)',
+        tipo: 'distancia',
+        valor: Number(Math.abs(d1 - d2).toFixed(1)),
+        unidad: 'mm',
+        norma: '0 mm (± 2,0 mm)',
+        normaValor: 0,
+        tolerancia: 2,
+        campo: 'Campo III · Problemas Dento-Esqueléticos',
+        factorNumero: 12,
+      },
+      ['Canteo del plano oclusal', 'Canteo del plano oclusal', 'Plano oclusal nivelado']
+    );
+  }
+
+  // Campo V: Relación Craneo-Facial
+  if (Z_izq && Z_der) {
+    const angZ = Math.abs((Math.atan2(Z_der.y - Z_izq.y, Z_der.x - Z_izq.x) * 180) / Math.PI);
+    const desvPostural = angZ > 90 ? 180 - angZ : angZ;
+    empujar(
+      {
+        nombre: 'Simetría postural',
+        sigla: 'Simetría postural',
+        tipo: 'angulo',
+        valor: Number(desvPostural.toFixed(1)),
+        unidad: '°',
+        norma: '0° (± 2,0°)',
+        normaValor: 0,
+        tolerancia: 2,
+        esqueletica: true,
+        campo: 'Campo V · Relación Craneofacial',
+        factorNumero: 13,
+      },
+      ['Inclinación postural / asimetría', 'Inclinación postural / asimetría', 'Postura craneal simétrica']
+    );
+  }
+
+  // Campo VI: Estructuras Internas
+  if (NC_izq && NC_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión transversal nasal',
+        sigla: 'Anchura nasal',
+        tipo: 'distancia',
+        valor: Number((distanciaPuntos(NC_izq, NC_der) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '30,6 mm (± 2,0 mm)',
+        normaValor: 30.6,
+        tolerancia: 2,
+        esqueletica: true,
+        campo: 'Campo VI · Estructuras Internas',
+        factorNumero: 14,
+      },
+      ['Cavidad nasal ancha', 'Estenosis / cavidad nasal estrecha', 'Anchura nasal normal']
+    );
+  }
+  if (ANS_f && Z_izq && Z_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión vertical nasal',
+        sigla: 'Altura nasal',
+        tipo: 'distancia',
+        valor: Number(Math.abs(distanciaPuntoALinea(ANS_f, Z_izq, Z_der, pxPorMm)).toFixed(1)),
+        unidad: 'mm',
+        norma: '52 mm (± 3,0 mm)',
+        normaValor: 52,
+        tolerancia: 3,
+        esqueletica: true,
+        campo: 'Campo VI · Estructuras Internas',
+        factorNumero: 15,
+      },
+      ['Altura nasal aumentada', 'Altura nasal disminuida', 'Altura nasal normal']
+    );
+  }
+  if (J_izq && J_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión transversal maxilar',
+        sigla: 'Anchura maxilar',
+        tipo: 'distancia',
+        valor: Number((distanciaPuntos(J_izq, J_der) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '66,3 mm (± 3,0 mm)',
+        normaValor: 66.3,
+        tolerancia: 3,
+        esqueletica: true,
+        campo: 'Campo VI · Estructuras Internas',
+        factorNumero: 16,
+      },
+      ['Maxilar ancho', 'Compresión esquelética maxilar', 'Anchura maxilar normal']
+    );
+  }
+  if (Ag_izq && Ag_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión transversal mandibular',
+        sigla: 'Anchura mandibular',
+        tipo: 'distancia',
+        valor: Number((distanciaPuntos(Ag_izq, Ag_der) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '86,5 mm (± 3,0 mm)',
+        normaValor: 86.5,
+        tolerancia: 3,
+        esqueletica: true,
+        campo: 'Campo VI · Estructuras Internas',
+        factorNumero: 17,
+      },
+      ['Mandíbula ancha', 'Mandíbula estrecha', 'Anchura mandibular normal']
+    );
+  }
+  if (ZA_izq && ZA_der && pxPorMm) {
+    empujar(
+      {
+        nombre: 'Dimensión transversal facial',
+        sigla: 'Anchura facial',
+        tipo: 'distancia',
+        valor: Number((distanciaPuntos(ZA_izq, ZA_der) / pxPorMm).toFixed(1)),
+        unidad: 'mm',
+        norma: '132,5 mm (± 3,0 mm)',
+        normaValor: 132.5,
+        tolerancia: 3,
+        esqueletica: true,
+        campo: 'Campo VI · Estructuras Internas',
+        factorNumero: 18,
+      },
+      ['Anchura facial aumentada', 'Anchura facial disminuida', 'Anchura facial normal']
+    );
+  }
+
+  return resultados;
+}

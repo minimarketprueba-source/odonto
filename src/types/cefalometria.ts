@@ -36,10 +36,11 @@ export interface MedicionResultado {
   unidad: '°' | 'mm';
   norma: string;
   desviacion?: number;
+  enNorma?: boolean;
   interpretacion?: string;
   esqueletica?: boolean;
   /** A qué análisis pertenece: se agrupan así en la pantalla y en el informe. */
-  analisis?: 'Ricketts' | 'Steiner' | 'Tweed';
+  analisis?: 'Ricketts' | 'Ricketts Frontal' | 'McNamara' | 'Steiner' | 'Tweed' | 'Wits';
   /** Campo de Ricketts (I al VI) y número de factor (1 al 33). */
   campo?: string;
   factorNumero?: number;

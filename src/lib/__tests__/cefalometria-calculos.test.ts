@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { calcularAnalisisCefalometrico, calcularSintesisRicketts } from '../cefalometria-calculos';
+import {
+  calcularAnalisisCefalometrico,
+  calcularAnalisisFrontalRicketts,
+  calcularSintesisRicketts,
+} from '../cefalometria-calculos';
 import type { CoordenadaPunto, PuntosCefalometricosMap } from '@/types/cefalometria';
 
 // Coordenadas de imagen: x hacia la derecha, y hacia ABAJO, como en la pantalla.
@@ -249,5 +253,57 @@ describe('análisis de Ricketts', () => {
     expect(sintesis.factoresMedidos).toBe(33);
     expect(sintesis.vert).not.toBeNull();
     expect(sintesis.biotipo).not.toMatch(/Pendiente/);
+
+    // McNamara, Steiner extra y Wits
+    expect(res.find((m) => m.sigla === 'McNamara-A')?.analisis).toBe('McNamara');
+    expect(res.find((m) => m.sigla === 'McNamara-Pog')?.analisis).toBe('McNamara');
+    expect(res.find((m) => m.sigla === 'Wits')?.analisis).toBe('Wits');
+    expect(res.find((m) => m.sigla === 'Go-Gn-Sn')?.analisis).toBe('Steiner');
+    const u1pp = res.find((m) => m.sigla === '1-Plano Maxilar');
+    expect(u1pp?.analisis).toBe('Steiner');
+    expect(u1pp?.valor).toBeGreaterThan(100);
+  });
+
+  it('calcula los 18 factores del Análisis Frontal de Ricketts', () => {
+    const frontal: PuntosCefalometricosMap = {
+      Z_izq: { x: 200, y: 200 },
+      Z_der: { x: 800, y: 200 },
+      ZA_izq: { x: 100, y: 300 },
+      ZA_der: { x: 900, y: 300 },
+      Cg: { x: 500, y: 150 },
+      NC_izq: { x: 420, y: 350 },
+      NC_der: { x: 580, y: 350 },
+      ANS_f: { x: 500, y: 450 },
+      J_izq: { x: 320, y: 460 },
+      J_der: { x: 680, y: 460 },
+      Ag_izq: { x: 280, y: 650 },
+      Ag_der: { x: 720, y: 650 },
+      Me_f: { x: 500, y: 780 },
+      U6_izq: { x: 340, y: 550 },
+      U6_der: { x: 660, y: 550 },
+      L6_izq: { x: 355, y: 560 },
+      L6_der: { x: 645, y: 560 },
+      L3_izq: { x: 430, y: 570 },
+      L3_der: { x: 570, y: 570 },
+      U1M: { x: 500, y: 565 },
+      L1M: { x: 500, y: 575 },
+    };
+
+    const res = calcularAnalisisFrontalRicketts(frontal, { distanciaRealMm: 10, pixelesPorMm: 10 });
+    expect(res).toHaveLength(18);
+    expect(res.every((m) => m.analisis === 'Ricketts Frontal')).toBe(true);
+    for (let i = 1; i <= 18; i++) {
+      expect(res.some((m) => m.factorNumero === i)).toBe(true);
+    }
+
+    // Mordida cruzada posterior izquierda: U6_izq más medial (hacia el centro) que L6_izq
+    const cruzada = calcularAnalisisFrontalRicketts(
+      { ...frontal, U6_izq: { x: 370, y: 550 }, L6_izq: { x: 340, y: 560 } },
+      { distanciaRealMm: 10, pixelesPorMm: 10 }
+    );
+    const relIzq = cruzada.find((m) => m.sigla === 'Rel. molar izq.');
+    expect(relIzq?.valor).toBe(-3);
+    expect(relIzq?.enNorma).toBe(false);
+    expect(relIzq?.interpretacion).toBe('Mordida cruzada posterior izq.');
   });
 });

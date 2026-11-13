@@ -1111,6 +1111,7 @@ export interface DatosInformeCefalometrico {
     unidad: string;
     norma: string;
     desviacion?: number;
+    enNorma?: boolean;
     interpretacion?: string;
     analisis?: string;
   }[];
@@ -1120,14 +1121,14 @@ export function imprimirInformeCefalometrico(datos: DatosInformeCefalometrico) {
   const tituloDoc = "INFORME CEFALOMÉTRICO";
 
   // Agrupadas por análisis, Ricketts primero, con una fila de título por grupo.
-  const grupos = ["Ricketts", "Steiner", "Tweed"];
+  const grupos = ["Ricketts", "Ricketts Frontal", "McNamara", "Steiner", "Tweed", "Wits"];
   const filas = grupos
     .map((g) => ({ g, ms: datos.mediciones.filter((m) => (m.analisis ?? "Ricketts") === g) }))
     .filter((x) => x.ms.length)
     .map(({ g, ms }) =>
       `<tr><td colspan="5" style="padding:5px 6px; background:#e2e8f0; font-weight:bold; font-size:10px; letter-spacing:0.5px;">ANÁLISIS DE ${g.toUpperCase()}</td></tr>` +
       ms.map((m) => {
-      const fuera = Math.abs(m.desviacion || 0) > 3;
+      const fuera = m.enNorma !== undefined ? !m.enNorma : Math.abs(m.desviacion || 0) > 3;
       return `
         <tr>
           <td style="border:1px solid #cbd5e1; padding:4px 6px; font-weight:bold;">${esc(m.sigla)}</td>
