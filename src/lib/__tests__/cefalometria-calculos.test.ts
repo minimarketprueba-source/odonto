@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PUNTOS_CEFALOMETRICOS,
+  SECUENCIA_RICKETTS,
   calcularAnalisisCefalometrico,
   calcularAnalisisFrontalRicketts,
+  calcularBolton,
+  calcularNance,
   calcularSintesisRicketts,
 } from '../cefalometria-calculos';
 import type { CoordenadaPunto, PuntosCefalometricosMap } from '@/types/cefalometria';
@@ -262,6 +266,17 @@ describe('análisis de Ricketts', () => {
     const u1pp = res.find((m) => m.sigla === '1-Plano Maxilar');
     expect(u1pp?.analisis).toBe('Steiner');
     expect(u1pp?.valor).toBeGreaterThan(100);
+    expect(res.find((m) => m.sigla === 'FM')?.analisis).toBe('Steiner');
+    expect(res.find((m) => m.sigla === 'MM')?.analisis).toBe('Steiner');
+    expect(res.find((m) => m.sigla === '1 Plano Mandib.')?.analisis).toBe('Steiner');
+    expect(res.find((m) => m.sigla === '1-NA (mm)')?.analisis).toBe('Steiner');
+    expect(res.find((m) => m.sigla === '1-NB (mm)')?.analisis).toBe('Steiner');
+
+    for (const id of ['SOr', 'R1', 'R2', 'R3', 'R4']) {
+      expect(PUNTOS_CEFALOMETRICOS.some((p) => p.id === id)).toBe(true);
+      expect(SECUENCIA_RICKETTS).toContain(id);
+    }
+    expect(SECUENCIA_RICKETTS[0]).toBe('S');
   });
 
   it('calcula los 18 factores del Análisis Frontal de Ricketts', () => {
@@ -305,5 +320,49 @@ describe('análisis de Ricketts', () => {
     expect(relIzq?.valor).toBe(-3);
     expect(relIzq?.enNorma).toBe(false);
     expect(relIzq?.interpretacion).toBe('Mordida cruzada posterior izq.');
+  });
+
+  it('calcula análisis de Bolton (total 91,3% y anterior 77,2%) según tabla UAP', () => {
+    // Max 12 = 94 (tabla mand = 85.8); paciente mand = 88.8 -> exceso mandibular 3.0 mm
+    const excMand = calcularBolton({ max12: 94, mand12: 88.8, max6: 46, mand6: 35.5 });
+    expect(excMand.relacion12).toBe(94.5);
+    expect(excMand.exceso12Tipo).toBe('mandibular');
+    expect(excMand.exceso12Tabla).toBe(85.8);
+    expect(excMand.exceso12Mm).toBe(3);
+    expect(excMand.relacion6).toBe(77.2);
+    expect(excMand.exceso6Tipo).toBe('normal');
+
+    // Max 12 = 98, Mand 12 = 85.8 (< 91.3%) -> exceso maxilar: 98 - 94 = 4.0 mm
+    const excMax = calcularBolton({ max12: 98, mand12: 85.8, max6: 48, mand6: 34.7 });
+    expect(excMax.exceso12Tipo).toBe('maxilar');
+    expect(excMax.exceso12Tabla).toBe(94);
+    expect(excMax.exceso12Mm).toBe(4);
+    expect(excMax.exceso6Tipo).toBe('maxilar');
+    expect(excMax.exceso6Tabla).toBe(45);
+    expect(excMax.exceso6Mm).toBe(3);
+  });
+
+  it('calcula análisis de Nance y discrepancia total/final', () => {
+    const nance = calcularNance({
+      epSuperior: 72,
+      erSuperior: 75,
+      epInferior: 64,
+      erInferior: 68,
+      filas: {
+        discrepancia_33: { negativo: 4 },
+        curva_spee: { negativo: 1.5 },
+        stripping: { positivo: 2 },
+        expansion: { positivo: 1.5 },
+      },
+      dc: -2,
+      exod: 14,
+    });
+    expect(nance.dmSuperior).toBe(-3);
+    expect(nance.dmInferior).toBe(-4);
+    expect(nance.totalPositivo).toBe(3.5);
+    expect(nance.totalNegativo).toBe(5.5);
+    expect(nance.totalNeto).toBe(-2);
+    expect(nance.dt).toBe(-6);
+    expect(nance.ef).toBe(8);
   });
 });

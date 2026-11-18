@@ -4,6 +4,8 @@ import {
   CalibracionRegla,
   MedicionResultado,
   DefinicionPunto,
+  DatosBolton,
+  DatosNance,
 } from '@/types/cefalometria';
 
 /**
@@ -182,6 +184,51 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     tipo: 'esqueletico',
     color: '#f472b6',
     sugerido: { x: 0.36, y: 0.5 },
+  },
+  {
+    id: 'SOr',
+    simbolo: 'SOr',
+    nombre: 'Supraorbitale',
+    descripcion: 'Punto más anterior en la unión del techo orbitario con el contorno del hueso frontal.',
+    tipo: 'esqueletico',
+    color: '#60a5fa',
+    sugerido: { x: 0.56, y: 0.24 },
+  },
+  {
+    id: 'R1',
+    simbolo: 'R1',
+    nombre: 'Punto R1 (Rama anterior - Ricketts)',
+    descripcion: 'Punto más profundo en el borde anterior de la rama ascendente mandibular.',
+    tipo: 'esqueletico',
+    color: '#f43f5e',
+    sugerido: { x: 0.45, y: 0.57 },
+  },
+  {
+    id: 'R2',
+    simbolo: 'R2',
+    nombre: 'Punto R2 (Rama posterior - Ricketts)',
+    descripcion: 'Punto en el borde posterior de la rama mandibular opuesto a R1.',
+    tipo: 'esqueletico',
+    color: '#f43f5e',
+    sugerido: { x: 0.37, y: 0.57 },
+  },
+  {
+    id: 'R3',
+    simbolo: 'R3',
+    nombre: 'Punto R3 (Escotadura sigmoidea - Ricketts)',
+    descripcion: 'Punto más profundo de la escotadura sigmoidea mandibular.',
+    tipo: 'esqueletico',
+    color: '#f43f5e',
+    sugerido: { x: 0.41, y: 0.49 },
+  },
+  {
+    id: 'R4',
+    simbolo: 'R4',
+    nombre: 'Punto R4 (Borde inf. rama - Ricketts)',
+    descripcion: 'Proyección inferior de R3 sobre el borde inferior mandibular.',
+    tipo: 'esqueletico',
+    color: '#f43f5e',
+    sugerido: { x: 0.41, y: 0.64 },
   },
 
   // --- Dentales ---
@@ -1459,7 +1506,8 @@ export function calcularAnalisisCefalometrico(
     );
   }
 
-  // Steiner adicionales: Go-Gn-Sn (32°) y 1-Plano Maxilar (110°)
+  // Steiner adicionales: Go-Gn-Sn (32°), FM (26°), MM (28°), 1-Plano Maxilar (110°),
+  // 1-Plano Mandib. (95°), 1-NA (4 mm), 1-NB (4 mm)
   if (S && N && Go && Gn) {
     empujar(
       {
@@ -1476,6 +1524,38 @@ export function calcularAnalisisCefalometrico(
       ['Patrón hiperdivergente', 'Patrón hipodivergente', 'Crecimiento vertical normal']
     );
   }
+  if (Po && Or && Go && Me) {
+    empujar(
+      {
+        nombre: 'FM (Frankfurt a Plano Mandibular)',
+        sigla: 'FM',
+        tipo: 'angulo',
+        valor: Number(anguloEntreLineas(Po, Or, Go, Me).toFixed(1)),
+        unidad: '°',
+        norma: '26° (± 3°)',
+        normaValor: 26,
+        tolerancia: 3,
+        esqueletica: true,
+      },
+      ['Patrón hiperdivergente', 'Patrón hipodivergente', 'Ángulo FM normal']
+    );
+  }
+  if (ANS && PNS && Go && Me) {
+    empujar(
+      {
+        nombre: 'MM (Plano Maxilar a Plano Mandibular)',
+        sigla: 'MM',
+        tipo: 'angulo',
+        valor: Number(anguloEntreLineas(ANS, PNS, Go, Me).toFixed(1)),
+        unidad: '°',
+        norma: '28° (± 3°)',
+        normaValor: 28,
+        tolerancia: 3,
+        esqueletica: true,
+      },
+      ['Divergencia maxilo-mandibular aumentada', 'Divergencia disminuida', 'Ángulo MM normal']
+    );
+  }
   if (U1A && U1I && ANS && PNS) {
     empujar(
       {
@@ -1490,6 +1570,54 @@ export function calcularAnalisisCefalometrico(
         esqueletica: false,
       },
       ['Incisivo superior proinclinado', 'Incisivo superior retroinclinado', 'Inclinación normal']
+    );
+  }
+  if (L1A && L1I && Go && Me) {
+    empujar(
+      {
+        nombre: 'Incisivo Inferior a Plano Mandibular (1-PM)',
+        sigla: '1 Plano Mandib.',
+        tipo: 'angulo',
+        valor: Number(anguloEntreVectores(L1A, L1I, Me, Go).toFixed(1)),
+        unidad: '°',
+        norma: '95° (± 5°)',
+        normaValor: 95,
+        tolerancia: 5,
+        esqueletica: false,
+      },
+      ['Incisivo inferior proinclinado', 'Incisivo inferior retroinclinado', 'Inclinación normal']
+    );
+  }
+  if (U1I && N && A && pxPorMm) {
+    empujar(
+      {
+        nombre: '1 a NA en milímetros (Steiner)',
+        sigla: '1-NA (mm)',
+        tipo: 'distancia',
+        valor: Number((sentido * distanciaPuntoALinea(U1I, N, A, pxPorMm)).toFixed(1)),
+        unidad: 'mm',
+        norma: '4 mm (± 2 mm)',
+        normaValor: 4,
+        tolerancia: 2,
+        esqueletica: false,
+      },
+      ['Incisivo superior protruido', 'Incisivo superior retruido', 'Posición normal']
+    );
+  }
+  if (L1I && N && B && pxPorMm) {
+    empujar(
+      {
+        nombre: '1 a NB en milímetros (Steiner)',
+        sigla: '1-NB (mm)',
+        tipo: 'distancia',
+        valor: Number((sentido * distanciaPuntoALinea(L1I, N, B, pxPorMm)).toFixed(1)),
+        unidad: 'mm',
+        norma: '4 mm (± 2 mm)',
+        normaValor: 4,
+        tolerancia: 2,
+        esqueletica: false,
+      },
+      ['Incisivo inferior protruido', 'Incisivo inferior retruido', 'Posición normal']
     );
   }
 
@@ -1617,9 +1745,14 @@ const ANALISIS_DE: Record<string, MedicionResultado['analisis']> = {
   SNB: 'Steiner',
   ANB: 'Steiner',
   '1-NA (°)': 'Steiner',
+  '1-NA (mm)': 'Steiner',
   '1-NB (°)': 'Steiner',
+  '1-NB (mm)': 'Steiner',
   'Go-Gn-Sn': 'Steiner',
+  FM: 'Steiner',
+  MM: 'Steiner',
   '1-Plano Maxilar': 'Steiner',
+  '1 Plano Mandib.': 'Steiner',
   FMA: 'Tweed',
   IMPA: 'Tweed',
   'McNamara-A': 'McNamara',
@@ -1632,7 +1765,7 @@ const ANALISIS_DE: Record<string, MedicionResultado['analisis']> = {
  * de arriba hacia abajo y de atrás hacia adelante, como se recorre la placa.
  */
 export const SECUENCIA_RICKETTS: string[] = [
-  'S', 'N', 'Ba', 'Po', 'Or', 'Pt', 'DC', 'Xi', 'ANS', 'PNS', 'A',
+  'S', 'N', 'SOr', 'Ba', 'Po', 'Or', 'Pt', 'DC', 'R1', 'R2', 'R3', 'R4', 'Xi', 'ANS', 'PNS', 'A',
   'U6D', 'L6D', 'U6C', 'L6C', 'PmO', 'U3C', 'L3C',
   'U1A', 'U1I', 'L1I', 'L1A', 'B', 'PM', 'Pog', 'Gn', 'Me', 'Go',
   'Pn', 'UL', 'Em', 'LL', 'Pog_b',
@@ -1643,27 +1776,27 @@ export const SECUENCIA_RICKETTS: string[] = [
 // ==========================================
 
 export const PUNTOS_FRONTAL_RICKETTS: DefinicionPunto[] = [
-  { id: 'Z_izq', simbolo: 'ZL', nombre: 'Zigomático Izquierdo', descripcion: 'Sutura frontozigomática en el reborde orbitario externo izquierdo.', tipo: 'esqueletico', color: '#3b82f6' },
-  { id: 'Z_der', simbolo: 'ZR', nombre: 'Zigomático Derecho', descripcion: 'Sutura frontozigomática en el reborde orbitario externo derecho.', tipo: 'esqueletico', color: '#3b82f6' },
-  { id: 'ZA_izq', simbolo: 'ZAL', nombre: 'Arco Cigomático Izquierdo', descripcion: 'Punto más lateral del arco cigomático izquierdo.', tipo: 'esqueletico', color: '#06b6d4' },
-  { id: 'ZA_der', simbolo: 'ZAR', nombre: 'Arco Cigomático Derecho', descripcion: 'Punto más lateral del arco cigomático derecho.', tipo: 'esqueletico', color: '#06b6d4' },
-  { id: 'Cg', simbolo: 'Cg', nombre: 'Crista Galli', descripcion: 'Centro superior de la apófisis Crista Galli (eje medio craneal).', tipo: 'esqueletico', color: '#8b5cf6' },
-  { id: 'NC_izq', simbolo: 'NCL', nombre: 'Cavidad Nasal Izquierda', descripcion: 'Punto más lateral de la apertura piriforme nasal izquierda.', tipo: 'esqueletico', color: '#10b981' },
-  { id: 'NC_der', simbolo: 'NCR', nombre: 'Cavidad Nasal Derecha', descripcion: 'Punto más lateral de la apertura piriforme nasal derecha.', tipo: 'esqueletico', color: '#10b981' },
-  { id: 'ANS_f', simbolo: 'ANS', nombre: 'Espina Nasal Anterior', descripcion: 'Centro de la espina nasal anterior en proyección frontal.', tipo: 'esqueletico', color: '#14b8a6' },
-  { id: 'J_izq', simbolo: 'JL', nombre: 'Proceso Yugal Izquierdo', descripcion: 'Intersección de la tuberosidad maxilar y el proceso cigomático izquierdo.', tipo: 'esqueletico', color: '#f59e0b' },
-  { id: 'J_der', simbolo: 'JR', nombre: 'Proceso Yugal Derecho', descripcion: 'Intersección de la tuberosidad maxilar y el proceso cigomático derecho.', tipo: 'esqueletico', color: '#f59e0b' },
-  { id: 'Ag_izq', simbolo: 'AgL', nombre: 'Antegonion Izquierdo', descripcion: 'Escotadura antegonial en el borde inferior mandibular izquierdo.', tipo: 'esqueletico', color: '#ef4444' },
-  { id: 'Ag_der', simbolo: 'AgR', nombre: 'Antegonion Derecho', descripcion: 'Escotadura antegonial en el borde inferior mandibular derecho.', tipo: 'esqueletico', color: '#ef4444' },
-  { id: 'Me_f', simbolo: 'Me', nombre: 'Mentoniano Frontal', descripcion: 'Centro del borde inferior de la sínfisis mentoniana.', tipo: 'esqueletico', color: '#22c55e' },
-  { id: 'U6_izq', simbolo: 'A6L', nombre: '1er Molar Sup. Izquierdo', descripcion: 'Contorno vestibular más prominente del 1er molar superior izquierdo.', tipo: 'dental', color: '#38bdf8' },
-  { id: 'U6_der', simbolo: 'A6R', nombre: '1er Molar Sup. Derecho', descripcion: 'Contorno vestibular más prominente del 1er molar superior derecho.', tipo: 'dental', color: '#38bdf8' },
-  { id: 'L6_izq', simbolo: 'B6L', nombre: '1er Molar Inf. Izquierdo', descripcion: 'Contorno vestibular más prominente del 1er molar inferior izquierdo.', tipo: 'dental', color: '#fb7185' },
-  { id: 'L6_der', simbolo: 'B6R', nombre: '1er Molar Inf. Derecho', descripcion: 'Contorno vestibular más prominente del 1er molar inferior derecho.', tipo: 'dental', color: '#fb7185' },
-  { id: 'L3_izq', simbolo: 'B3L', nombre: 'Canino Inf. Izquierdo', descripcion: 'Vértice cuspídeo del canino inferior izquierdo.', tipo: 'dental', color: '#f472b6' },
-  { id: 'L3_der', simbolo: 'B3R', nombre: 'Canino Inf. Derecho', descripcion: 'Vértice cuspídeo del canino inferior derecho.', tipo: 'dental', color: '#f472b6' },
-  { id: 'U1M', simbolo: 'U1M', nombre: 'Línea Media Incisiva Sup.', descripcion: 'Punto interproximal entre los incisivos centrales superiores.', tipo: 'dental', color: '#facc15' },
-  { id: 'L1M', simbolo: 'L1M', nombre: 'Línea Media Incisiva Inf.', descripcion: 'Punto interproximal entre los incisivos centrales inferiores.', tipo: 'dental', color: '#facc15' },
+  { id: 'Z_izq', simbolo: 'ZL', nombre: 'Zigomático Izquierdo', descripcion: 'Sutura frontozigomática en el reborde orbitario externo izquierdo.', tipo: 'esqueletico', color: '#3b82f6', sugerido: { x: 0.27, y: 0.31 } },
+  { id: 'Z_der', simbolo: 'ZR', nombre: 'Zigomático Derecho', descripcion: 'Sutura frontozigomática en el reborde orbitario externo derecho.', tipo: 'esqueletico', color: '#3b82f6', sugerido: { x: 0.73, y: 0.31 } },
+  { id: 'ZA_izq', simbolo: 'ZAL', nombre: 'Arco Cigomático Izquierdo', descripcion: 'Punto más lateral del arco cigomático izquierdo.', tipo: 'esqueletico', color: '#06b6d4', sugerido: { x: 0.19, y: 0.42 } },
+  { id: 'ZA_der', simbolo: 'ZAR', nombre: 'Arco Cigomático Derecho', descripcion: 'Punto más lateral del arco cigomático derecho.', tipo: 'esqueletico', color: '#06b6d4', sugerido: { x: 0.81, y: 0.42 } },
+  { id: 'Cg', simbolo: 'Cg', nombre: 'Crista Galli', descripcion: 'Centro superior de la apófisis Crista Galli (eje medio craneal).', tipo: 'esqueletico', color: '#8b5cf6', sugerido: { x: 0.5, y: 0.25 } },
+  { id: 'NC_izq', simbolo: 'NCL', nombre: 'Cavidad Nasal Izquierda', descripcion: 'Punto más lateral de la apertura piriforme nasal izquierda.', tipo: 'esqueletico', color: '#10b981', sugerido: { x: 0.43, y: 0.45 } },
+  { id: 'NC_der', simbolo: 'NCR', nombre: 'Cavidad Nasal Derecha', descripcion: 'Punto más lateral de la apertura piriforme nasal derecha.', tipo: 'esqueletico', color: '#10b981', sugerido: { x: 0.57, y: 0.45 } },
+  { id: 'ANS_f', simbolo: 'ANS', nombre: 'Espina Nasal Anterior', descripcion: 'Centro de la espina nasal anterior en proyección frontal.', tipo: 'esqueletico', color: '#14b8a6', sugerido: { x: 0.5, y: 0.52 } },
+  { id: 'J_izq', simbolo: 'JL', nombre: 'Proceso Yugal Izquierdo', descripcion: 'Intersección de la tuberosidad maxilar y el proceso cigomático izquierdo.', tipo: 'esqueletico', color: '#f59e0b', sugerido: { x: 0.34, y: 0.53 } },
+  { id: 'J_der', simbolo: 'JR', nombre: 'Proceso Yugal Derecho', descripcion: 'Intersección de la tuberosidad maxilar y el proceso cigomático derecho.', tipo: 'esqueletico', color: '#f59e0b', sugerido: { x: 0.66, y: 0.53 } },
+  { id: 'Ag_izq', simbolo: 'AgL', nombre: 'Antegonion Izquierdo', descripcion: 'Escotadura antegonial en el borde inferior mandibular izquierdo.', tipo: 'esqueletico', color: '#ef4444', sugerido: { x: 0.29, y: 0.7 } },
+  { id: 'Ag_der', simbolo: 'AgR', nombre: 'Antegonion Derecho', descripcion: 'Escotadura antegonial en el borde inferior mandibular derecho.', tipo: 'esqueletico', color: '#ef4444', sugerido: { x: 0.71, y: 0.7 } },
+  { id: 'Me_f', simbolo: 'Me', nombre: 'Mentoniano Frontal', descripcion: 'Centro del borde inferior de la sínfisis mentoniana.', tipo: 'esqueletico', color: '#22c55e', sugerido: { x: 0.5, y: 0.82 } },
+  { id: 'U6_izq', simbolo: 'A6L', nombre: '1er Molar Sup. Izquierdo', descripcion: 'Contorno vestibular más prominente del 1er molar superior izquierdo.', tipo: 'dental', color: '#38bdf8', sugerido: { x: 0.35, y: 0.61 } },
+  { id: 'U6_der', simbolo: 'A6R', nombre: '1er Molar Sup. Derecho', descripcion: 'Contorno vestibular más prominente del 1er molar superior derecho.', tipo: 'dental', color: '#38bdf8', sugerido: { x: 0.65, y: 0.61 } },
+  { id: 'L6_izq', simbolo: 'B6L', nombre: '1er Molar Inf. Izquierdo', descripcion: 'Contorno vestibular más prominente del 1er molar inferior izquierdo.', tipo: 'dental', color: '#fb7185', sugerido: { x: 0.36, y: 0.63 } },
+  { id: 'L6_der', simbolo: 'B6R', nombre: '1er Molar Inf. Derecho', descripcion: 'Contorno vestibular más prominente del 1er molar inferior derecho.', tipo: 'dental', color: '#fb7185', sugerido: { x: 0.64, y: 0.63 } },
+  { id: 'L3_izq', simbolo: 'B3L', nombre: 'Canino Inf. Izquierdo', descripcion: 'Vértice cuspídeo del canino inferior izquierdo.', tipo: 'dental', color: '#f472b6', sugerido: { x: 0.43, y: 0.64 } },
+  { id: 'L3_der', simbolo: 'B3R', nombre: 'Canino Inf. Derecho', descripcion: 'Vértice cuspídeo del canino inferior derecho.', tipo: 'dental', color: '#f472b6', sugerido: { x: 0.57, y: 0.64 } },
+  { id: 'U1M', simbolo: 'U1M', nombre: 'Línea Media Incisiva Sup.', descripcion: 'Punto interproximal entre los incisivos centrales superiores.', tipo: 'dental', color: '#facc15', sugerido: { x: 0.5, y: 0.62 } },
+  { id: 'L1M', simbolo: 'L1M', nombre: 'Línea Media Incisiva Inf.', descripcion: 'Punto interproximal entre los incisivos centrales inferiores.', tipo: 'dental', color: '#facc15', sugerido: { x: 0.5, y: 0.64 } },
 ];
 
 export const SEGMENTOS_FRONTAL_RICKETTS: SegmentoCefalometrico[] = [
@@ -2028,4 +2161,245 @@ export function calcularAnalisisFrontalRicketts(
   }
 
   return resultados;
+}
+
+// ==========================================
+// ANÁLISIS DE BOLTON (UAP)
+// ==========================================
+
+export interface ParBoltonTabla {
+  max: number;
+  mand: number;
+}
+
+export const TABLA_BOLTON_12: ParBoltonTabla[] = [
+  { max: 85, mand: 77.6 },
+  { max: 86, mand: 78.5 },
+  { max: 87, mand: 79.4 },
+  { max: 88, mand: 80.3 },
+  { max: 89, mand: 81.3 },
+  { max: 90, mand: 82.1 },
+  { max: 91, mand: 83.1 },
+  { max: 92, mand: 84.0 },
+  { max: 93, mand: 84.9 },
+  { max: 94, mand: 85.8 },
+  { max: 95, mand: 86.7 },
+  { max: 96, mand: 87.6 },
+  { max: 97, mand: 88.6 },
+  { max: 98, mand: 89.5 },
+  { max: 99, mand: 90.4 },
+  { max: 100, mand: 91.3 },
+  { max: 101, mand: 92.2 },
+  { max: 102, mand: 93.1 },
+  { max: 103, mand: 94.0 },
+  { max: 104, mand: 95.0 },
+  { max: 105, mand: 95.9 },
+  { max: 106, mand: 96.8 },
+  { max: 107, mand: 97.8 },
+  { max: 108, mand: 98.8 },
+  { max: 109, mand: 99.5 },
+  { max: 110, mand: 100.4 },
+];
+
+export const TABLA_BOLTON_6: ParBoltonTabla[] = [
+  { max: 40.0, mand: 30.9 },
+  { max: 40.5, mand: 31.3 },
+  { max: 41.0, mand: 31.7 },
+  { max: 41.5, mand: 32.0 },
+  { max: 42.0, mand: 32.4 },
+  { max: 42.5, mand: 32.8 },
+  { max: 43.0, mand: 33.2 },
+  { max: 43.5, mand: 33.6 },
+  { max: 44.0, mand: 34.0 },
+  { max: 44.5, mand: 34.4 },
+  { max: 45.0, mand: 34.7 },
+  { max: 45.5, mand: 35.1 },
+  { max: 46.0, mand: 35.5 },
+  { max: 46.5, mand: 35.9 },
+  { max: 47.0, mand: 36.3 },
+  { max: 47.5, mand: 36.7 },
+  { max: 48.0, mand: 37.1 },
+  { max: 48.5, mand: 37.4 },
+  { max: 49.0, mand: 37.8 },
+  { max: 49.5, mand: 38.2 },
+  { max: 50.0, mand: 38.6 },
+  { max: 50.5, mand: 39.0 },
+  { max: 51.0, mand: 39.4 },
+  { max: 51.5, mand: 39.8 },
+  { max: 52.0, mand: 40.1 },
+  { max: 52.5, mand: 40.5 },
+  { max: 53.0, mand: 40.9 },
+  { max: 53.5, mand: 41.3 },
+  { max: 54.0, mand: 41.7 },
+  { max: 54.5, mand: 42.1 },
+  { max: 55.0, mand: 42.5 },
+];
+
+function interpolarTablaBolton(
+  tabla: ParBoltonTabla[],
+  valor: number,
+  desde: 'max' | 'mand',
+  mediaPct: number
+): number {
+  const claveIn = desde;
+  const claveOut = desde === 'max' ? 'mand' : 'max';
+  if (valor <= tabla[0][claveIn]) {
+    return Number((desde === 'max' ? (valor * mediaPct) / 100 : (valor * 100) / mediaPct).toFixed(1));
+  }
+  const ultimo = tabla[tabla.length - 1];
+  if (valor >= ultimo[claveIn]) {
+    return Number((desde === 'max' ? (valor * mediaPct) / 100 : (valor * 100) / mediaPct).toFixed(1));
+  }
+  for (let i = 0; i < tabla.length - 1; i++) {
+    const a = tabla[i];
+    const b = tabla[i + 1];
+    if (valor >= a[claveIn] && valor <= b[claveIn]) {
+      const t = (valor - a[claveIn]) / (b[claveIn] - a[claveIn]);
+      return Number((a[claveOut] + t * (b[claveOut] - a[claveOut])).toFixed(1));
+    }
+  }
+  return Number((desde === 'max' ? (valor * mediaPct) / 100 : (valor * 100) / mediaPct).toFixed(1));
+}
+
+export interface ResultadoBolton {
+  relacion12: number | null;
+  exceso12Tipo: 'mandibular' | 'maxilar' | 'normal' | null;
+  exceso12Tabla: number | null;
+  exceso12Mm: number | null;
+  relacion6: number | null;
+  exceso6Tipo: 'mandibular' | 'maxilar' | 'normal' | null;
+  exceso6Tabla: number | null;
+  exceso6Mm: number | null;
+}
+
+export function calcularBolton(datos: DatosBolton): ResultadoBolton {
+  const max12 = datos.max12 && datos.max12 > 0 ? datos.max12 : null;
+  const mand12 = datos.mand12 && datos.mand12 > 0 ? datos.mand12 : null;
+  const max6 = datos.max6 && datos.max6 > 0 ? datos.max6 : null;
+  const mand6 = datos.mand6 && datos.mand6 > 0 ? datos.mand6 : null;
+
+  let relacion12: number | null = null;
+  let exceso12Tipo: ResultadoBolton['exceso12Tipo'] = null;
+  let exceso12Tabla: number | null = null;
+  let exceso12Mm: number | null = null;
+
+  if (max12 && mand12) {
+    relacion12 = Number(((mand12 / max12) * 100).toFixed(1));
+    if (relacion12 > 91.3) {
+      exceso12Tipo = 'mandibular';
+      exceso12Tabla = interpolarTablaBolton(TABLA_BOLTON_12, max12, 'max', 91.3);
+      exceso12Mm = Number((mand12 - exceso12Tabla).toFixed(1));
+    } else if (relacion12 < 91.3) {
+      exceso12Tipo = 'maxilar';
+      exceso12Tabla = interpolarTablaBolton(TABLA_BOLTON_12, mand12, 'mand', 91.3);
+      exceso12Mm = Number((max12 - exceso12Tabla).toFixed(1));
+    } else {
+      exceso12Tipo = 'normal';
+      exceso12Tabla = mand12;
+      exceso12Mm = 0;
+    }
+  }
+
+  let relacion6: number | null = null;
+  let exceso6Tipo: ResultadoBolton['exceso6Tipo'] = null;
+  let exceso6Tabla: number | null = null;
+  let exceso6Mm: number | null = null;
+
+  if (max6 && mand6) {
+    relacion6 = Number(((mand6 / max6) * 100).toFixed(1));
+    if (relacion6 > 77.2) {
+      exceso6Tipo = 'mandibular';
+      exceso6Tabla = interpolarTablaBolton(TABLA_BOLTON_6, max6, 'max', 77.2);
+      exceso6Mm = Number((mand6 - exceso6Tabla).toFixed(1));
+    } else if (relacion6 < 77.2) {
+      exceso6Tipo = 'maxilar';
+      exceso6Tabla = interpolarTablaBolton(TABLA_BOLTON_6, mand6, 'mand', 77.2);
+      exceso6Mm = Number((max6 - exceso6Tabla).toFixed(1));
+    } else {
+      exceso6Tipo = 'normal';
+      exceso6Tabla = mand6;
+      exceso6Mm = 0;
+    }
+  }
+
+  return {
+    relacion12,
+    exceso12Tipo,
+    exceso12Tabla,
+    exceso12Mm,
+    relacion6,
+    exceso6Tipo,
+    exceso6Tabla,
+    exceso6Mm,
+  };
+}
+
+// ==========================================
+// ANÁLISIS DE NANCE (UAP)
+// ==========================================
+
+export const FILAS_NANCE: { id: string; label: string }[] = [
+  { id: 'discrepancia_33', label: 'Discrepancia 3/3' },
+  { id: 'discrepancia_45', label: 'Discrepancia 4/5' },
+  { id: 'curva_spee', label: 'Curva de Spee' },
+  { id: 'linea_media_inf', label: 'Linea média Inferior' },
+  { id: 'linea_media_sup', label: 'Linea média superior' },
+  { id: 'protrusion_incisivos', label: 'Protrusión de Incisivos' },
+  { id: 'stripping', label: 'Stripping' },
+  { id: 'expansion', label: 'Expansión' },
+  { id: 'pos_1', label: 'Posicionamiento del 1' },
+  { id: 'pos_6', label: 'Posicionamiento del 6' },
+  { id: 'extracciones', label: 'Extracciones' },
+];
+
+export interface ResultadoNance {
+  dmSuperior: number | null;
+  dmInferior: number | null;
+  totalPositivo: number;
+  totalNegativo: number;
+  totalNeto: number;
+  dt: number | null;
+  ef: number | null;
+}
+
+export function calcularNance(datos: DatosNance): ResultadoNance {
+  const dmSuperior =
+    datos.epSuperior !== undefined && datos.erSuperior !== undefined
+      ? Number((datos.epSuperior - datos.erSuperior).toFixed(1))
+      : null;
+  const dmInferior =
+    datos.epInferior !== undefined && datos.erInferior !== undefined
+      ? Number((datos.epInferior - datos.erInferior).toFixed(1))
+      : null;
+
+  let totalPositivo = 0;
+  let totalNegativo = 0;
+  for (const fila of FILAS_NANCE) {
+    const valores = datos.filas?.[fila.id];
+    if (!valores) continue;
+    if (typeof valores.positivo === 'number' && !Number.isNaN(valores.positivo)) {
+      totalPositivo += Math.abs(valores.positivo);
+    }
+    if (typeof valores.negativo === 'number' && !Number.isNaN(valores.negativo)) {
+      totalNegativo += Math.abs(valores.negativo);
+    }
+  }
+  totalPositivo = Number(totalPositivo.toFixed(1));
+  totalNegativo = Number(totalNegativo.toFixed(1));
+  const totalNeto = Number((totalPositivo - totalNegativo).toFixed(1));
+
+  const dm = datos.dm ?? dmInferior;
+  const dc = datos.dc;
+  const dt = dm !== null && dm !== undefined && dc !== undefined ? Number((dm + dc).toFixed(1)) : null;
+  const ef = dt !== null && datos.exod !== undefined ? Number((dt + datos.exod).toFixed(1)) : dt;
+
+  return {
+    dmSuperior,
+    dmInferior,
+    totalPositivo,
+    totalNegativo,
+    totalNeto,
+    dt,
+    ef,
+  };
 }

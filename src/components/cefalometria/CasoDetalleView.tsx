@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EstudioCefalometrico } from '@/types/cefalometria'
@@ -27,6 +27,7 @@ import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useUrlImagenCefalometria } from '@/api/cefalometria'
 import { showSwal } from '@/components/ui/swal'
+import { PanelBoltonNance } from './PanelBoltonNance'
 
 type PestanaId =
   | 'digitalizacion'
@@ -89,16 +90,16 @@ const PESTANAS: PestanaConfig[] = [
   },
   {
     id: 'oclusograma',
-    label: 'Oclusograma',
+    label: 'Bolton / Nance',
     icono: <Smile className="h-4 w-4" />,
     indicador: 'E',
-    habilitada: false,
+    habilitada: true,
   },
   {
     id: 'evaluacion',
-    label: 'Evaluación',
+    label: 'Post-grado UAP',
     icono: <ClipboardList className="h-4 w-4" />,
-    habilitada: false,
+    habilitada: true,
   },
   {
     id: 'tratamiento',
@@ -217,7 +218,34 @@ export function CasoDetalleView({
   const [slotParaSubir, setSlotParaSubir] = useState<string | null>(null)
   const [slotSubiendo, setSlotSubiendo] = useState<string | null>(null)
   const [slotEnVisor, setSlotEnVisor] = useState<SlotImagen | null>(null)
+  const [boltonLocal, setBoltonLocal] = useState(estudio.calibracion?.bolton || {})
+  const [nanceLocal, setNanceLocal] = useState(estudio.calibracion?.nance || {})
+  const [guardandoModelos, setGuardandoModelos] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setBoltonLocal(estudio.calibracion?.bolton || {})
+    setNanceLocal(estudio.calibracion?.nance || {})
+  }, [estudio.id, estudio.calibracion])
+
+  const guardarModelos = async () => {
+    setGuardandoModelos(true)
+    try {
+      await onGuardar({
+        ...estudio,
+        calibracion: {
+          ...estudio.calibracion,
+          bolton: boltonLocal,
+          nance: nanceLocal,
+        },
+      })
+      toast.success('Análisis de Bolton y Nance guardados.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar.')
+    } finally {
+      setGuardandoModelos(false)
+    }
+  }
 
   const numPuntos = Object.keys(estudio.puntos || {}).length
 
@@ -408,6 +436,38 @@ export function CasoDetalleView({
           <Button className="mt-5 gap-2" onClick={() => onAbrirDigitalizacion(estudio)}>
             <ScanLine className="h-4 w-4" /> Abrir digitalizador
           </Button>
+        </div>
+      )
+    }
+
+    if (pestanaActiva === 'oclusograma' || pestanaActiva === 'evaluacion') {
+      return (
+        <div className="mx-auto w-full max-w-4xl p-5 sm:p-8 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {pestanaActiva === 'evaluacion'
+                  ? 'Cefalometría Post-grado UAP'
+                  : 'Análisis de Modelos (Bolton y Nance)'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Planillas oficiales de la Especialización en Ortodoncia (UAP).
+              </p>
+            </div>
+            <Button size="sm" onClick={guardarModelos} disabled={guardandoModelos}>
+              {guardandoModelos ? 'Guardando…' : 'Guardar cambios'}
+            </Button>
+          </div>
+          <PanelBoltonNance
+            key={pestanaActiva}
+            mediciones={estudio.mediciones || []}
+            bolton={boltonLocal}
+            nance={nanceLocal}
+            onChangeBolton={setBoltonLocal}
+            onChangeNance={setNanceLocal}
+            tema="light"
+            subtabInicial={pestanaActiva === 'evaluacion' ? 'uap' : 'bolton'}
+          />
         </div>
       )
     }

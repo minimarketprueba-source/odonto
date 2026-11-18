@@ -40,11 +40,17 @@ import {
   ChevronLeft,
   Upload,
   Trash2,
+  Hand,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { esRutaDeposito, useUrlImagenCefalometria } from '@/api/cefalometria';
 import { imprimirInformeCefalometrico } from '@/lib/imprimir';
 import { showSwal } from '@/components/ui/swal';
+import { PanelBoltonNance } from './PanelBoltonNance';
 
 interface CefalometriaEditorProps {
   estudio: EstudioCefalometrico;
@@ -105,8 +111,10 @@ export function CefalometriaEditor({
 
   // Vista (Zoom y desplazamiento)
   const [zoom, setZoom] = useState(1);
+  const [modoMoverVista, setModoMoverVista] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+  const [arrastrandoRegla, setArrastrandoRegla] = useState<'A' | 'B' | null>(null);
   // La guía no debe tapar una referencia anatómica. Se puede llevar a
   // cualquier zona libre del visor desde su barra superior.
   const [guiaPosicion, setGuiaPosicion] = useState<{ x: number; y: number } | null>(null);
@@ -146,7 +154,7 @@ export function CefalometriaEditor({
   const [puntoArrastrePos, setPuntoArrastrePos] = useState<CoordenadaPunto | null>(null);
 
   // Paneles
-  const [tabDerecho, setTabDerecho] = useState<'herramientas' | 'puntos' | 'analisis'>('herramientas');
+  const [tabDerecho, setTabDerecho] = useState<'herramientas' | 'puntos' | 'analisis' | 'modelos'>('herramientas');
   const [panelDerechoAbierto, setPanelDerechoAbierto] = useState(true);
   const [guardadoStatus, setGuardadoStatus] = useState<'guardado' | 'guardando' | 'cambios'>('guardado');
 
@@ -168,15 +176,43 @@ export function CefalometriaEditor({
   };
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Si no hay puntos colocados, sugerir posiciones aproximadas iniciales al cargar la imagen
+  // Al cargar la imagen por primera vez sin puntos previos, pre-marcar plantilla y regla roja editable
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const naturalW = e.currentTarget.naturalWidth || 800;
     const naturalH = e.currentTarget.naturalHeight || 800;
     setImgDimensions({ width: naturalW, height: naturalH });
-    // Antes, si no había puntos, se colocaban solos en posiciones de una
-    // plantilla genérica, y con eso ya aparecía un diagnóstico (Clase II,
-    // hiperdivergente…) sin que nadie hubiera marcado nada en ESTA radiografía.
-    // Ahora cada punto lo coloca el profesional; la plantilla es opcional.
+
+    if (Object.keys(puntos).length === 0) {
+      const autoMarcados: PuntosCefalometricosMap = {};
+      catalogoPuntos.forEach((p) => {
+        if (p.sugerido) {
+          autoMarcados[p.id] = {
+            x: Math.round(p.sugerido.x * naturalW),
+            y: Math.round(p.sugerido.y * naturalH),
+          };
+        }
+      });
+      if (Object.keys(autoMarcados).length > 0) {
+        setPuntos(autoMarcados);
+        setPuntoActivoId('');
+      }
+    }
+
+    if (!calibracion.puntoA || !calibracion.puntoB) {
+      const puntoA = { x: Math.round(naturalW * 0.82), y: Math.round(naturalH * 0.14) };
+      const puntoB = { x: Math.round(naturalW * 0.82), y: Math.round(naturalH * 0.34) };
+      const distReal = calibracion.distanciaRealMm || 30;
+      const distPx = distanciaPuntos(puntoA, puntoB);
+      const pxPorMm = distPx > 0 ? Number((distPx / distReal).toFixed(2)) : undefined;
+      setCalibracion((prev) => ({
+        ...prev,
+        puntoA,
+        puntoB,
+        distanciaRealMm: distReal,
+        pixelesPorMm: prev.pixelesPorMm ?? pxPorMm,
+      }));
+      setDistanciaInput(String(distReal));
+    }
   };
 
   // Sincronizar estado local cuando cambia el estudio activo
@@ -351,6 +387,26 @@ export function CefalometriaEditor({
       return;
     }
 
+    if (arrastrandoRegla) {
+      const coords = getCoordenadaImagen(e.clientX, e.clientY);
+      if (coords) {
+        setCalibracion((prev) => {
+          const pA = arrastrandoRegla === 'A' ? coords : prev.puntoA || coords;
+          const pB = arrastrandoRegla === 'B' ? coords : prev.puntoB || coords;
+          const distPx = distanciaPuntos(pA, pB);
+          const distReal = prev.distanciaRealMm || 30;
+          return {
+            ...prev,
+            puntoA: pA,
+            puntoB: pB,
+            pixelesPorMm: distPx >= 5 ? Number((distPx / distReal).toFixed(2)) : prev.pixelesPorMm,
+          };
+        });
+        setGuardadoStatus('cambios');
+      }
+      return;
+    }
+
     if (arrastrandoPuntoId) {
       const coords = getCoordenadaImagen(e.clientX, e.clientY);
       if (coords) {
@@ -373,6 +429,7 @@ export function CefalometriaEditor({
   // Fin de arrastre
   const handleMouseUp = () => {
     if (moviendoGuia) setMoviendoGuia(false);
+    if (arrastrandoRegla) setArrastrandoRegla(null);
     if (arrastrandoPuntoId) {
       setArrastrandoPuntoId(null);
       setPuntoArrastrePos(null);
@@ -384,9 +441,8 @@ export function CefalometriaEditor({
 
   // Inicio de paneo
   const handlePanStart = (e: React.MouseEvent) => {
-    // El clic normal sigue colocando puntos. Para recorrer la imagen arrastrando,
-    // use Shift + arrastre o el botón central, además de las barras de scroll.
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+    // El clic normal coloca puntos salvo si el modo mano está activo.
+    if (e.button === 1 || (e.button === 0 && (e.shiftKey || modoMoverVista))) {
       e.preventDefault();
       const scroller = scrollContainerRef.current;
       setIsPanning(true);
@@ -397,6 +453,12 @@ export function CefalometriaEditor({
         scrollTop: scroller?.scrollTop ?? 0,
       });
     }
+  };
+
+  const desplazarScroll = (dx: number, dy: number) => {
+    if (!scrollContainerRef.current) return;
+    scrollContainerRef.current.scrollLeft += dx;
+    scrollContainerRef.current.scrollTop += dy;
   };
 
   const handleInicioMovimientoGuia = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -573,6 +635,8 @@ export function CefalometriaEditor({
       calibrado: Boolean(calibracion.pixelesPorMm),
       puntosColocados: Object.keys(puntos).length,
       mediciones,
+      bolton: calibracion.bolton,
+      nance: calibracion.nance,
     });
   };
 
@@ -735,7 +799,9 @@ export function CefalometriaEditor({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className={`flex-1 bg-black relative overflow-hidden ${isPanning ? 'cursor-grabbing' : 'cursor-crosshair'}`}
+          className={`flex-1 bg-black relative overflow-hidden ${
+            isPanning ? 'cursor-grabbing' : modoMoverVista ? 'cursor-grab' : 'cursor-crosshair'
+          }`}
         >
           {/* Controles flotantes sobre el visor */}
           <div className="absolute top-4 left-4 z-30 flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-xl">
@@ -816,6 +882,64 @@ export function CefalometriaEditor({
             >
               <Undo2 className="w-3.5 h-3.5" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setModoMoverVista((m) => !m)}
+              className={`h-7 w-7 ${modoMoverVista ? 'bg-primary text-white' : 'text-slate-200 hover:bg-slate-800 hover:text-white'}`}
+              title={modoMoverVista ? 'Volver al modo marcar/editar puntos' : 'Mover vista (arrastrar radiografía)'}
+            >
+              <Hand className="w-3.5 h-3.5" />
+            </Button>
+            <div className="h-px bg-slate-700 my-0.5" />
+            {/* Cruceta direccional para mover la radiografía con precisión */}
+            <div className="grid grid-cols-3 gap-0.5 w-[54px] mx-auto">
+              <div />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => desplazarScroll(0, -80)}
+                className="h-4 w-4 p-0 text-slate-300 hover:bg-slate-800 hover:text-white"
+                title="Subir vista"
+                aria-label="Subir vista"
+              >
+                <ArrowUp className="w-3 h-3" />
+              </Button>
+              <div />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => desplazarScroll(-80, 0)}
+                className="h-4 w-4 p-0 text-slate-300 hover:bg-slate-800 hover:text-white"
+                title="Mover a la izquierda"
+                aria-label="Mover a la izquierda"
+              >
+                <ArrowLeft className="w-3 h-3" />
+              </Button>
+              <div />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => desplazarScroll(80, 0)}
+                className="h-4 w-4 p-0 text-slate-300 hover:bg-slate-800 hover:text-white"
+                title="Mover a la derecha"
+                aria-label="Mover a la derecha"
+              >
+                <ArrowRight className="w-3 h-3" />
+              </Button>
+              <div />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => desplazarScroll(0, 80)}
+                className="h-4 w-4 p-0 text-slate-300 hover:bg-slate-800 hover:text-white"
+                title="Bajar vista"
+                aria-label="Bajar vista"
+              >
+                <ArrowDown className="w-3 h-3" />
+              </Button>
+              <div />
+            </div>
           </div>
 
           {/* Cartel del punto bajo el mouse */}
@@ -1010,9 +1134,8 @@ export function CefalometriaEditor({
               className="absolute inset-0 w-full h-full cursor-crosshair"
               style={{ overflow: 'visible', pointerEvents: 'all' }}
               onMouseDown={(e) => {
-                // Solo el botón izquierdo: el derecho es para borrar un punto.
-                // Shift + arrastre queda reservado para desplazar la vista.
-                if (e.button === 0 && !e.shiftKey) handleCanvasClick(e);
+                // Solo el botón izquierdo coloca puntos (salvo modo mano o Shift+arrastre).
+                if (e.button === 0 && !e.shiftKey && !modoMoverVista) handleCanvasClick(e);
               }}
             >
               {/* Superficie de captura: responde al primer clic sobre cualquier
@@ -1051,31 +1174,114 @@ export function CefalometriaEditor({
                   );
                 })}
 
-              {/* Regla de Calibración visual si está calibrado */}
-              {calibracion.puntoA && calibracion.puntoB && (
-                <g>
-                  <line
-                    x1={calibracion.puntoA.x}
-                    y1={calibracion.puntoA.y}
-                    x2={calibracion.puntoB.x}
-                    y2={calibracion.puntoB.y}
-                    stroke="#eab308"
-                    strokeWidth="3"
-                  />
-                  <circle cx={calibracion.puntoA.x} cy={calibracion.puntoA.y} r="4" fill="#eab308" />
-                  <circle cx={calibracion.puntoB.x} cy={calibracion.puntoB.y} r="4" fill="#eab308" />
-                  <text
-                    x={(calibracion.puntoA.x + calibracion.puntoB.x) / 2}
-                    y={(calibracion.puntoA.y + calibracion.puntoB.y) / 2 - 8}
-                    fill="#eab308"
-                    fontSize="11"
-                    fontWeight="bold"
-                    textAnchor="middle"
-                  >
-                    {calibracion.distanciaRealMm} mm
-                  </text>
-                </g>
-              )}
+              {/* Regla de Calibración Roja interactiva estilo WebCeph */}
+              {calibracion.puntoA && calibracion.puntoB && (() => {
+                const pA = calibracion.puntoA;
+                const pB = calibracion.puntoB;
+                const dx = pB.x - pA.x;
+                const dy = pB.y - pA.y;
+                const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                const nx = -dy / len;
+                const ny = dx / len;
+                const ticks = [0.2, 0.4, 0.6, 0.8];
+                return (
+                  <g style={{ pointerEvents: 'all' }}>
+                    <line
+                      x1={pA.x}
+                      y1={pA.y}
+                      x2={pB.x}
+                      y2={pB.y}
+                      stroke="#ef4444"
+                      strokeWidth="3"
+                    />
+                    {ticks.map((t) => {
+                      const tx = pA.x + dx * t;
+                      const ty = pA.y + dy * t;
+                      return (
+                        <line
+                          key={t}
+                          x1={tx}
+                          y1={ty}
+                          x2={tx + nx * 6}
+                          y2={ty + ny * 6}
+                          stroke="#ef4444"
+                          strokeWidth="1.5"
+                        />
+                      );
+                    })}
+                    {(['A', 'B'] as const).map((ext) => {
+                      const pt = ext === 'A' ? pA : pB;
+                      return (
+                        <circle
+                          key={ext}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r="7"
+                          fill="#ef4444"
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          className="cursor-grab active:cursor-grabbing"
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setArrastrandoRegla(ext);
+                          }}
+                        >
+                          <title>Arrastre el extremo de la regla ({calibracion.distanciaRealMm} mm)</title>
+                        </circle>
+                      );
+                    })}
+                    <text
+                      x={(pA.x + pB.x) / 2 + nx * 16}
+                      y={(pA.y + pB.y) / 2 + ny * 16}
+                      fill="#fca5a5"
+                      fontSize="11"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)', userSelect: 'none' }}
+                    >
+                      {calibracion.distanciaRealMm} mm
+                      {calibracion.pixelesPorMm ? ` (${calibracion.pixelesPorMm} px/mm)` : ''}
+                    </text>
+                  </g>
+                );
+              })()}
+
+              {/* Lectura visual del ángulo incisivo sobre el trazado */}
+              {mostrarLineas && !esFrontal && puntos['U1I'] && puntos['L1I'] && (() => {
+                const interinc = mediciones.find((m) => m.sigla === 'Interincisivo');
+                const u1pp = mediciones.find((m) => m.sigla === '1-Plano Maxilar');
+                const l1pm = mediciones.find((m) => m.sigla === '1 Plano Mandib.');
+                if (!interinc && !u1pp && !l1pm) return null;
+                const pU = puntos['U1I'];
+                return (
+                  <g style={{ pointerEvents: 'none' }}>
+                    {interinc && (
+                      <text
+                        x={pU.x + 22}
+                        y={pU.y - 6}
+                        fill="#38bdf8"
+                        fontSize="10"
+                        fontWeight="bold"
+                        style={{ textShadow: '0 1px 3px rgba(0,0,0,0.95)', userSelect: 'none' }}
+                      >
+                        ∠ Interinc: {interinc.valor}°
+                      </text>
+                    )}
+                    {u1pp && (
+                      <text
+                        x={pU.x + 22}
+                        y={pU.y + 6}
+                        fill="#a7f3d0"
+                        fontSize="9"
+                        fontWeight="bold"
+                        style={{ textShadow: '0 1px 3px rgba(0,0,0,0.95)', userSelect: 'none' }}
+                      >
+                        1-PP: {u1pp.valor}°{l1pm ? ` · 1-PM: ${l1pm.valor}°` : ''}
+                      </text>
+                    )}
+                  </g>
+                );
+              })()}
 
               {/* Puntos Cefalométricos Interactivos */}
               {catalogoPuntos.map((def) => {
@@ -1184,6 +1390,16 @@ export function CefalometriaEditor({
               >
                 Diagnóstico ({mediciones.length})
               </button>
+              <button
+                onClick={() => setTabDerecho('modelos')}
+                className={`flex-1 py-3 text-center border-b-2 transition-colors ${
+                  tabDerecho === 'modelos'
+                    ? 'border-primary text-primary bg-slate-800/40'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                UAP / Modelos
+              </button>
             </div>
 
             {/* CONTENIDO DEL PANEL */}
@@ -1192,26 +1408,27 @@ export function CefalometriaEditor({
               {tabDerecho === 'herramientas' && (
                 <>
                   {/* Botones superiores estilo WebCeph */}
-                  <div className={`grid gap-2 ${esFrontal ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => toast.info('Arrastre cualquier punto directamente sobre la imagen para modificarlo.')}
+                      onClick={() => {
+                        setModoMoverVista(false);
+                        toast.info('Arrastre cualquier punto directamente sobre la imagen para modificarlo.');
+                      }}
                       className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1.5 h-9"
                     >
                       <Move className="w-3.5 h-3.5 text-blue-400" /> Modificar
                     </Button>
-                    {!esFrontal && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!srcImagen}
-                        onClick={handleRestablecerPuntos}
-                        className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1.5 h-9"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Plantilla guía
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!srcImagen}
+                      onClick={handleRestablecerPuntos}
+                      className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 gap-1.5 h-9"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Plantilla guía
+                    </Button>
                   </div>
 
                   {/* Sección Calibración Milimétrica */}
@@ -1246,20 +1463,33 @@ export function CefalometriaEditor({
                           setDistanciaInput(raw);
                           const val = Number(raw);
                           if (val > 0) {
-                            setCalibracion((prev) => ({
-                              ...prev,
-                              distanciaRealMm: val,
-                            }));
+                            setCalibracion((prev) => {
+                              const distPx =
+                                prev.puntoA && prev.puntoB ? distanciaPuntos(prev.puntoA, prev.puntoB) : 0;
+                              return {
+                                ...prev,
+                                distanciaRealMm: val,
+                                pixelesPorMm:
+                                  distPx >= 5 ? Number((distPx / val).toFixed(2)) : prev.pixelesPorMm,
+                              };
+                            });
+                            setGuardadoStatus('cambios');
                           }
                         }}
                         onBlur={() => {
                           const val = Number(distanciaInput);
                           const corregido = val > 0 ? val : 10;
                           setDistanciaInput(String(corregido));
-                          setCalibracion((prev) => ({
-                            ...prev,
-                            distanciaRealMm: corregido,
-                          }));
+                          setCalibracion((prev) => {
+                            const distPx =
+                              prev.puntoA && prev.puntoB ? distanciaPuntos(prev.puntoA, prev.puntoB) : 0;
+                            return {
+                              ...prev,
+                              distanciaRealMm: corregido,
+                              pixelesPorMm:
+                                distPx >= 5 ? Number((distPx / corregido).toFixed(2)) : prev.pixelesPorMm,
+                            };
+                          });
                         }}
                         className="h-8 bg-slate-900 border-slate-700 text-xs w-24 text-center font-bold"
                       />
@@ -1623,6 +1853,24 @@ export function CefalometriaEditor({
                     );
                   })}
                 </div>
+              )}
+
+              {/* TAB 4: APARTADO UAP / BOLTON / NANCE */}
+              {tabDerecho === 'modelos' && (
+                <PanelBoltonNance
+                  mediciones={mediciones}
+                  bolton={calibracion.bolton}
+                  nance={calibracion.nance}
+                  onChangeBolton={(nextBolton) => {
+                    setCalibracion((prev) => ({ ...prev, bolton: nextBolton }));
+                    setGuardadoStatus('cambios');
+                  }}
+                  onChangeNance={(nextNance) => {
+                    setCalibracion((prev) => ({ ...prev, nance: nextNance }));
+                    setGuardadoStatus('cambios');
+                  }}
+                  tema="dark"
+                />
               )}
             </div>
           </div>

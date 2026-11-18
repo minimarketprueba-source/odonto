@@ -1,4 +1,6 @@
 import { getEmpresa, lineaContacto, aclararColor } from "@/lib/clinica";
+import type { DatosBolton, DatosNance } from "@/types/cefalometria";
+import { FILAS_NANCE, calcularBolton, calcularNance } from "@/lib/cefalometria-calculos";
 
 /**
  * El encabezado que comparten todos los impresos: logo, nombre del
@@ -1115,6 +1117,8 @@ export interface DatosInformeCefalometrico {
     interpretacion?: string;
     analisis?: string;
   }[];
+  bolton?: DatosBolton;
+  nance?: DatosNance;
 }
 
 export function imprimirInformeCefalometrico(datos: DatosInformeCefalometrico) {
@@ -1140,6 +1144,103 @@ export function imprimirInformeCefalometrico(datos: DatosInformeCefalometrico) {
       }).join("")
     )
     .join("");
+
+  const resBolton = datos.bolton ? calcularBolton(datos.bolton) : null;
+  const tieneBolton = Boolean(resBolton && (resBolton.relacion12 !== null || resBolton.relacion6 !== null));
+  const resNance = datos.nance ? calcularNance(datos.nance) : null;
+  const tieneNance = Boolean(
+    datos.nance &&
+      (resNance?.dmSuperior !== null ||
+        resNance?.dmInferior !== null ||
+        (resNance && (resNance.totalPositivo > 0 || resNance.totalNegativo > 0)) ||
+        resNance?.dt !== null)
+  );
+
+  const seccionBoltonHtml =
+    tieneBolton && resBolton
+      ? `<div style="margin-top:14px;">
+           <h3 style="font-size:11px; margin:0 0 6px; padding:4px 6px; background:#e2e8f0;">ANÁLISIS DE BOLTON</h3>
+           <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
+             <thead>
+               <tr style="background:#1e293b; color:#fff;">
+                 <th style="padding:4px 6px; text-align:left;">Relación</th>
+                 <th style="padding:4px 6px;">Mand. / Máx.</th>
+                 <th style="padding:4px 6px;">Índice %</th>
+                 <th style="padding:4px 6px; text-align:left;">Discrepancia</th>
+               </tr>
+             </thead>
+             <tbody>
+               ${
+                 resBolton.relacion12 !== null
+                   ? `<tr>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px; font-weight:bold;">Total (12 dientes)</td>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:center;">${datos.bolton?.mand12} / ${datos.bolton?.max12} mm</td>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:center; font-weight:bold;">${resBolton.relacion12}% (media 91,3%)</td>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px;">${
+                          resBolton.exceso12Tipo === "normal"
+                            ? "Armónico"
+                            : `Exceso ${resBolton.exceso12Tipo}: ${resBolton.exceso12Mm} mm`
+                        }</td>
+                      </tr>`
+                   : ""
+               }
+               ${
+                 resBolton.relacion6 !== null
+                   ? `<tr>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px; font-weight:bold;">Anterior (6 dientes)</td>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:center;">${datos.bolton?.mand6} / ${datos.bolton?.max6} mm</td>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px; text-align:center; font-weight:bold;">${resBolton.relacion6}% (media 77,2%)</td>
+                        <td style="border:1px solid #cbd5e1; padding:4px 6px;">${
+                          resBolton.exceso6Tipo === "normal"
+                            ? "Armónico"
+                            : `Exceso ${resBolton.exceso6Tipo}: ${resBolton.exceso6Mm} mm`
+                        }</td>
+                      </tr>`
+                   : ""
+               }
+             </tbody>
+           </table>
+         </div>`
+      : "";
+
+  const seccionNanceHtml =
+    tieneNance && resNance && datos.nance
+      ? `<div style="margin-top:14px;">
+           <h3 style="font-size:11px; margin:0 0 6px; padding:4px 6px; background:#e2e8f0;">ANÁLISIS DE NANCE</h3>
+           <table style="width:100%; border-collapse:collapse; font-size:10.5px; margin-bottom:6px;">
+             <tbody>
+               <tr>
+                 <td style="border:1px solid #cbd5e1; padding:4px 6px;"><strong>Maxilar Sup.:</strong> E.P. ${datos.nance.epSuperior ?? "—"} mm · E.R. ${datos.nance.erSuperior ?? "—"} mm · <strong>D.M. ${resNance.dmSuperior ?? "—"} mm</strong></td>
+                 <td style="border:1px solid #cbd5e1; padding:4px 6px;"><strong>Mandibular:</strong> E.P. ${datos.nance.epInferior ?? "—"} mm · E.R. ${datos.nance.erInferior ?? "—"} mm · <strong>D.M. ${resNance.dmInferior ?? "—"} mm</strong></td>
+               </tr>
+             </tbody>
+           </table>
+           <table style="width:100%; border-collapse:collapse; font-size:10px;">
+             <thead>
+               <tr style="background:#1e293b; color:#fff;">
+                 <th style="padding:3px 6px; text-align:left;">Concepto</th>
+                 <th style="padding:3px 6px;">Positivo (+)</th>
+                 <th style="padding:3px 6px;">Negativo (-)</th>
+               </tr>
+             </thead>
+             <tbody>
+               ${FILAS_NANCE.map((f) => {
+                 const fv = datos.nance?.filas?.[f.id];
+                 if (!fv || (fv.positivo === undefined && fv.negativo === undefined)) return "";
+                 return `<tr>
+                   <td style="border:1px solid #cbd5e1; padding:3px 6px;">${esc(f.label)}</td>
+                   <td style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center;">${fv.positivo ?? "—"}</td>
+                   <td style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center;">${fv.negativo ?? "—"}</td>
+                 </tr>`;
+               }).join("")}
+               <tr style="background:#f8fafc; font-weight:bold;">
+                 <td style="border:1px solid #cbd5e1; padding:3px 6px;">TOTAL (Pos +${resNance.totalPositivo} / Neg -${resNance.totalNegativo})</td>
+                 <td colspan="2" style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center;">Neto: ${resNance.totalNeto} mm · DT: ${resNance.dt ?? "—"} mm · EF: ${resNance.ef ?? "—"} mm</td>
+               </tr>
+             </tbody>
+           </table>
+         </div>`
+      : "";
 
   const html = `
     <div style="font-family: Arial, sans-serif; color:#0f172a;">
@@ -1176,6 +1277,9 @@ export function imprimirInformeCefalometrico(datos: DatosInformeCefalometrico) {
              <p style="font-size:9px; color:#475569; margin:4px 0 0;">* Fuera de la norma por más de 3 unidades.</p>`
           : `<p style="font-size:11px; color:#475569;">Todavía no hay puntos suficientes para calcular medidas.</p>`
       }
+
+      ${seccionBoltonHtml}
+      ${seccionNanceHtml}
 
       <div style="margin-top:36px; text-align:center;">
         <div style="width:220px; border-bottom:1px solid #000; margin:0 auto 5px;"></div>

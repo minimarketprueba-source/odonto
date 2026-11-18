@@ -21,11 +21,37 @@ export interface CoordenadaPunto {
 
 export type PuntosCefalometricosMap = Record<string, CoordenadaPunto>;
 
+export interface DatosBolton {
+  max12?: number;
+  mand12?: number;
+  max6?: number;
+  mand6?: number;
+  dientes?: Record<string, number>;
+}
+
+export interface FilaNance {
+  positivo?: number;
+  negativo?: number;
+}
+
+export interface DatosNance {
+  epSuperior?: number;
+  erSuperior?: number;
+  epInferior?: number;
+  erInferior?: number;
+  filas?: Record<string, FilaNance>;
+  dm?: number;
+  dc?: number;
+  exod?: number;
+}
+
 export interface CalibracionRegla {
   puntoA?: CoordenadaPunto;
   puntoB?: CoordenadaPunto;
-  distanciaRealMm: number; // Por defecto 10mm o 20mm
+  distanciaRealMm: number; // Por defecto 10mm, 20mm o 30mm
   pixelesPorMm?: number;
+  bolton?: DatosBolton;
+  nance?: DatosNance;
 }
 
 export interface MedicionResultado {
