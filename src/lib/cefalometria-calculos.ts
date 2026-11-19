@@ -8,6 +8,63 @@ import {
   DatosNance,
 } from '@/types/cefalometria';
 
+export const PLANTILLA_CANONICA_MM: Record<string, CoordenadaPunto> = {
+  S: { x: 0, y: 0 },
+  N: { x: 75.4, y: -9.3 },
+  Po: { x: -13, y: 22 },
+  Or: { x: 58, y: 22 },
+  Ba: { x: -18.2, y: 38.4 },
+  Pt: { x: 18, y: 16 },
+  ANS: { x: 77, y: 48 },
+  PNS: { x: 24, y: 49 },
+  A: { x: 74.3, y: 55.7 },
+  B: { x: 70.0, y: 93.7 },
+  Pog: { x: 69.2, y: 109.0 },
+  Gn: { x: 69.8, y: 117.6 },
+  Me: { x: 66.0, y: 120.0 },
+  Go: { x: 1.3, y: 88.4 },
+  Ar: { x: -13.0, y: 44.0 },
+  Co: { x: -14.0, y: 34.0 },
+  Xi: { x: 11.0, y: 74.0 },
+  PM: { x: 69.0, y: 102.0 },
+  DC: { x: -13.7, y: 42.6 },
+  SOr: { x: 67.0, y: -23.0 },
+  R1: { x: 24.0, y: 70.0 },
+  R2: { x: -2.0, y: 74.0 },
+  R3: { x: 6.0, y: 52.0 },
+  R4: { x: 6.0, y: 91.0 },
+  U1A: { x: 68.2, y: 59.0 },
+  U1I: { x: 76.7, y: 79.3 },
+  L1A: { x: 65.3, y: 94.2 },
+  L1I: { x: 74.5, y: 76.5 },
+  U6C: { x: 44.0, y: 73.0 },
+  L6C: { x: 44.0, y: 75.0 },
+  U6D: { x: 36.0, y: 74.6 },
+  L6D: { x: 39.0, y: 75.0 },
+  PmO: { x: 60.0, y: 76.0 },
+  U3C: { x: 64.0, y: 77.3 },
+  L3C: { x: 66.0, y: 77.5 },
+  G_b: { x: 82.0, y: -22.0 },
+  Na_b: { x: 81.0, y: -8.0 },
+  Pn: { x: 103.0, y: 40.0 },
+  Sn: { x: 88.0, y: 50.0 },
+  A_b: { x: 87.0, y: 57.0 },
+  UL: { x: 91.0, y: 67.0 },
+  Em: { x: 85.0, y: 70.0 },
+  LL: { x: 90.0, y: 78.0 },
+  B_b: { x: 82.0, y: 92.0 },
+  Pog_b: { x: 83.0, y: 108.0 },
+  Me_b: { x: 72.0, y: 126.0 },
+};
+
+const canonSug = (id: string): { x: number; y: number } => {
+  const p = PLANTILLA_CANONICA_MM[id] ?? { x: 0, y: 0 };
+  return {
+    x: Number((0.44 + p.x * 0.0042).toFixed(3)),
+    y: Number((0.30 + p.y * 0.0042).toFixed(3)),
+  };
+};
+
 /**
  * Catálogo maestro de puntos cefalométricos anatómicos estándar (WebCeph / Steiner / Ricketts / Downs)
  */
@@ -20,7 +77,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Centro geométrico de la fosa hipofisiaria o silla turca del esfenoides.',
     tipo: 'esqueletico',
     color: '#ef4444',
-    sugerido: { x: 0.38, y: 0.35 },
+    sugerido: canonSug('S'),
   },
   {
     id: 'N',
@@ -29,7 +86,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior de la sutura frontonasal.',
     tipo: 'esqueletico',
     color: '#3b82f6',
-    sugerido: { x: 0.58, y: 0.28 },
+    sugerido: canonSug('N'),
   },
   {
     id: 'Po',
@@ -38,7 +95,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más superior del conducto auditivo externo óseo.',
     tipo: 'esqueletico',
     color: '#10b981',
-    sugerido: { x: 0.32, y: 0.46 },
+    sugerido: canonSug('Po'),
   },
   {
     id: 'Or',
@@ -47,7 +104,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más inferior del reborde orbitario óseo.',
     tipo: 'esqueletico',
     color: '#f59e0b',
-    sugerido: { x: 0.55, y: 0.43 },
+    sugerido: canonSug('Or'),
   },
   {
     id: 'Ba',
@@ -56,7 +113,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más posteroinferior en el borde anterior del foramen magnum.',
     tipo: 'esqueletico',
     color: '#8b5cf6',
-    sugerido: { x: 0.34, y: 0.52 },
+    sugerido: canonSug('Ba'),
   },
   {
     id: 'Pt',
@@ -65,7 +122,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más superior de la fisura pterigomaxilar.',
     tipo: 'esqueletico',
     color: '#ec4899',
-    sugerido: { x: 0.44, y: 0.42 },
+    sugerido: canonSug('Pt'),
   },
   {
     id: 'ANS',
@@ -74,7 +131,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Vértice anterior de la apófisis maxilar en el límite inferior de la cavidad nasal.',
     tipo: 'esqueletico',
     color: '#06b6d4',
-    sugerido: { x: 0.60, y: 0.49 },
+    sugerido: canonSug('ANS'),
   },
   {
     id: 'PNS',
@@ -83,7 +140,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Vértice posterior del paladar duro.',
     tipo: 'esqueletico',
     color: '#14b8a6',
-    sugerido: { x: 0.43, y: 0.51 },
+    sugerido: canonSug('PNS'),
   },
   {
     id: 'A',
@@ -92,7 +149,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más profundo en la concavidad anterior del maxilar entre ANS y el reborde alveolar.',
     tipo: 'esqueletico',
     color: '#ef4444',
-    sugerido: { x: 0.58, y: 0.53 },
+    sugerido: canonSug('A'),
   },
   {
     id: 'B',
@@ -101,7 +158,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más profundo en la concavidad anterior de la sínfisis mandibular.',
     tipo: 'esqueletico',
     color: '#f97316',
-    sugerido: { x: 0.57, y: 0.69 },
+    sugerido: canonSug('B'),
   },
   {
     id: 'Pog',
@@ -110,7 +167,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior del contorno óseo de la sínfisis mentoniana.',
     tipo: 'esqueletico',
     color: '#eab308',
-    sugerido: { x: 0.59, y: 0.74 },
+    sugerido: canonSug('Pog'),
   },
   {
     id: 'Gn',
@@ -119,7 +176,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anteroinferior de la sínfisis mentoniana (intersección eje facial y plano mandibular).',
     tipo: 'esqueletico',
     color: '#84cc16',
-    sugerido: { x: 0.58, y: 0.77 },
+    sugerido: canonSug('Gn'),
   },
   {
     id: 'Me',
@@ -128,7 +185,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más inferior del contorno de la sínfisis mandibular.',
     tipo: 'esqueletico',
     color: '#22c55e',
-    sugerido: { x: 0.56, y: 0.79 },
+    sugerido: canonSug('Me'),
   },
   {
     id: 'Go',
@@ -137,7 +194,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más posteroinferior en el ángulo de la mandíbula entre rama y cuerpo.',
     tipo: 'esqueletico',
     color: '#3b82f6',
-    sugerido: { x: 0.38, y: 0.64 },
+    sugerido: canonSug('Go'),
   },
   {
     id: 'Ar',
@@ -146,7 +203,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Intersección del borde posterior de la rama mandibular con el hueso occipital.',
     tipo: 'esqueletico',
     color: '#6366f1',
-    sugerido: { x: 0.36, y: 0.49 },
+    sugerido: canonSug('Ar'),
   },
   {
     id: 'Co',
@@ -155,7 +212,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más superoposterior del cóndilo mandibular.',
     tipo: 'esqueletico',
     color: '#a855f7',
-    sugerido: { x: 0.37, y: 0.44 },
+    sugerido: canonSug('Co'),
   },
   {
     id: 'Xi',
@@ -164,7 +221,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Centro geométrico de la rama ascendente mandibular.',
     tipo: 'esqueletico',
     color: '#d946ef',
-    sugerido: { x: 0.42, y: 0.59 },
+    sugerido: canonSug('Xi'),
   },
   {
     id: 'PM',
@@ -174,7 +231,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
       'En el borde anterior de la sínfisis, donde la curva pasa de cóncava a convexa, por encima de Pogonion.',
     tipo: 'esqueletico',
     color: '#a3e635',
-    sugerido: { x: 0.6, y: 0.7 },
+    sugerido: canonSug('PM'),
   },
   {
     id: 'DC',
@@ -183,7 +240,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Centro del cuello del cóndilo, sobre la línea Ba-N.',
     tipo: 'esqueletico',
     color: '#f472b6',
-    sugerido: { x: 0.36, y: 0.5 },
+    sugerido: canonSug('DC'),
   },
   {
     id: 'SOr',
@@ -192,7 +249,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior en la unión del techo orbitario con el contorno del hueso frontal.',
     tipo: 'esqueletico',
     color: '#60a5fa',
-    sugerido: { x: 0.56, y: 0.24 },
+    sugerido: canonSug('SOr'),
   },
   {
     id: 'R1',
@@ -201,7 +258,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más profundo en el borde anterior de la rama ascendente mandibular.',
     tipo: 'esqueletico',
     color: '#f43f5e',
-    sugerido: { x: 0.45, y: 0.57 },
+    sugerido: canonSug('R1'),
   },
   {
     id: 'R2',
@@ -210,7 +267,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto en el borde posterior de la rama mandibular opuesto a R1.',
     tipo: 'esqueletico',
     color: '#f43f5e',
-    sugerido: { x: 0.37, y: 0.57 },
+    sugerido: canonSug('R2'),
   },
   {
     id: 'R3',
@@ -219,7 +276,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más profundo de la escotadura sigmoidea mandibular.',
     tipo: 'esqueletico',
     color: '#f43f5e',
-    sugerido: { x: 0.41, y: 0.49 },
+    sugerido: canonSug('R3'),
   },
   {
     id: 'R4',
@@ -228,7 +285,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Proyección inferior de R3 sobre el borde inferior mandibular.',
     tipo: 'esqueletico',
     color: '#f43f5e',
-    sugerido: { x: 0.41, y: 0.64 },
+    sugerido: canonSug('R4'),
   },
 
   // --- Dentales ---
@@ -239,7 +296,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Vértice apical de la raíz del incisivo central superior más vestibularizado.',
     tipo: 'dental',
     color: '#38bdf8',
-    sugerido: { x: 0.54, y: 0.52 },
+    sugerido: canonSug('U1A'),
   },
   {
     id: 'U1I',
@@ -248,7 +305,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Extremo incisal del incisivo central superior.',
     tipo: 'dental',
     color: '#38bdf8',
-    sugerido: { x: 0.60, y: 0.61 },
+    sugerido: canonSug('U1I'),
   },
   {
     id: 'L1A',
@@ -257,7 +314,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Vértice apical de la raíz del incisivo central inferior.',
     tipo: 'dental',
     color: '#fb7185',
-    sugerido: { x: 0.55, y: 0.72 },
+    sugerido: canonSug('L1A'),
   },
   {
     id: 'L1I',
@@ -266,7 +323,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Extremo incisal del incisivo central inferior.',
     tipo: 'dental',
     color: '#fb7185',
-    sugerido: { x: 0.59, y: 0.63 },
+    sugerido: canonSug('L1I'),
   },
   {
     id: 'U6C',
@@ -275,7 +332,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Cúspide mesiovestibular del primer molar permanente superior.',
     tipo: 'dental',
     color: '#f43f5e',
-    sugerido: { x: 0.49, y: 0.60 },
+    sugerido: canonSug('U6C'),
   },
   {
     id: 'L6C',
@@ -284,7 +341,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Cúspide mesiovestibular del primer molar permanente inferior.',
     tipo: 'dental',
     color: '#f43f5e',
-    sugerido: { x: 0.49, y: 0.62 },
+    sugerido: canonSug('L6C'),
   },
   {
     id: 'U6D',
@@ -293,7 +350,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Contorno distal de la corona del primer molar permanente superior (para Relación Molar y A6-PTV).',
     tipo: 'dental',
     color: '#fb923c',
-    sugerido: { x: 0.47, y: 0.59 },
+    sugerido: canonSug('U6D'),
   },
   {
     id: 'L6D',
@@ -302,7 +359,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Contorno distal de la corona del primer molar permanente inferior (para Relación Molar).',
     tipo: 'dental',
     color: '#fb923c',
-    sugerido: { x: 0.48, y: 0.63 },
+    sugerido: canonSug('L6D'),
   },
   {
     id: 'PmO',
@@ -311,7 +368,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto de intercuspidación de los primeros premolares; junto con el molar define el Plano Oclusal Funcional.',
     tipo: 'dental',
     color: '#facc15',
-    sugerido: { x: 0.54, y: 0.61 },
+    sugerido: canonSug('PmO'),
   },
   {
     id: 'U3C',
@@ -320,7 +377,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Vértice cuspídeo del canino superior.',
     tipo: 'dental',
     color: '#38bdf8',
-    sugerido: { x: 0.57, y: 0.61 },
+    sugerido: canonSug('U3C'),
   },
   {
     id: 'L3C',
@@ -329,7 +386,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Vértice cuspídeo del canino inferior.',
     tipo: 'dental',
     color: '#fb7185',
-    sugerido: { x: 0.56, y: 0.62 },
+    sugerido: canonSug('L3C'),
   },
 
   // --- Tejido Blando ---
@@ -340,7 +397,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más prominente del contorno de la frente en el plano sagital.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.60, y: 0.23 },
+    sugerido: canonSug('G_b'),
   },
   {
     id: 'Na_b',
@@ -349,7 +406,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más profundo en la curvatura de la raíz nasal de tejido blando.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.61, y: 0.28 },
+    sugerido: canonSug('Na_b'),
   },
   {
     id: 'Pn',
@@ -358,7 +415,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior y prominente de la punta nasal blanda.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.68, y: 0.45 },
+    sugerido: canonSug('Pn'),
   },
   {
     id: 'Sn',
@@ -367,7 +424,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto en la unión entre la columela nasal y el labio superior.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.62, y: 0.51 },
+    sugerido: canonSug('Sn'),
   },
   {
     id: 'A_b',
@@ -376,7 +433,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más cóncavo del filtrum del labio superior.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.62, y: 0.54 },
+    sugerido: canonSug('A_b'),
   },
   {
     id: 'UL',
@@ -385,7 +442,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior y prominente del bermellón del labio superior.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.64, y: 0.58 },
+    sugerido: canonSug('UL'),
   },
   {
     id: 'Em',
@@ -394,7 +451,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto de contacto entre el labio superior e inferior en reposo (para longitud labial y plano oclusal).',
     tipo: 'blando',
     color: '#4ade80',
-    sugerido: { x: 0.63, y: 0.61 },
+    sugerido: canonSug('Em'),
   },
   {
     id: 'LL',
@@ -403,7 +460,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior y prominente del bermellón del labio inferior.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.63, y: 0.64 },
+    sugerido: canonSug('LL'),
   },
   {
     id: 'B_b',
@@ -412,7 +469,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más profundo de la hendidura entre el labio inferior y el mentón.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.61, y: 0.68 },
+    sugerido: canonSug('B_b'),
   },
   {
     id: 'Pog_b',
@@ -421,7 +478,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más anterior del contorno de tejido blando del mentón.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.62, y: 0.74 },
+    sugerido: canonSug('Pog_b'),
   },
   {
     id: 'Me_b',
@@ -430,7 +487,7 @@ export const PUNTOS_CEFALOMETRICOS: DefinicionPunto[] = [
     descripcion: 'Punto más inferior del contorno de tejido blando del mentón.',
     tipo: 'blando',
     color: '#22c55e',
-    sugerido: { x: 0.58, y: 0.81 },
+    sugerido: canonSug('Me_b'),
   },
 ];
 
@@ -2402,4 +2459,305 @@ export function calcularNance(datos: DatosNance): ResultadoNance {
     dt,
     ef,
   };
+}
+
+// ==========================================
+// PLANTILLA CANÓNICA Y ALINEACIÓN ANATÓMICA
+// ==========================================
+
+/**
+ * Genera la plantilla anatómica canónica con proporciones isotrópicas reales
+ * sobre un lienzo de `imgW × imgH` píxeles.
+ */
+export function generarPlantillaCanonica(
+  imgW: number,
+  imgH: number,
+  esFrontal = false
+): PuntosCefalometricosMap {
+  const w = Math.max(100, imgW || 800);
+  const h = Math.max(100, imgH || 800);
+  const resultado: PuntosCefalometricosMap = {};
+
+  if (esFrontal) {
+    const lado = Math.min(w, h);
+    const ox = (w - lado) / 2;
+    const oy = (h - lado) / 2;
+    for (const p of PUNTOS_FRONTAL_RICKETTS) {
+      if (!p.sugerido) continue;
+      resultado[p.id] = {
+        x: Math.round(ox + p.sugerido.x * lado),
+        y: Math.round(oy + p.sugerido.y * lado),
+      };
+    }
+    return resultado;
+  }
+
+  const escala = Math.min(w, h) / 230;
+  const origenX = w * 0.44;
+  const origenY = h * 0.30;
+
+  for (const [id, pt] of Object.entries(PLANTILLA_CANONICA_MM)) {
+    resultado[id] = {
+      x: Math.max(0, Math.min(w, Math.round(origenX + pt.x * escala))),
+      y: Math.max(0, Math.min(h, Math.round(origenY + pt.y * escala))),
+    };
+  }
+  return resultado;
+}
+
+/**
+ * Proyecta los 38 puntos canónicos ajustándolos al triángulo anatómico
+ * definido por las anclas `S`, `N` (`Na`) y `Me`. Preserva cualquier punto cuyo id
+ * esté en `ignorarIds` (ya ajustados manualmente por el profesional).
+ */
+export function alinearPlantillaASNaMe(
+  puntosActuales: PuntosCefalometricosMap,
+  imgW: number,
+  imgH: number,
+  anclas: { S: CoordenadaPunto; N: CoordenadaPunto; Me: CoordenadaPunto },
+  ignorarIds?: Set<string>
+): PuntosCefalometricosMap {
+  const w = Math.max(100, imgW || 800);
+  const h = Math.max(100, imgH || 800);
+  const sC = PLANTILLA_CANONICA_MM.S;
+  const nC = PLANTILLA_CANONICA_MM.N;
+  const meC = PLANTILLA_CANONICA_MM.Me;
+
+  const uX = nC.x - sC.x;
+  const uY = nC.y - sC.y;
+  const vX = meC.x - sC.x;
+  const vY = meC.y - sC.y;
+  const detC = uX * vY - uY * vX;
+
+  const tUX = anclas.N.x - anclas.S.x;
+  const tUY = anclas.N.y - anclas.S.y;
+  const tVX = anclas.Me.x - anclas.S.x;
+  const tVY = anclas.Me.y - anclas.S.y;
+  const detT = tUX * tVY - tUY * tVX;
+
+  const lenSN = Math.hypot(tUX, tUY);
+  const lenSMe = Math.hypot(tVX, tVY);
+  const ratioValido =
+    lenSN > 10 &&
+    lenSMe > 10 &&
+    Math.abs(detC) > 1e-3 &&
+    Math.abs(detT) > lenSN * lenSMe * 0.15;
+
+  const resultado: PuntosCefalometricosMap = { ...puntosActuales };
+
+  for (const [id, pt] of Object.entries(PLANTILLA_CANONICA_MM)) {
+    if (id === 'S' || id === 'N' || id === 'Me') {
+      resultado[id] = {
+        x: Math.max(0, Math.min(w, Math.round(anclas[id].x))),
+        y: Math.max(0, Math.min(h, Math.round(anclas[id].y))),
+      };
+      continue;
+    }
+    if (ignorarIds?.has(id) && puntosActuales[id]) continue;
+
+    const dx = pt.x - sC.x;
+    const dy = pt.y - sC.y;
+
+    let xPx: number;
+    let yPx: number;
+
+    if (ratioValido) {
+      // Coordenadas baricéntricas respecto al triángulo (S, N, Me)
+      const alpha = (dx * vY - dy * vX) / detC;
+      const beta = (uX * dy - uY * dx) / detC;
+      xPx = anclas.S.x + alpha * tUX + beta * tVX;
+      yPx = anclas.S.y + alpha * tUY + beta * tVY;
+    } else if (lenSN > 5) {
+      // Respaldo por similitud isotrópica usando S -> N
+      const magC = Math.hypot(uX, uY) || 1;
+      const cosC = uX / magC;
+      const sinC = uY / magC;
+      const esc = lenSN / magC;
+      const cosT = tUX / lenSN;
+      const sinT = tUY / lenSN;
+      const lx = (dx * cosC + dy * sinC) * esc;
+      const ly = (-dx * sinC + dy * cosC) * esc;
+      xPx = anclas.S.x + (lx * cosT - ly * sinT);
+      yPx = anclas.S.y + (lx * sinT + ly * cosT);
+    } else {
+      continue;
+    }
+
+    resultado[id] = {
+      x: Math.max(0, Math.min(w, Math.round(xPx))),
+      y: Math.max(0, Math.min(h, Math.round(yPx))),
+    };
+  }
+
+  return resultado;
+}
+
+/**
+ * Analiza la radiografía cargada en un canvas reducido para localizar la caja
+ * craneofacial y el perfil blando anterior (punta nasal, concavidad frontonasal
+ * y mentón), proyectando luego la plantilla canónica sobre esas anclas.
+ * Si la imagen no permite lectura de píxeles (CORS o entorno de test), devuelve
+ * la plantilla canónica centrada.
+ */
+export function detectarPuntosEnRadiografia(
+  img: HTMLImageElement,
+  esFrontal = false
+): PuntosCefalometricosMap {
+  const naturalW = img.naturalWidth || 800;
+  const naturalH = img.naturalHeight || 800;
+
+  if (esFrontal) {
+    return generarPlantillaCanonica(naturalW, naturalH, true);
+  }
+
+  try {
+    const dim = 180;
+    const canvas = document.createElement('canvas');
+    canvas.width = dim;
+    canvas.height = dim;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return generarPlantillaCanonica(naturalW, naturalH, false);
+
+    ctx.drawImage(img, 0, 0, dim, dim);
+    const { data } = ctx.getImageData(0, 0, dim, dim);
+
+    const lum = (x: number, y: number) => {
+      const idx = (y * dim + x) * 4;
+      return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+    };
+
+    // 1. Determinar orientación (mira a la derecha o izquierda)
+    const minX = Math.round(dim * 0.06);
+    const maxX = Math.round(dim * 0.94);
+
+    let xLeftSum = 0;
+    let xRightSum = 0;
+    for (let y = Math.round(dim * 0.25); y <= Math.round(dim * 0.72); y++) {
+      for (let x = minX; x < dim / 2; x++) xLeftSum += lum(x, y);
+      for (let x = Math.floor(dim / 2); x <= maxX; x++) xRightSum += lum(x, y);
+    }
+
+    // La mitad con el cráneo posterior tiene mayor densidad promedio; el perfil mira al lado opuesto.
+    const miraDerecha = xLeftSum >= xRightSum;
+
+    // 2. Umbral adaptativo de tejido blando vs aire de fondo
+    let bgSamples = 0;
+    let bgSum = 0;
+    const edgeCols = miraDerecha
+      ? [maxX - 4, maxX - 3, maxX - 2]
+      : [minX + 2, minX + 3, minX + 4];
+    for (let y = Math.round(dim * 0.2); y <= Math.round(dim * 0.8); y++) {
+      for (const cx of edgeCols) {
+        const l = lum(cx, y);
+        if (l < 90) {
+          bgSum += l;
+          bgSamples++;
+        }
+      }
+    }
+    const bgLum = bgSamples > 10 ? bgSum / bgSamples : 18;
+    const umbralTejido = Math.min(85, Math.max(26, bgLum + 22));
+
+    // 3. Rastrear borde anterior por fila en [0.16h .. 0.86h]
+    const perfil: { y: number; x: number }[] = [];
+    for (let y = Math.round(dim * 0.16); y <= Math.round(dim * 0.86); y++) {
+      let bordeX: number | null = null;
+      if (miraDerecha) {
+        for (let x = maxX; x >= minX + Math.round(dim * 0.35); x--) {
+          if (lum(x, y) >= umbralTejido && lum(x - 1, y) >= umbralTejido) {
+            bordeX = x;
+            break;
+          }
+        }
+      } else {
+        for (let x = minX; x <= maxX - Math.round(dim * 0.35); x++) {
+          if (lum(x, y) >= umbralTejido && lum(x + 1, y) >= umbralTejido) {
+            bordeX = x;
+            break;
+          }
+        }
+      }
+      if (bordeX !== null) perfil.push({ y, x: bordeX });
+    }
+
+    if (perfil.length < 25) {
+      return generarPlantillaCanonica(naturalW, naturalH, false);
+    }
+
+    // 4. Localizar punta nasal (Pn): punto más adelantado en franja media [0.32..0.58]
+    const bandaNasal = perfil.filter((p) => p.y >= dim * 0.32 && p.y <= dim * 0.58);
+    if (!bandaNasal.length) {
+      return generarPlantillaCanonica(naturalW, naturalH, false);
+    }
+    const pn = bandaNasal.reduce((best, p) =>
+      miraDerecha ? (p.x > best.x ? p : best) : p.x < best.x ? p : best
+    );
+
+    // 5. Localizar Nasion blando (concavidad por encima de Pn en [0.18..pn.y - 6])
+    const bandaNa = perfil.filter((p) => p.y >= dim * 0.16 && p.y <= pn.y - 6);
+    const naBlando = bandaNa.length
+      ? bandaNa.reduce((best, p) =>
+          miraDerecha ? (p.x < best.x ? p : best) : p.x > best.x ? p : best
+        )
+      : { x: pn.x - (miraDerecha ? 22 : -22), y: Math.round(dim * 0.28) };
+
+    // 6. Localizar mentón inferior (Me): franja [pn.y + 28 .. 0.86*dim]
+    const bandaMenton = perfil.filter((p) => p.y >= pn.y + 24 && p.y <= dim * 0.86);
+    const mentonBorde = bandaMenton.length
+      ? bandaMenton[Math.min(bandaMenton.length - 1, Math.floor(bandaMenton.length * 0.88))]
+      : { x: naBlando.x - (miraDerecha ? 6 : -6), y: Math.round(dim * 0.78) };
+
+    // Convertir de coordenadas [0..dim] a píxeles reales de la imagen
+    const toImg = (pt: { x: number; y: number }): CoordenadaPunto => ({
+      x: (pt.x / dim) * naturalW,
+      y: (pt.y / dim) * naturalH,
+    });
+
+    const pnImg = toImg(pn);
+    const naBImg = toImg(naBlando);
+    const meBImg = toImg(mentonBorde);
+
+    const dir = miraDerecha ? 1 : -1;
+    const altFacial = meBImg.y - naBImg.y;
+    const anchoNasal = Math.abs(pnImg.x - naBImg.x);
+
+    // Validar proporciones fisiológicas antes de usar las anclas detectadas
+    if (
+      altFacial < naturalH * 0.28 ||
+      altFacial > naturalH * 0.75 ||
+      anchoNasal < naturalW * 0.03 ||
+      anchoNasal > naturalW * 0.25
+    ) {
+      return generarPlantillaCanonica(naturalW, naturalH, false);
+    }
+
+    // Estimar Nasion óseo (~6% de altFacial detrás de Na'), Me óseo (~5% arriba de Me'),
+    // y Sella (~58% de altFacial detrás de Na y ~7% debajo de Na).
+    const nAncla: CoordenadaPunto = {
+      x: naBImg.x - dir * altFacial * 0.05,
+      y: naBImg.y,
+    };
+    const meAncla: CoordenadaPunto = {
+      x: meBImg.x - dir * altFacial * 0.08,
+      y: meBImg.y - altFacial * 0.04,
+    };
+    const sAncla: CoordenadaPunto = {
+      x: nAncla.x - dir * altFacial * 0.58,
+      y: nAncla.y + altFacial * 0.075,
+    };
+
+    const alineados = alinearPlantillaASNaMe({}, naturalW, naturalH, {
+      S: sAncla,
+      N: nAncla,
+      Me: meAncla,
+    });
+    // Ajustar punta nasal directamente al pico detectado
+    alineados.Pn = {
+      x: Math.max(0, Math.min(naturalW, Math.round(pnImg.x))),
+      y: Math.max(0, Math.min(naturalH, Math.round(pnImg.y))),
+    };
+    return alineados;
+  } catch {
+    return generarPlantillaCanonica(naturalW, naturalH, false);
+  }
 }

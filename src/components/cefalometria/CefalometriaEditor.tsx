@@ -10,6 +10,9 @@ import {
   calcularAnalisisFrontalRicketts,
   calcularSintesisRicketts,
   distanciaPuntos,
+  alinearPlantillaASNaMe,
+  detectarPuntosEnRadiografia,
+  generarPlantillaCanonica,
 } from '@/lib/cefalometria-calculos';
 import {
   EstudioCefalometrico,
@@ -152,6 +155,10 @@ export function CefalometriaEditor({
   // Arrastre de puntos
   const [arrastrandoPuntoId, setArrastrandoPuntoId] = useState<string | null>(null);
   const [puntoArrastrePos, setPuntoArrastrePos] = useState<CoordenadaPunto | null>(null);
+  const [anclarSNaMe, setAnclarSNaMe] = useState<boolean>(
+    () => Object.keys(estudio.puntos || {}).length === 0
+  );
+  const [puntosAjustadosManual, setPuntosAjustadosManual] = useState<Set<string>>(() => new Set());
 
   // Paneles
   const [tabDerecho, setTabDerecho] = useState<'herramientas' | 'puntos' | 'analisis' | 'modelos'>('herramientas');
@@ -176,25 +183,19 @@ export function CefalometriaEditor({
   };
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Al cargar la imagen por primera vez sin puntos previos, pre-marcar plantilla y regla roja editable
+  // Al cargar la imagen por primera vez sin puntos previos, detectar contorno y pre-marcar plantilla
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const naturalW = e.currentTarget.naturalWidth || 800;
     const naturalH = e.currentTarget.naturalHeight || 800;
     setImgDimensions({ width: naturalW, height: naturalH });
 
     if (Object.keys(puntos).length === 0) {
-      const autoMarcados: PuntosCefalometricosMap = {};
-      catalogoPuntos.forEach((p) => {
-        if (p.sugerido) {
-          autoMarcados[p.id] = {
-            x: Math.round(p.sugerido.x * naturalW),
-            y: Math.round(p.sugerido.y * naturalH),
-          };
-        }
-      });
+      const autoMarcados = detectarPuntosEnRadiografia(e.currentTarget, esFrontal);
       if (Object.keys(autoMarcados).length > 0) {
         setPuntos(autoMarcados);
         setPuntoActivoId('');
+        setPuntosAjustadosManual(new Set());
+        setAnclarSNaMe(!esFrontal);
       }
     }
 
@@ -222,6 +223,8 @@ export function CefalometriaEditor({
     setCalibracion(estudio.calibracion || { distanciaRealMm: 10 });
     setDistanciaInput(String(estudio.calibracion?.distanciaRealMm || 10));
     setHistorialPuntos([]);
+    setPuntosAjustadosManual(new Set());
+    setAnclarSNaMe(Object.keys(estudio.puntos || {}).length === 0);
     setModoCalibracion(false);
     setPasoCalibracion(1);
     setZoom(1);
@@ -411,10 +414,38 @@ export function CefalometriaEditor({
       const coords = getCoordenadaImagen(e.clientX, e.clientY);
       if (coords) {
         setPuntoArrastrePos(coords);
-        setPuntos((prev) => ({
-          ...prev,
-          [arrastrandoPuntoId]: coords,
-        }));
+        if (
+          !esFrontal &&
+          anclarSNaMe &&
+          (arrastrandoPuntoId === 'S' || arrastrandoPuntoId === 'N' || arrastrandoPuntoId === 'Me')
+        ) {
+          setPuntos((prev) => {
+            const S = arrastrandoPuntoId === 'S' ? coords : prev.S;
+            const N = arrastrandoPuntoId === 'N' ? coords : prev.N;
+            const Me = arrastrandoPuntoId === 'Me' ? coords : prev.Me;
+            if (S && N && Me) {
+              return alinearPlantillaASNaMe(
+                prev,
+                imgDimensions.width,
+                imgDimensions.height,
+                { S, N, Me },
+                puntosAjustadosManual
+              );
+            }
+            return { ...prev, [arrastrandoPuntoId]: coords };
+          });
+        } else {
+          setPuntosAjustadosManual((prev) => {
+            if (prev.has(arrastrandoPuntoId)) return prev;
+            const next = new Set(prev);
+            next.add(arrastrandoPuntoId);
+            return next;
+          });
+          setPuntos((prev) => ({
+            ...prev,
+            [arrastrandoPuntoId]: coords,
+          }));
+        }
         setGuardadoStatus('cambios');
       }
       return;
@@ -547,30 +578,44 @@ export function CefalometriaEditor({
     }
   };
 
-  // Restablecer puntos a valores sugeridos
+  // Restablecer puntos adaptados a la radiografía actual
   const handleRestablecerPuntos = async () => {
     const { isConfirmed } = await showSwal({
       icon: 'warning',
-      title: '¿Usar la plantilla de puntos?',
+      title: '¿Recolocar plantilla guía?',
       text:
-        'Colocará los puntos en posiciones promedio, no en esta radiografía. Son solo una guía: ajuste cada punto antes de usar las medidas.',
+        'Detectará el perfil de esta radiografía y colocará los puntos anatómicos iniciales. Podrá mover S, Na y Me para ajustar todo en bloque o mover punto por punto.',
       showCancelButton: true,
       confirmButtonText: 'Usar plantilla',
       cancelButtonText: 'Cancelar',
     });
     if (!isConfirmed) return;
-    const sugeridos: PuntosCefalometricosMap = {};
-    catalogoPuntos.forEach((p) => {
-      if (p.sugerido) {
-        sugeridos[p.id] = {
-          x: Math.round(p.sugerido.x * imgDimensions.width),
-          y: Math.round(p.sugerido.y * imgDimensions.height),
-        };
-      }
-    });
+    const sugeridos = imgRef.current
+      ? detectarPuntosEnRadiografia(imgRef.current, esFrontal)
+      : generarPlantillaCanonica(imgDimensions.width, imgDimensions.height, esFrontal);
     setPuntos(sugeridos);
+    setPuntosAjustadosManual(new Set());
+    setAnclarSNaMe(!esFrontal);
     setGuardadoStatus('cambios');
-    toast.info('Plantilla colocada. Ajuste cada punto sobre la radiografía.');
+    toast.info('Plantilla ajustada a la placa. Mueva S, Na o Me para alinear todo o retoque cada punto.');
+  };
+
+  const handleAlinearSNaMe = () => {
+    if (esFrontal) return;
+    if (!puntos.S || !puntos.N || !puntos.Me) {
+      toast.warning('Marque primero S, Na y Me para alinear el resto de los puntos.');
+      return;
+    }
+    const alineados = alinearPlantillaASNaMe(
+      puntos,
+      imgDimensions.width,
+      imgDimensions.height,
+      { S: puntos.S, N: puntos.N, Me: puntos.Me }
+    );
+    setPuntos(alineados);
+    setPuntosAjustadosManual(new Set());
+    setGuardadoStatus('cambios');
+    toast.success('Todos los puntos se alinearon al triángulo S – Na – Me.');
   };
 
   // Radiografía con el trazado dibujado encima, para el informe impreso.
@@ -1039,7 +1084,9 @@ export function CefalometriaEditor({
                   </button>
                 ) : (
                   <p className="mt-1 text-emerald-300">
-                    Listo. Para corregir un punto, arrástrelo o elíjalo en la pestaña Puntos.
+                    {!esFrontal && anclarSNaMe
+                      ? 'Listo. Arrastrar S, Na o Me ajusta todo el trazado en bloque; los demás puntos se editan uno a uno.'
+                      : 'Listo. Para corregir un punto, arrástrelo o elíjalo en la pestaña Puntos.'}
                   </p>
                 )}
               </div>
@@ -1430,6 +1477,33 @@ export function CefalometriaEditor({
                       <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Plantilla guía
                     </Button>
                   </div>
+
+                  {!esFrontal && (
+                    <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/70 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label htmlFor="anclar-sname" className="text-[11px] font-semibold text-slate-200 cursor-pointer">
+                          Mover en bloque desde S / Na / Me
+                        </Label>
+                        <Switch
+                          id="anclar-sname"
+                          checked={anclarSNaMe}
+                          onCheckedChange={setAnclarSNaMe}
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!puntos.S || !puntos.N || !puntos.Me}
+                        onClick={handleAlinearSNaMe}
+                        className="w-full h-8 text-[11px] border-cyan-500/40 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-200"
+                      >
+                        Alinear todo a S-Na-Me
+                      </Button>
+                      <p className="text-[10px] text-slate-400 leading-snug">
+                        Ubique S, Na y Me en la placa y todo el trazado se reacomoda proporcionalmente; luego retoque solo los puntos necesarios.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Sección Calibración Milimétrica */}
                   <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/70 space-y-3">

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   PUNTOS_CEFALOMETRICOS,
   SECUENCIA_RICKETTS,
+  alinearPlantillaASNaMe,
   calcularAnalisisCefalometrico,
   calcularAnalisisFrontalRicketts,
   calcularBolton,
   calcularNance,
   calcularSintesisRicketts,
+  generarPlantillaCanonica,
 } from '../cefalometria-calculos';
 import type { CoordenadaPunto, PuntosCefalometricosMap } from '@/types/cefalometria';
 
@@ -364,5 +366,45 @@ describe('análisis de Ricketts', () => {
     expect(nance.totalNeto).toBe(-2);
     expect(nance.dt).toBe(-6);
     expect(nance.ef).toBe(8);
+  });
+
+  it('genera plantilla canónica con proporciones anatómicas reales y alinea a S-Na-Me', () => {
+    const puntos = generarPlantillaCanonica(1000, 800, false);
+    const escala = 800 / 230; // ~3.478 px/mm
+    const res = calcularAnalisisCefalometrico(puntos, {
+      distanciaRealMm: 30,
+      pixelesPorMm: escala,
+    });
+
+    const val = (sigla: string) => res.find((m) => m.sigla === sigla)?.valor;
+    expect(res.filter((m) => m.factorNumero != null)).toHaveLength(33);
+    expect(val('SNA')).toBeCloseTo(82, 0);
+    expect(val('SNB')).toBeCloseTo(80, 0);
+    expect(val('ANB')).toBeCloseTo(2, 0);
+    expect(val('Eje Facial')).toBeCloseTo(90, 0);
+    expect(val('Ángulo facial')).toBeCloseTo(87, 0);
+    expect(val('Plano mandibular')).toBeCloseTo(26, 0);
+    expect(val('AFI')).toBeCloseTo(47, 0);
+    expect(val('Interincisivo')).toBeCloseTo(130, 0);
+    expect(val('Overjet')).toBeCloseTo(2.5, 0);
+    expect(val('Overbite')).toBeCloseTo(2.5, 0);
+    expect(val('Relación molar')).toBeCloseTo(-3, 0);
+
+    // Mover anclas S, N, Me traslada/escala los demás puntos y respeta ignorarIds
+    const aManual = { x: 777, y: 444 };
+    const reubicados = alinearPlantillaASNaMe(
+      { ...puntos, A: aManual },
+      1000,
+      800,
+      {
+        S: { x: puntos.S.x + 30, y: puntos.S.y + 20 },
+        N: { x: puntos.N.x + 30, y: puntos.N.y + 20 },
+        Me: { x: puntos.Me.x + 30, y: puntos.Me.y + 20 },
+      },
+      new Set(['A'])
+    );
+    expect(reubicados.A).toEqual(aManual);
+    expect(reubicados.U1I.x).toBe(puntos.U1I.x + 30);
+    expect(reubicados.U1I.y).toBe(puntos.U1I.y + 20);
   });
 });
