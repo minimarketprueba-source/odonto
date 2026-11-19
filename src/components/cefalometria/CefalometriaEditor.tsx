@@ -13,6 +13,7 @@ import {
   alinearPlantillaASNaMe,
   detectarPuntosEnRadiografia,
   generarContornosAnatomicosSvg,
+  generarPlantillaCanonica,
   generarPlantillaWebCeph,
 } from '@/lib/cefalometria-calculos';
 import {
@@ -208,23 +209,20 @@ export function CefalometriaEditor({
     const naturalH = e.currentTarget.naturalHeight || 800;
     setImgDimensions({ width: naturalW, height: naturalH });
 
-    const puntosDesfasados = Boolean(
+    const coincidePlantilla = (ref: typeof puntos) =>
+      (['S', 'N', 'Me', 'Pn'] as const).every(
+        (id) =>
+          Boolean(puntos[id] && ref[id]) &&
+          distanciaPuntos(puntos[id]!, ref[id]!) <= 4
+      );
+
+    const esPlantillaEstaticaSinEditar = Boolean(
       !esFrontal &&
-        puntos.S &&
-        puntos.N &&
-        puntos.S.x < naturalW * 0.465 &&
-        puntos.N.x < naturalW * 0.72
+        (coincidePlantilla(generarPlantillaCanonica(naturalW, naturalH, esFrontal)) ||
+          coincidePlantilla(generarPlantillaWebCeph(naturalW, naturalH, esFrontal)))
     );
 
-    const plantillaEstaticaSinAdaptar = Boolean(
-      !esFrontal &&
-        puntos.S &&
-        puntos.Pn &&
-        Math.abs(puntos.S.x - naturalW * (507 / 1005)) <= naturalW * 0.015 &&
-        Math.abs(puntos.Pn.x - naturalW * (876 / 1005)) <= naturalW * 0.015
-    );
-
-    if (Object.keys(puntos).length < 10 || puntosDesfasados || plantillaEstaticaSinAdaptar) {
+    if (Object.keys(puntos).length < 10 || esPlantillaEstaticaSinEditar) {
       const autoMarcados = detectarPuntosEnRadiografia(e.currentTarget, esFrontal);
       if (Object.keys(autoMarcados).length > 0) {
         setPuntos(autoMarcados);

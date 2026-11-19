@@ -2763,6 +2763,7 @@ export function detectarContornoAnatomicoEnCanvas(
     const yMin = Math.round(dim * 0.10);
     const yMax = Math.round(dim * 0.80);
     const xHuesoRaw = new Float32Array(dim).fill(-1);
+    const umbralContiguo = (bgAir + umbralHueso) * 0.5;
 
     for (let y = yMin; y <= yMax; y++) {
       const upperBand = y < Math.round(dim * 0.30);
@@ -2778,9 +2779,12 @@ export function detectarContornoAnatomicoEnCanvas(
           for (let k = 1; k <= 18; k++) {
             const px = x + dirIn * k;
             if (px < 0 || px >= dim) break;
-            if (lum(px, y) >= bgAir + 8) {
+            const lv = lum(px, y);
+            if (lv >= bgAir + 8) {
               inCnt++;
-              if (k <= 5) imme++;
+            }
+            if (k <= 5 && lv >= umbralContiguo) {
+              imme++;
             }
           }
           if (inCnt >= 12 && imme >= 4) {
@@ -2952,11 +2956,48 @@ export function detectarContornoAnatomicoEnCanvas(
       return xBlandoRef + dirIn * dim * fallbackOffRatio;
     };
 
+    const ansG: CoordenadaPunto = {
+      x: huesoEnY(snG.y - dim * 0.008, snG.x, 0.035),
+      y: Math.round(snG.y - dim * 0.006),
+    };
+
+    const buscarCorticalDetrasDeAns = (y: number): number => {
+      const startX = Math.max(
+        0,
+        Math.min(
+          dim - 1,
+          miraDerecha ? Math.floor(ansG.x - dim * 0.01) : Math.ceil(ansG.x + dim * 0.01)
+        )
+      );
+      const endX = miraDerecha ? Math.round(dim * 0.36) : Math.round(dim * 0.64);
+      for (let x = startX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
+        if (lum(x, y) >= umbralHueso * 0.88) {
+          let inCnt = 0;
+          let imme = 0;
+          for (let k = 1; k <= 8; k++) {
+            const px = x + dirIn * k;
+            if (px < 0 || px >= dim) break;
+            const lv = lum(px, y);
+            if (lv >= bgAir + 8) inCnt++;
+            if (k <= 3 && lv >= umbralContiguo * 0.9) imme++;
+          }
+          if (inCnt >= 4 && imme >= 2) {
+            return x;
+          }
+        }
+      }
+      if (xHueso[y] >= 0 && fwd(xHueso[y]) <= fwd(ansG.x) - dim * 0.01) {
+        return xHueso[y];
+      }
+      return -1;
+    };
+
     const nTargetY = Math.max(yMin + 4, Math.round(pnG.y - altFacialG * 0.58));
     let nDetG: CoordenadaPunto | null = null;
     for (let y = Math.max(yMin + 2, nTargetY - 6); y <= Math.min(yMax - 2, nTargetY + 6); y++) {
-      if (xHueso[y] >= 0 && (!nDetG || fwd(xHueso[y]) > fwd(nDetG.x))) {
-        nDetG = { x: xHueso[y], y };
+      const xDet = buscarCorticalDetrasDeAns(y);
+      if (xDet >= 0 && (!nDetG || fwd(xDet) > fwd(nDetG.x))) {
+        nDetG = { x: xDet, y };
       }
     }
     const nG: CoordenadaPunto = nDetG ?? {
@@ -2965,14 +3006,10 @@ export function detectarContornoAnatomicoEnCanvas(
     };
 
     const sorY = Math.max(yMin + 2, Math.round(nG.y - dim * 0.045));
+    const sorDetX = buscarCorticalDetrasDeAns(sorY);
     const sorG: CoordenadaPunto = {
-      x: xHueso[sorY] >= 0 ? xHueso[sorY] : nG.x + dirIn * dim * 0.025,
+      x: sorDetX >= 0 ? sorDetX : nG.x + dirIn * dim * 0.025,
       y: sorY,
-    };
-
-    const ansG: CoordenadaPunto = {
-      x: huesoEnY(snG.y - dim * 0.008, snG.x, 0.035),
-      y: Math.round(snG.y - dim * 0.006),
     };
     const aG: CoordenadaPunto = {
       x: huesoEnY(abG.y + dim * 0.005, abG.x, 0.042),
@@ -3465,15 +3502,33 @@ export function generarContornosAnatomicosSvg(
   }
 
   // 4. Hueso nasal (N -> NasalBridgePoint derivado)
-  if (puntos.N && (puntos.Pn || puntos.ANS)) {
+  if (puntos.N && (puntos.ANS || puntos.Pn)) {
     const bridge =
-      map2P({ x: 823, y: 203 }, 'N', puntos.Pn ? 'Pn' : 'ANS') ?? {
-        x: puntos.N.x + 30,
-        y: puntos.N.y + 45,
+      map2P({ x: 810, y: 198 }, 'N', 'ANS') ??
+      map2P({ x: 810, y: 198 }, 'N', 'Pn') ?? {
+        x: puntos.N.x + (mirror ? -24 : 24),
+        y: puntos.N.y + 42,
       };
-    const pts = NASAL_BONE_OUTLINE.map((p) =>
+    const rawPts = NASAL_BONE_OUTLINE.map((p) =>
       transformarPunto2P(p, NASAL_REF_NA, NASAL_REF_NB, puntos.N, bridge, mirror)
     );
+    const pts =
+      puntos.Na_b && puntos.Pn && Math.abs(puntos.Pn.y - puntos.Na_b.y) > 1
+        ? rawPts.map((pt) => {
+            const t = Math.max(
+              0,
+              Math.min(1, (pt.y - puntos.Na_b!.y) / (puntos.Pn!.y - puntos.Na_b!.y))
+            );
+            const xPiel = puntos.Na_b!.x + t * (puntos.Pn!.x - puntos.Na_b!.x);
+            if (!mirror && pt.x > xPiel - 3) {
+              return { x: xPiel - 3, y: pt.y };
+            }
+            if (mirror && pt.x < xPiel + 3) {
+              return { x: xPiel + 3, y: pt.y };
+            }
+            return pt;
+          })
+        : rawPts;
     contornos.push({
       id: 'hueso_nasal',
       d: curvaSuaveSvg(pts, 0.5),
@@ -3621,19 +3676,6 @@ export function generarContornosAnatomicosSvg(
         grosor: 1.65,
       });
     }
-  }
-
-  // 9b. Borde anterior de la rama (Co -> R3 -> R1)
-  const ramaAntPts = [puntos.Co, puntos.R3, puntos.R1].filter((p): p is CoordenadaPunto =>
-    Boolean(p)
-  );
-  if (ramaAntPts.length >= 2) {
-    contornos.push({
-      id: 'rama_anterior',
-      d: curvaSuaveSvg(ramaAntPts, 0.45),
-      color: azulWebCeph,
-      grosor: 1.4,
-    });
   }
 
   // 10. Tejido blando superior e inferior (WebCeph upper & lower soft tissue)
