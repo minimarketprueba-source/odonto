@@ -2,12 +2,12 @@ import {
   alinearPlantillaASNaMe,
   calcularBolton,
   calcularNance,
+  detectarContornoAnatomicoEnCanvas,
   generarPlantillaWebCeph,
   SintesisRicketts,
 } from '@/lib/cefalometria-calculos';
 import {
   CalibracionRegla,
-  CoordenadaPunto,
   MedicionResultado,
   PuntosCefalometricosMap,
 } from '@/types/cefalometria';
@@ -125,9 +125,8 @@ export function validarYCompletarPuntosIA(
 }
 
 /**
- * Detector anatómico local basado en análisis de perfil en Canvas.
- * Exige continuidad horizontal de tejido blando para ignorar reglas laterales,
- * posicionadores nasales superiores y logotipos en esquinas.
+ * Detector anatómico local basado en análisis dual (tejido blando + cortical ósea)
+ * en Canvas con rechazo de cadenas metálicas y reglas verticales.
  */
 export function detectarPuntosVisionLocal(
   img: HTMLImageElement | null,
@@ -137,161 +136,11 @@ export function detectarPuntosVisionLocal(
 ): PuntosCefalometricosMap {
   const naturalW = img?.naturalWidth || imgW || 1005;
   const naturalH = img?.naturalHeight || imgH || 803;
-  const baseWebCeph = generarPlantillaWebCeph(naturalW, naturalH, esFrontal);
 
-  if (esFrontal || !img || typeof document === 'undefined') {
-    return baseWebCeph;
+  if (!img) {
+    return generarPlantillaWebCeph(naturalW, naturalH, esFrontal);
   }
-
-  try {
-    const dim = 180;
-    const canvas = document.createElement('canvas');
-    canvas.width = dim;
-    canvas.height = dim;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return baseWebCeph;
-
-    ctx.drawImage(img, 0, 0, dim, dim);
-    const { data } = ctx.getImageData(0, 0, dim, dim);
-
-    const lum = (x: number, y: number) => {
-      const idx = (y * dim + x) * 4;
-      return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-    };
-
-    const minX = Math.round(dim * 0.12);
-    const maxX = Math.round(dim * 0.90);
-
-    let xLeftSum = 0;
-    let xRightSum = 0;
-    for (let y = Math.round(dim * 0.22); y <= Math.round(dim * 0.72); y++) {
-      for (let x = minX; x < Math.floor(dim / 2); x++) xLeftSum += lum(x, y);
-      for (let x = Math.floor(dim / 2); x <= maxX; x++) xRightSum += lum(x, y);
-    }
-    const miraDerecha = xLeftSum >= xRightSum;
-
-    // Estimar luminancia de aire fuera de objetos en franja media
-    let bgSamples = 0;
-    let bgSum = 0;
-    const sampleX = miraDerecha ? maxX - 2 : minX + 2;
-    for (let y = Math.round(dim * 0.22); y <= Math.round(dim * 0.76); y++) {
-      const l = lum(sampleX, y);
-      if (l < 75) {
-        bgSum += l;
-        bgSamples++;
-      }
-    }
-    const bgLum = bgSamples > 8 ? bgSum / bgSamples : 18;
-    const umbralTejido = Math.min(82, Math.max(24, bgLum + 20));
-
-    // Buscar borde con profundidad sólida >= 5 píxeles consecutivos (descarta reglas de 2-3px)
-    const tieneContinuidad = (x: number, y: number) => {
-      const dirIn = miraDerecha ? -1 : 1;
-      let solidos = 0;
-      for (let k = 0; k < 6; k++) {
-        const px = x + dirIn * k;
-        if (px < minX || px > maxX) break;
-        if (lum(px, y) >= umbralTejido) solidos++;
-      }
-      return solidos >= 5;
-    };
-
-    const perfil: { y: number; x: number }[] = [];
-    for (let y = Math.round(dim * 0.16); y <= Math.round(dim * 0.80); y++) {
-      let bordeX: number | null = null;
-      if (miraDerecha) {
-        for (let x = maxX; x >= minX + Math.round(dim * 0.35); x--) {
-          if (lum(x, y) >= umbralTejido && tieneContinuidad(x, y)) {
-            bordeX = x;
-            break;
-          }
-        }
-      } else {
-        for (let x = minX; x <= maxX - Math.round(dim * 0.35); x++) {
-          if (lum(x, y) >= umbralTejido && tieneContinuidad(x, y)) {
-            bordeX = x;
-            break;
-          }
-        }
-      }
-      if (bordeX !== null) perfil.push({ y, x: bordeX });
-    }
-
-    if (perfil.length < 30) return baseWebCeph;
-
-    const bandaNasal = perfil.filter((p) => p.y >= dim * 0.27 && p.y <= dim * 0.44);
-    const bandaMenton = perfil.filter((p) => p.y >= dim * 0.62 && p.y <= dim * 0.78);
-    if (!bandaNasal.length || !bandaMenton.length) return baseWebCeph;
-
-    const pn = bandaNasal.reduce((best, p) =>
-      miraDerecha ? (p.x > best.x ? p : best) : p.x < best.x ? p : best
-    );
-
-    const bandaNa = perfil.filter((p) => p.y >= dim * 0.14 && p.y <= pn.y - 4);
-    if (!bandaNa.length) return baseWebCeph;
-    const naB = bandaNa.reduce((best, p) =>
-      miraDerecha ? (p.x < best.x ? p : best) : p.x > best.x ? p : best
-    );
-    const pogB = bandaMenton[Math.floor(bandaMenton.length * 0.6)];
-
-    const toImg = (p: { x: number; y: number }): CoordenadaPunto => ({
-      x: (p.x / dim) * naturalW,
-      y: (p.y / dim) * naturalH,
-    });
-
-    const pnImg = toImg(pn);
-    const naBImg = toImg(naB);
-    const pogBImg = toImg(pogB);
-
-    const refPn = baseWebCeph.Pn;
-    const refNaB = baseWebCeph.Na_b;
-    const refPogB = baseWebCeph.Pog_b;
-
-    if (!refPn || !refNaB || !refPogB) return baseWebCeph;
-
-    // Si el perfil detectado coincide dentro del ±3.5% con WebCeph, conservar las coordenadas exactas
-    const errEncuadre =
-      Math.max(
-        Math.hypot(pnImg.x - refPn.x, pnImg.y - refPn.y),
-        Math.hypot(naBImg.x - refNaB.x, naBImg.y - refNaB.y),
-        Math.hypot(pogBImg.x - refPogB.x, pogBImg.y - refPogB.y)
-      ) / Math.min(naturalW, naturalH);
-
-    if (miraDerecha && errEncuadre <= 0.04) {
-      return baseWebCeph;
-    }
-
-    const altFacial = pogBImg.y - naBImg.y;
-    const anchoNasal = Math.abs(pnImg.x - naBImg.x);
-    if (
-      altFacial < naturalH * 0.25 ||
-      altFacial > naturalH * 0.72 ||
-      anchoNasal < naturalW * 0.02 ||
-      anchoNasal > naturalW * 0.22
-    ) {
-      return baseWebCeph;
-    }
-
-    const dir = miraDerecha ? 1 : -1;
-    const nAncla: CoordenadaPunto = { x: naBImg.x - dir * altFacial * 0.06, y: naBImg.y - altFacial * 0.04 };
-    const meAncla: CoordenadaPunto = { x: pogBImg.x - dir * altFacial * 0.11, y: pogBImg.y + altFacial * 0.07 };
-    const sAncla: CoordenadaPunto = { x: nAncla.x - dir * altFacial * 0.57, y: nAncla.y + altFacial * 0.11 };
-
-    const alineados = alinearPlantillaASNaMe({}, naturalW, naturalH, {
-      S: sAncla,
-      N: nAncla,
-      Me: meAncla,
-    });
-    return {
-      ...alineados,
-      Pn: {
-        x: Math.max(0, Math.min(naturalW, Math.round(pnImg.x))),
-        y: Math.max(0, Math.min(naturalH, Math.round(pnImg.y))),
-      },
-    };
-  } catch {
-    return baseWebCeph;
-  }
+  return detectarContornoAnatomicoEnCanvas(img, esFrontal);
 }
 
 function convertirImagenABase64(img: HTMLImageElement, ladoMax = 1024): string | null {

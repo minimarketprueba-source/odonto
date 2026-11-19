@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   PUNTOS_CEFALOMETRICOS,
   SECUENCIA_RICKETTS,
@@ -8,6 +8,7 @@ import {
   calcularBolton,
   calcularNance,
   calcularSintesisRicketts,
+  detectarContornoAnatomicoEnCanvas,
   generarContornosAnatomicosSvg,
   generarPlantillaCanonica,
 } from '../cefalometria-calculos';
@@ -449,5 +450,63 @@ describe('análisis de Ricketts', () => {
     expect(informe).toContain('BIOTIPO Y PATRÓN ESQUELÉTICO');
     expect(informe).toContain('ANÁLISIS DENTO-ALVEOLAR');
     expect(informe).toContain('ORIENTACIÓN TERAPÉUTICA SUGERIDA');
+  });
+
+  it('detecta el contorno facial y cortical ósea desplazados e ignora cadena metálica lateral', () => {
+    const dim = 200;
+    const data = new Uint8ClampedArray(dim * dim * 4);
+    for (let y = 0; y < dim; y++) {
+      for (let x = 0; x < dim; x++) {
+        let lum = 12; // aire de fondo
+        // Perfil craneofacial sintético desplazado a la izquierda (Sn ≈ 132, Pn ≈ 146, Pog_b ≈ 134)
+        let bordeBlando = -1;
+        if (y >= 40 && y < 74) bordeBlando = 126 + Math.round(((y - 40) / 34) * 20); // dorso nasal hasta Pn=146
+        else if (y >= 74 && y < 90) bordeBlando = 146 - Math.round(((y - 74) / 16) * 14); // Pn -> Sn=132
+        else if (y >= 90 && y < 104) bordeBlando = 132 + Math.round(Math.sin(((y - 90) / 14) * Math.PI) * 5); // labio sup
+        else if (y >= 104 && y < 118) bordeBlando = 131 + Math.round(Math.sin(((y - 104) / 14) * Math.PI) * 5); // labio inf
+        else if (y >= 118 && y < 130) bordeBlando = 126; // surco B'
+        else if (y >= 130 && y <= 165) bordeBlando = 134 - Math.round(((y - 130) / 35) * 8); // Pog' hasta mentón inferior
+
+        if (x >= 25 && bordeBlando > 0 && x <= bordeBlando) {
+          lum = x <= bordeBlando - 10 ? 185 : 90; // hueso cortical detrás de tejido blando
+        }
+        // Cadena metálica vertical fina (3px de ancho) delante del rostro en x=176..178
+        if (x >= 176 && x <= 178 && y >= 20 && y <= 185) {
+          lum = 240;
+        }
+        const i = (y * dim + x) * 4;
+        data[i] = lum;
+        data[i + 1] = lum;
+        data[i + 2] = lum;
+        data[i + 3] = 255;
+      }
+    }
+
+    const origCreate = document.createElement.bind(document);
+    const spy = vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+      if (tag === 'canvas') {
+        return {
+          width: dim,
+          height: dim,
+          getContext: () => ({
+            drawImage: () => {},
+            getImageData: () => ({ data }),
+          }),
+        } as unknown as HTMLCanvasElement;
+      }
+      return origCreate(tag);
+    }) as typeof document.createElement);
+
+    try {
+      const fakeImg = { naturalWidth: 1000, naturalHeight: 800 } as HTMLImageElement;
+      const detectados = detectarContornoAnatomicoEnCanvas(fakeImg, false);
+      // En una placa desplazada a la izquierda, Pn debe seguir x ≈ 146/200*1000 = 730 (NO quedarse en 876 ni atraparse en cadena x=885)
+      expect(detectados.Pn.x).toBeGreaterThan(700);
+      expect(detectados.Pn.x).toBeLessThan(770);
+      expect(detectados.Sn.x).toBeLessThan(detectados.Pn.x);
+      expect(detectados.Pog.x).toBeLessThan(detectados.Pog_b.x);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

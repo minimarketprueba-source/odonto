@@ -202,7 +202,7 @@ export function CefalometriaEditor({
   };
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Al cargar la imagen, auto-digitalizar si falta el trazado o si proviene de la plantilla desfasada anterior
+  // Al cargar la imagen, adaptar automáticamente el trazado al contorno de la radiografía
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const naturalW = e.currentTarget.naturalWidth || 800;
     const naturalH = e.currentTarget.naturalHeight || 800;
@@ -216,7 +216,15 @@ export function CefalometriaEditor({
         puntos.N.x < naturalW * 0.72
     );
 
-    if (Object.keys(puntos).length < 10 || puntosDesfasados) {
+    const plantillaEstaticaSinAdaptar = Boolean(
+      !esFrontal &&
+        puntos.S &&
+        puntos.Pn &&
+        Math.abs(puntos.S.x - naturalW * (507 / 1005)) <= naturalW * 0.015 &&
+        Math.abs(puntos.Pn.x - naturalW * (876 / 1005)) <= naturalW * 0.015
+    );
+
+    if (Object.keys(puntos).length < 10 || puntosDesfasados || plantillaEstaticaSinAdaptar) {
       const autoMarcados = detectarPuntosEnRadiografia(e.currentTarget, esFrontal);
       if (Object.keys(autoMarcados).length > 0) {
         setPuntos(autoMarcados);
