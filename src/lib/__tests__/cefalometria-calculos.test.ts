@@ -8,6 +8,7 @@ import {
   calcularBolton,
   calcularNance,
   calcularSintesisRicketts,
+  generarContornosAnatomicosSvg,
   generarPlantillaCanonica,
 } from '../cefalometria-calculos';
 import type { CoordenadaPunto, PuntosCefalometricosMap } from '@/types/cefalometria';
@@ -406,5 +407,15 @@ describe('análisis de Ricketts', () => {
     expect(reubicados.A).toEqual(aManual);
     expect(reubicados.U1I.x).toBe(puntos.U1I.x + 30);
     expect(reubicados.U1I.y).toBe(puntos.U1I.y + 20);
+  });
+
+  it('genera contornos anatómicos SVG estilo WebCeph a partir de la plantilla', () => {
+    const puntos = generarPlantillaCanonica(1000, 800, false);
+    const contornos = generarContornosAnatomicosSvg(puntos);
+    const ids = contornos.map((c) => c.id);
+    for (const esperado of ['perfil_blando', 'mandibula', 'maxilar', 'incisivo_sup', 'incisivo_inf']) {
+      expect(ids).toContain(esperado);
+    }
+    expect(contornos.every((c) => c.d.startsWith('M '))).toBe(true);
   });
 });

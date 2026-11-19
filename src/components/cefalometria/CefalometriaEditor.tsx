@@ -12,7 +12,8 @@ import {
   distanciaPuntos,
   alinearPlantillaASNaMe,
   detectarPuntosEnRadiografia,
-  generarPlantillaCanonica,
+  generarContornosAnatomicosSvg,
+  generarPlantillaWebCeph,
 } from '@/lib/cefalometria-calculos';
 import {
   EstudioCefalometrico,
@@ -48,6 +49,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { esRutaDeposito, useUrlImagenCefalometria } from '@/api/cefalometria';
@@ -149,15 +151,16 @@ export function CefalometriaEditor({
     () => secuenciaRicketts.find((id) => !(estudio.puntos || {})[id]) ?? ''
   );
   const [mostrarEtiquetas, setMostrarEtiquetas] = useState(true);
-  const [mostrarLineas, setMostrarLineas] = useState(true);
+  const [mostrarContornos, setMostrarContornos] = useState(true);
+  const [mostrarLineas, setMostrarLineas] = useState(false);
+  const [lupaVisible, setLupaVisible] = useState(true);
+  const [cursorImgPos, setCursorImgPos] = useState<CoordenadaPunto | null>(null);
   const [filtroTipoPunto, setFiltroTipoPunto] = useState<'todos' | 'esqueletico' | 'dental' | 'blando'>('todos');
 
   // Arrastre de puntos
   const [arrastrandoPuntoId, setArrastrandoPuntoId] = useState<string | null>(null);
   const [puntoArrastrePos, setPuntoArrastrePos] = useState<CoordenadaPunto | null>(null);
-  const [anclarSNaMe, setAnclarSNaMe] = useState<boolean>(
-    () => Object.keys(estudio.puntos || {}).length === 0
-  );
+  const [anclarSNaMe, setAnclarSNaMe] = useState<boolean>(false);
   const [puntosAjustadosManual, setPuntosAjustadosManual] = useState<Set<string>>(() => new Set());
 
   // Paneles
@@ -183,25 +186,32 @@ export function CefalometriaEditor({
   };
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Al cargar la imagen por primera vez sin puntos previos, detectar contorno y pre-marcar plantilla
+  // Al cargar la imagen, auto-digitalizar si falta el trazado o si proviene de la plantilla desfasada anterior
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const naturalW = e.currentTarget.naturalWidth || 800;
     const naturalH = e.currentTarget.naturalHeight || 800;
     setImgDimensions({ width: naturalW, height: naturalH });
 
-    if (Object.keys(puntos).length === 0) {
+    const puntosDesfasados = Boolean(
+      !esFrontal &&
+        puntos.S &&
+        puntos.N &&
+        puntos.S.x < naturalW * 0.465 &&
+        puntos.N.x < naturalW * 0.72
+    );
+
+    if (Object.keys(puntos).length < 10 || puntosDesfasados) {
       const autoMarcados = detectarPuntosEnRadiografia(e.currentTarget, esFrontal);
       if (Object.keys(autoMarcados).length > 0) {
         setPuntos(autoMarcados);
         setPuntoActivoId('');
         setPuntosAjustadosManual(new Set());
-        setAnclarSNaMe(!esFrontal);
       }
     }
 
     if (!calibracion.puntoA || !calibracion.puntoB) {
-      const puntoA = { x: Math.round(naturalW * 0.82), y: Math.round(naturalH * 0.14) };
-      const puntoB = { x: Math.round(naturalW * 0.82), y: Math.round(naturalH * 0.34) };
+      const puntoA = { x: Math.round(naturalW * 0.85), y: Math.round(naturalH * 0.14) };
+      const puntoB = { x: Math.round(naturalW * 0.85), y: Math.round(naturalH * 0.34) };
       const distReal = calibracion.distanciaRealMm || 30;
       const distPx = distanciaPuntos(puntoA, puntoB);
       const pxPorMm = distPx > 0 ? Number((distPx / distReal).toFixed(2)) : undefined;
@@ -224,7 +234,7 @@ export function CefalometriaEditor({
     setDistanciaInput(String(estudio.calibracion?.distanciaRealMm || 10));
     setHistorialPuntos([]);
     setPuntosAjustadosManual(new Set());
-    setAnclarSNaMe(Object.keys(estudio.puntos || {}).length === 0);
+    setAnclarSNaMe(false);
     setModoCalibracion(false);
     setPasoCalibracion(1);
     setZoom(1);
@@ -310,6 +320,11 @@ export function CefalometriaEditor({
     return calcularSintesisRicketts(mediciones);
   }, [mediciones]);
 
+  const contornosAnatomicos = useMemo(() => {
+    if (esFrontal || !mostrarContornos) return [];
+    return generarContornosAnatomicosSvg(puntos);
+  }, [esFrontal, mostrarContornos, puntos]);
+
   // Manejo de clic sobre el lienzo (colocar punto o calibración)
   const handleCanvasClick = (e: React.MouseEvent<SVGElement>) => {
     if (isPanning || !srcImagen) return;
@@ -376,8 +391,13 @@ export function CefalometriaEditor({
     if (coords) setPuntoArrastrePos(coords);
   };
 
-  // Movimiento del ratón (arrastrar punto o paneo)
+  // Movimiento del ratón (lupa en vivo, arrastrar punto o paneo)
   const handleMouseMove = (e: React.MouseEvent) => {
+    const hoverCoords = getCoordenadaImagen(e.clientX, e.clientY);
+    if (hoverCoords) {
+      setCursorImgPos(hoverCoords);
+    }
+
     if (moviendoGuia) {
       const contenedor = containerRef.current;
       const guia = guiaRef.current;
@@ -541,17 +561,38 @@ export function CefalometriaEditor({
   };
 
   const handleIniciarDigitalizacion = () => {
-    setModoCalibracion(false);
-    setPuntoActivoId(secuencia.find((id) => !puntos[id]) ?? '');
-    setTabDerecho('puntos');
-
-    const faltantes = secuencia.filter((id) => !puntos[id]).length;
-    if (faltantes) {
-      toast.info(`Digitalización iniciada: faltan ${faltantes} puntos.`);
-    } else {
-      toast.success('Todos los puntos de la guía están completos. Revise el diagnóstico.');
-      setTabDerecho('analisis');
+    if (!srcImagen) {
+      toast.warning('Cargue primero una radiografía para digitalizar.');
+      return;
     }
+    setModoCalibracion(false);
+    setModoMoverVista(false);
+    setMostrarContornos(true);
+    const autoMarcados = imgRef.current
+      ? detectarPuntosEnRadiografia(imgRef.current, esFrontal)
+      : generarPlantillaWebCeph(imgDimensions.width, imgDimensions.height, esFrontal);
+    setPuntos(autoMarcados);
+    setPuntosAjustadosManual(new Set());
+    setPuntoActivoId('');
+
+    if (!calibracion.puntoA || !calibracion.puntoB) {
+      const puntoA = { x: Math.round(imgDimensions.width * 0.85), y: Math.round(imgDimensions.height * 0.14) };
+      const puntoB = { x: Math.round(imgDimensions.width * 0.85), y: Math.round(imgDimensions.height * 0.34) };
+      const distReal = calibracion.distanciaRealMm || 30;
+      const distPx = distanciaPuntos(puntoA, puntoB);
+      setCalibracion((prev) => ({
+        ...prev,
+        puntoA,
+        puntoB,
+        distanciaRealMm: distReal,
+        pixelesPorMm: distPx > 0 ? Number((distPx / distReal).toFixed(2)) : prev.pixelesPorMm,
+      }));
+      setDistanciaInput(String(distReal));
+    }
+
+    setGuardadoStatus('cambios');
+    setTabDerecho('analisis');
+    toast.success('Cefalometría digitalizada. Arrastre cualquier punto para ajustarlo manualmente.');
   };
 
   // Guardar estudio
@@ -592,12 +633,11 @@ export function CefalometriaEditor({
     if (!isConfirmed) return;
     const sugeridos = imgRef.current
       ? detectarPuntosEnRadiografia(imgRef.current, esFrontal)
-      : generarPlantillaCanonica(imgDimensions.width, imgDimensions.height, esFrontal);
+      : generarPlantillaWebCeph(imgDimensions.width, imgDimensions.height, esFrontal);
     setPuntos(sugeridos);
     setPuntosAjustadosManual(new Set());
-    setAnclarSNaMe(!esFrontal);
     setGuardadoStatus('cambios');
-    toast.info('Plantilla ajustada a la placa. Mueva S, Na o Me para alinear todo o retoque cada punto.');
+    toast.info('Plantilla ajustada a la placa. Arrastre manualmente cualquier punto que necesite corregir.');
   };
 
   const handleAlinearSNaMe = () => {
@@ -635,31 +675,45 @@ export function CefalometriaEditor({
     ctx.drawImage(img, 0, 0);
     // Grosor proporcional al tamaño de la imagen, así se ve igual en papel.
     const k = Math.max(1, ancho / 800);
-    catalogoSegmentos.forEach((seg) => {
-      const p1 = puntos[seg.de];
-      const p2 = puntos[seg.a];
-      if (!p1 || !p2) return;
-      ctx.strokeStyle = seg.color;
-      ctx.lineWidth = (seg.grosor || 1.5) * k;
-      ctx.setLineDash(seg.dash ? [4 * k, 4 * k] : []);
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.stroke();
-    });
+    if (!esFrontal && mostrarContornos && typeof Path2D !== 'undefined') {
+      generarContornosAnatomicosSvg(puntos).forEach((c) => {
+        const path = new Path2D(c.d);
+        if (c.fill) {
+          ctx.fillStyle = c.fill;
+          ctx.fill(path);
+        }
+        ctx.strokeStyle = c.color;
+        ctx.lineWidth = (c.grosor || 1.5) * k;
+        ctx.stroke(path);
+      });
+    }
+    if (mostrarLineas) {
+      catalogoSegmentos.forEach((seg) => {
+        const p1 = puntos[seg.de];
+        const p2 = puntos[seg.a];
+        if (!p1 || !p2) return;
+        ctx.strokeStyle = seg.color;
+        ctx.lineWidth = (seg.grosor || 1.5) * k;
+        ctx.setLineDash(seg.dash ? [4 * k, 4 * k] : []);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      });
+    }
     ctx.setLineDash([]);
     ctx.font = `bold ${Math.round(10 * k)}px Arial`;
     catalogoPuntos.forEach((def) => {
       const p = puntos[def.id];
       if (!p) return;
-      ctx.fillStyle = def.color || '#3b82f6';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5 * k;
+      ctx.fillStyle = def.tipo === 'blando' ? '#22c55e' : '#ef4444';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2 * k;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 4 * k, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 3.8 * k, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#facc15';
       ctx.fillText(def.simbolo, p.x + 6 * k, p.y - 4 * k);
     });
     return canvas.toDataURL('image/jpeg', 0.85);
@@ -774,6 +828,36 @@ export function CefalometriaEditor({
             title="Iniciar o retomar el trazado cefalométrico guiado"
           >
             <PenLine className="w-3.5 h-3.5" /> Digitalización
+          </Button>
+
+          {!esFrontal && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setMostrarContornos((v) => !v)}
+              className={`h-8 gap-1.5 text-xs ${
+                mostrarContornos
+                  ? 'border-blue-500/80 bg-blue-950/60 text-blue-200 hover:bg-blue-900/70'
+                  : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+              }`}
+              title="Mostrar u ocultar contornos anatómicos azules estilo WebCeph"
+            >
+              Contornos
+            </Button>
+          )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setMostrarLineas((v) => !v)}
+            className={`h-8 gap-1.5 text-xs ${
+              mostrarLineas
+                ? 'border-emerald-500/80 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-900/70'
+                : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+            }`}
+            title="Mostrar u ocultar planos y líneas de medición cefalométrica"
+          >
+            Planos
           </Button>
 
           <Button
@@ -904,9 +988,18 @@ export function CefalometriaEditor({
               size="icon"
               onClick={() => setMostrarLineas(!mostrarLineas)}
               className={`h-7 w-7 ${mostrarLineas ? 'text-blue-400' : 'text-slate-500'} hover:bg-slate-800`}
-              title="Alternar líneas anatómicas"
+              title="Alternar planos cefalométricos"
             >
               <Eye className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLupaVisible((v) => !v)}
+              className={`h-7 w-7 ${lupaVisible ? 'text-cyan-400' : 'text-slate-500'} hover:bg-slate-800`}
+              title="Mostrar u ocultar lupa de precisión"
+            >
+              <Search className="w-3.5 h-3.5" />
             </Button>
             <Button
               variant="ghost"
@@ -1197,6 +1290,21 @@ export function CefalometriaEditor({
                 pointerEvents="all"
               />
 
+              {/* Contornos Anatómicos Curvos estilo WebCeph */}
+              {contornosAnatomicos.map((c) => (
+                <path
+                  key={c.id}
+                  d={c.d}
+                  fill={c.fill || 'none'}
+                  stroke={c.color}
+                  strokeWidth={c.grosor || 1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.92}
+                  style={{ pointerEvents: 'none' }}
+                />
+              ))}
+
               {/* Líneas y Planos Cefalométricos */}
               {mostrarLineas &&
                 catalogoSegmentos.map((seg) => {
@@ -1330,13 +1438,13 @@ export function CefalometriaEditor({
                 );
               })()}
 
-              {/* Puntos Cefalométricos Interactivos */}
+              {/* Puntos Cefalométricos Interactivos (estilo WebCeph: rojo óseo/dental, verde tejido blando, etiqueta amarilla) */}
               {catalogoPuntos.map((def) => {
                 const pos = puntos[def.id];
                 if (!pos) return null;
 
                 const esActivo = puntoActivoId === def.id;
-                const color = def.color || '#3b82f6';
+                const color = def.tipo === 'blando' ? '#22c55e' : '#ef4444';
 
                 return (
                   <g
@@ -1359,10 +1467,10 @@ export function CefalometriaEditor({
                       <circle
                         cx={pos.x}
                         cy={pos.y}
-                        r="10"
+                        r="9"
                         fill="none"
-                        stroke="#ffffff"
-                        strokeWidth="2"
+                        stroke="#facc15"
+                        strokeWidth="1.8"
                         className="animate-ping opacity-75"
                       />
                     )}
@@ -1371,10 +1479,10 @@ export function CefalometriaEditor({
                     <circle
                       cx={pos.x}
                       cy={pos.y}
-                      r={esActivo ? '5.5' : '4'}
+                      r={esActivo ? '5' : '3.6'}
                       fill={color}
-                      stroke="#ffffff"
-                      strokeWidth="1.5"
+                      stroke="#0f172a"
+                      strokeWidth="1"
                     />
 
                     {/* Nombre del punto */}
@@ -1382,11 +1490,11 @@ export function CefalometriaEditor({
                       <text
                         x={pos.x + 6}
                         y={pos.y - 4}
-                        fill="#ffffff"
+                        fill="#facc15"
                         fontSize="10"
                         fontWeight="bold"
                         style={{
-                          textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px black',
+                          textShadow: '0 1px 3px rgba(0,0,0,0.95), 0 0 2px #000000',
                           userSelect: 'none',
                         }}
                       >
@@ -1725,6 +1833,7 @@ export function CefalometriaEditor({
                           tabIndex={0}
                           onClick={() => {
                             setPuntoActivoId(def.id);
+                            if (pos) setCursorImgPos(pos);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') setPuntoActivoId(def.id);
@@ -1947,6 +2056,154 @@ export function CefalometriaEditor({
                 />
               )}
             </div>
+
+            {/* LUPA DE PRECISIÓN EN TIEMPO REAL ESTILO WEBCEPH */}
+            {srcImagen && (() => {
+              const foco =
+                (arrastrandoPuntoId && puntoArrastrePos) ||
+                cursorImgPos ||
+                (puntoActivoId ? puntos[puntoActivoId] : undefined) || {
+                  x: Math.round(imgDimensions.width * 0.72),
+                  y: Math.round(imgDimensions.height * 0.45),
+                };
+              const magSize = Math.max(
+                80,
+                Math.round(Math.min(imgDimensions.width, imgDimensions.height) / 2.8)
+              );
+              const vx = foco.x - magSize / 2;
+              const vy = foco.y - magSize / 2;
+              const kLupa = magSize / 260;
+
+              return (
+                <div className="border-t border-slate-800 bg-slate-950/90 flex-shrink-0">
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/80 border-b border-slate-800/80 text-[11px]">
+                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-cyan-400" />
+                      Lupa en vivo 2.8×
+                      {arrastrandoPuntoId && (
+                        <span className="text-amber-300 font-bold">
+                          ({catalogoPuntos.find((p) => p.id === arrastrandoPuntoId)?.simbolo || arrastrandoPuntoId})
+                        </span>
+                      )}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] text-slate-400">
+                        {foco.x}, {foco.y}px
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setLupaVisible((v) => !v)}
+                        className="text-[10px] text-cyan-300 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700"
+                      >
+                        {lupaVisible ? 'Ocultar' : 'Mostrar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {lupaVisible && (
+                    <div className="p-2 flex justify-center bg-black/70">
+                      <div className="w-full max-w-[228px] aspect-square rounded-lg border border-slate-700 overflow-hidden bg-black shadow-inner">
+                        <svg
+                          viewBox={`${vx} ${vy} ${magSize} ${magSize}`}
+                          className="w-full h-full select-none"
+                        >
+                          <image
+                            href={srcImagen}
+                            x={0}
+                            y={0}
+                            width={imgDimensions.width}
+                            height={imgDimensions.height}
+                            preserveAspectRatio="none"
+                            style={{
+                              filter: `brightness(${brillo}%) contrast(${contraste}%) ${
+                                invertirColor ? 'invert(100%)' : ''
+                              }`,
+                            }}
+                          />
+                          {contornosAnatomicos.map((c) => (
+                            <path
+                              key={`lupa-${c.id}`}
+                              d={c.d}
+                              fill={c.fill || 'none'}
+                              stroke={c.color}
+                              strokeWidth={(c.grosor || 1.6) * kLupa * 0.85}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              opacity={0.95}
+                            />
+                          ))}
+                          {mostrarLineas &&
+                            catalogoSegmentos.map((seg) => {
+                              const p1 = puntos[seg.de];
+                              const p2 = puntos[seg.a];
+                              if (!p1 || !p2) return null;
+                              return (
+                                <line
+                                  key={`lupa-${seg.id}`}
+                                  x1={p1.x}
+                                  y1={p1.y}
+                                  x2={p2.x}
+                                  y2={p2.y}
+                                  stroke={seg.color}
+                                  strokeWidth={(seg.grosor || 1.5) * kLupa * 0.75}
+                                  strokeDasharray={seg.dash ? `${4 * kLupa},${4 * kLupa}` : undefined}
+                                  opacity={0.85}
+                                />
+                              );
+                            })}
+                          {catalogoPuntos.map((def) => {
+                            const pos = puntos[def.id];
+                            if (!pos) return null;
+                            const colorPt = def.tipo === 'blando' ? '#22c55e' : '#ef4444';
+                            return (
+                              <g key={`lupa-pt-${def.id}`}>
+                                <circle
+                                  cx={pos.x}
+                                  cy={pos.y}
+                                  r={4 * kLupa}
+                                  fill={colorPt}
+                                  stroke="#0f172a"
+                                  strokeWidth={1 * kLupa}
+                                />
+                                {mostrarEtiquetas && (
+                                  <text
+                                    x={pos.x + 6 * kLupa}
+                                    y={pos.y - 4 * kLupa}
+                                    fill="#facc15"
+                                    fontSize={12 * kLupa}
+                                    fontWeight="bold"
+                                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.95)' }}
+                                  >
+                                    {def.simbolo}
+                                  </text>
+                                )}
+                              </g>
+                            );
+                          })}
+                          {/* Cruz reticular roja central estilo WebCeph */}
+                          <line
+                            x1={foco.x - 10 * kLupa}
+                            y1={foco.y}
+                            x2={foco.x + 10 * kLupa}
+                            y2={foco.y}
+                            stroke="#ef4444"
+                            strokeWidth={1.5 * kLupa}
+                          />
+                          <line
+                            x1={foco.x}
+                            y1={foco.y - 10 * kLupa}
+                            x2={foco.x}
+                            y2={foco.y + 10 * kLupa}
+                            stroke="#ef4444"
+                            strokeWidth={1.5 * kLupa}
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

@@ -60,8 +60,8 @@ export const PLANTILLA_CANONICA_MM: Record<string, CoordenadaPunto> = {
 const canonSug = (id: string): { x: number; y: number } => {
   const p = PLANTILLA_CANONICA_MM[id] ?? { x: 0, y: 0 };
   return {
-    x: Number((0.44 + p.x * 0.0042).toFixed(3)),
-    y: Number((0.30 + p.y * 0.0042).toFixed(3)),
+    x: Number((0.5045 + p.x * 0.0035).toFixed(3)),
+    y: Number((0.2242 + p.y * 0.0043).toFixed(3)),
   };
 };
 
@@ -2465,6 +2465,59 @@ export function calcularNance(datos: DatosNance): ResultadoNance {
 // PLANTILLA CANÓNICA Y ALINEACIÓN ANATÓMICA
 // ==========================================
 
+export const WEBCEPH_REF_WIDTH = 1005;
+export const WEBCEPH_REF_HEIGHT = 803;
+
+/** Coordenadas canónicas exactas extraídas del trazado digitalizado en WebCeph (1005 × 803 px). */
+export const WEBCEPH_CANONICAL_PX: Record<string, CoordenadaPunto> = {
+  S: { x: 507, y: 180 },
+  N: { x: 763, y: 127 },
+  SOr: { x: 732.66, y: 89.54 },
+  Po: { x: 440, y: 279 },
+  Or: { x: 732, y: 238 },
+  Pt: { x: 591, y: 255 },
+  Ba: { x: 436, y: 349 },
+  ANS: { x: 804, y: 318 },
+  PNS: { x: 603, y: 347 },
+  A: { x: 791, y: 343 },
+  B: { x: 781, y: 510 },
+  PM: { x: 779, y: 533 },
+  Pog: { x: 778, y: 552 },
+  Gn: { x: 770, y: 569 },
+  Me: { x: 752, y: 574 },
+  Go: { x: 489, y: 460 },
+  Ar: { x: 477, y: 314 },
+  Co: { x: 486, y: 275 },
+  DC: { x: 494.77, y: 309.1 },
+  Xi: { x: 553.98, y: 414.63 },
+  R1: { x: 618, y: 391 },
+  R2: { x: 477, y: 346 },
+  R3: { x: 554, y: 336 },
+  R4: { x: 563, y: 492 },
+  U1I: { x: 827, y: 435 },
+  U1A: { x: 772, y: 353 },
+  L1I: { x: 808, y: 423 },
+  L1A: { x: 768, y: 497 },
+  U6C: { x: 701, y: 408 },
+  U6D: { x: 657, y: 403 },
+  L6C: { x: 701, y: 428 },
+  L6D: { x: 656, y: 423 },
+  PmO: { x: 759, y: 424 },
+  U3C: { x: 778, y: 426 },
+  L3C: { x: 785, y: 426 },
+  G_b: { x: 804, y: 83 },
+  Na_b: { x: 793, y: 153 },
+  Pn: { x: 876, y: 276 },
+  Sn: { x: 837, y: 324 },
+  A_b: { x: 834, y: 340 },
+  UL: { x: 857, y: 381 },
+  Em: { x: 844, y: 408 },
+  LL: { x: 859, y: 433 },
+  B_b: { x: 832, y: 477 },
+  Pog_b: { x: 827, y: 533 },
+  Me_b: { x: 756, y: 603 },
+};
+
 /**
  * Genera la plantilla anatómica canónica con proporciones isotrópicas reales
  * sobre un lienzo de `imgW × imgH` píxeles.
@@ -2493,13 +2546,43 @@ export function generarPlantillaCanonica(
   }
 
   const escala = Math.min(w, h) / 230;
-  const origenX = w * 0.44;
-  const origenY = h * 0.30;
+  const origenX = w * 0.5045;
+  const origenY = h * 0.2242;
 
   for (const [id, pt] of Object.entries(PLANTILLA_CANONICA_MM)) {
     resultado[id] = {
       x: Math.max(0, Math.min(w, Math.round(origenX + pt.x * escala))),
       y: Math.max(0, Math.min(h, Math.round(origenY + pt.y * escala))),
+    };
+  }
+  return resultado;
+}
+
+/**
+ * Proyecta los hitos canónicos de WebCeph (espacio `1005 × 803`) al tamaño real
+ * de la radiografía preservando la relación isotrópica craneofacial.
+ */
+export function generarPlantillaWebCeph(
+  imgW: number,
+  imgH: number,
+  esFrontal = false
+): PuntosCefalometricosMap {
+  const w = Math.max(100, imgW || WEBCEPH_REF_WIDTH);
+  const h = Math.max(100, imgH || WEBCEPH_REF_HEIGHT);
+
+  if (esFrontal) {
+    return generarPlantillaCanonica(w, h, true);
+  }
+
+  const escala = Math.min(w / WEBCEPH_REF_WIDTH, h / WEBCEPH_REF_HEIGHT);
+  const ox = (w - WEBCEPH_REF_WIDTH * escala) / 2;
+  const oy = (h - WEBCEPH_REF_HEIGHT * escala) / 2;
+  const resultado: PuntosCefalometricosMap = {};
+
+  for (const [id, pt] of Object.entries(WEBCEPH_CANONICAL_PX)) {
+    resultado[id] = {
+      x: Math.max(0, Math.min(w, Math.round(ox + pt.x * escala))),
+      y: Math.max(0, Math.min(h, Math.round(oy + pt.y * escala))),
     };
   }
   return resultado;
@@ -2593,171 +2676,715 @@ export function alinearPlantillaASNaMe(
 }
 
 /**
- * Analiza la radiografía cargada en un canvas reducido para localizar la caja
- * craneofacial y el perfil blando anterior (punta nasal, concavidad frontonasal
- * y mentón), proyectando luego la plantilla canónica sobre esas anclas.
- * Si la imagen no permite lectura de píxeles (CORS o entorno de test), devuelve
- * la plantilla canónica centrada.
+ * Proyecta la plantilla anatómica de WebCeph al tamaño real de la radiografía
+ * para iniciar la digitalización sin sesgos por artefactos de borde o posicionador.
  */
 export function detectarPuntosEnRadiografia(
   img: HTMLImageElement,
   esFrontal = false
 ): PuntosCefalometricosMap {
-  const naturalW = img.naturalWidth || 800;
-  const naturalH = img.naturalHeight || 800;
+  const naturalW = img.naturalWidth || WEBCEPH_REF_WIDTH;
+  const naturalH = img.naturalHeight || WEBCEPH_REF_HEIGHT;
+  return generarPlantillaWebCeph(naturalW, naturalH, esFrontal);
+}
 
-  if (esFrontal) {
-    return generarPlantillaCanonica(naturalW, naturalH, true);
+// ==========================================
+// CONTORNOS ANATÓMICOS ESTILO WEBCEPH (SVG)
+// ==========================================
+
+export interface ContornoAnatomicoSvg {
+  id: string;
+  d: string;
+  color: string;
+  grosor?: number;
+  fill?: string;
+}
+
+const U1_SVG_PATH =
+  'M3.7,20.4c0,0-0.9,18.6-2.5,24.2c-1.4,3.8-0.7,5.9,1.9,8.3c3.5,4.4,5.1,6.2,5.6,13.9c0.5,7.7,3.4,9.9,7.3,3.4 s8.5-20,7.9-25.3c-0.2-3.7-1.7-4.7-2.2-9.6C21.3,30.6,9.3-30,3.7,20.4z';
+const U1_REF_TIP: CoordenadaPunto = { x: 11.892, y: 73.884 };
+const U1_REF_APEX: CoordenadaPunto = { x: 9.5, y: 0.785 };
+
+const L1_SVG_PATH =
+  'M6.139,19.266c0,0,3.634-2.413,3.575-10.239 C9.654,1.201,13.955-1.738,17.155,7.48s5.174,13.825,4.244,18.975s-1.006,5.002-1.459,14.024 c-0.453,9.023-9.722,52.785-15.038,2.425C4.34,37.579,3.714,31.08,3.335,27.896C3.033,25.369,3.69,22.146,6.139,19.266z';
+const L1_REF_TIP: CoordenadaPunto = { x: 12.745, y: 1.754 };
+const L1_REF_APEX: CoordenadaPunto = { x: 11.375, y: 66.716 };
+
+const U6_SVG_PATH =
+  'M6.771,24.439c0,0,0.036-9.221,0.87-14.839 c0.834-5.618,4.394-13.198,6.766-4.985s6.019,29.365,8.138,10.457s6.349-15.331,8.808-7.881s-0.052,22.629,2.176,31.864 c2.227,9.234,3.326,13.309-1.141,17.046c-2.906,2.641-5.863,3.214-8.755,1.255c-1.762-1.027-5.904-1.484-9.424,0.223 C8.214,60.486,5.64,56.595,3.84,54.745c-3.476-3.573-3.737-7.651-0.914-15.07C3.014,39.444,6.509,32.524,6.771,24.439z';
+const U6_REF_MESIAL: CoordenadaPunto = { x: 35.469, y: 51.14 };
+const U6_REF_DISTAL: CoordenadaPunto = { x: 1.284, y: 50.381 };
+
+const L6_SVG_PATH =
+  'M6.767,22.824c0,0,0.416,11.006-2.663,19.306 S0.971,69.883,9.49,53.955s13.966-26.819,12.365-12.124c-1.729,6.049-7.325,31.006,3.966,15.212 c5.734-9.034,8.055-12.625,9.322-22.523c1.267-9.898,2.586-14.907,5.333-20.794c2.747-5.887-0.362-8.438-1.518-9.466 c-1.157-1.028-3.453-2.898-6.671-1.675c-1.337,0.493-3.048,1.02-5.515-0.647c-1.931-1.274-5.369-0.409-7.658,0.67 c-1.326,0.618-3.148,2.023-5.967,0.643c-1.825-0.777-4.423-0.361-6.19,1.676s-3.332,6.377-1.502,10.797 C6.654,19.383,6.416,19.529,6.767,22.824z';
+const L6_REF_MESIAL: CoordenadaPunto = { x: 41.579, y: 9.14 };
+const L6_REF_DISTAL: CoordenadaPunto = { x: 4.846, y: 9.491 };
+
+const SPHENOID_REF_S: CoordenadaPunto = { x: 296.72, y: 383.35 };
+const SPHENOID_REF_BA: CoordenadaPunto = { x: 240.04, y: 487.01 };
+const SPHENOID_OUTLINE: CoordenadaPunto[] = [
+  { x: 308.59, y: 377.54 }, { x: 307.9, y: 385.35 }, { x: 303.36, y: 391.77 },
+  { x: 295.61, y: 394.61 }, { x: 288.01, y: 391.8 }, { x: 284.46, y: 383.09 },
+  { x: 287.53, y: 375.94 }, { x: 285.99, y: 371.6 }, { x: 280.63, y: 375.18 },
+  { x: 275.27, y: 388.96 }, { x: 269.65, y: 403.01 }, { x: 255.04, y: 429.81 },
+  { x: 239.78, y: 459.18 }, { x: 237.02, y: 477.33 }, { x: 240.04, y: 487.01 },
+  { x: 244.38, y: 481.39 }, { x: 257.65, y: 463.26 }, { x: 281.14, y: 448.2 },
+  { x: 313.31, y: 432.62 }, { x: 340.7, y: 415.67 }, { x: 360.63, y: 390.35 },
+  { x: 365.0, y: 360.75 },
+];
+
+const ACB_REF_S: CoordenadaPunto = { x: 212.58, y: 456.49 };
+const ACB_REF_NA: CoordenadaPunto = { x: 371.39, y: 450.96 };
+const ACB_REF_SOR: CoordenadaPunto = { x: 357.049, y: 425.4085 };
+const ACB_OUTLINE_2: CoordenadaPunto[] = [
+  { x: 359.1341, y: 422.0255 }, { x: 340.4107, y: 444.834 }, { x: 307.049, y: 454.7063 },
+  { x: 270.6234, y: 449.2595 }, { x: 240.3255, y: 445.5148 }, { x: 225.6873, y: 443.8127 },
+  { x: 217.517, y: 444.834 }, { x: 218.8787, y: 448.5787 }, { x: 228.4107, y: 450.9617 },
+  { x: 237.2617, y: 450.2808 },
+];
+const ACB_OUTLINE_3: CoordenadaPunto[] = [
+  { x: 357.049, y: 425.4085 }, { x: 340.9639, y: 422.8553 }, { x: 316.6234, y: 424.983 },
+  { x: 278.4958, y: 438.0042 }, { x: 249.2192, y: 444.9829 }, { x: 241.5596, y: 446.1744 },
+];
+
+const ORBIT_REF_SOR: CoordenadaPunto = { x: 305.6099, y: 352.7272 };
+const ORBIT_REF_NA: CoordenadaPunto = { x: 317.27, y: 379.28 };
+const ORBIT_REF_OR: CoordenadaPunto = { x: 292.76, y: 429.32 };
+const ORBIT_OUTLINE_1: CoordenadaPunto[] = [
+  { x: 295.6099, y: 362.7272 }, { x: 285.9716, y: 373.6634 }, { x: 278.8227, y: 390.1315 },
+  { x: 278.1205, y: 408.6422 }, { x: 283.5673, y: 424.7273 }, { x: 292.7588, y: 429.323 },
+  { x: 298.3759, y: 425.7485 },
+];
+
+const NASAL_REF_NA: CoordenadaPunto = { x: 294.87, y: 392.9 };
+const NASAL_REF_NB: CoordenadaPunto = { x: 322.9562, y: 445.6653 };
+const NASAL_BONE_OUTLINE: CoordenadaPunto[] = [
+  { x: 294.8711, y: 392.8993 }, { x: 295.8924, y: 406.5164 }, { x: 302.3605, y: 422.5164 },
+  { x: 310.8711, y: 435.1121 }, { x: 315.9775, y: 449.0696 }, { x: 309.5094, y: 442.6015 },
+  { x: 299.2967, y: 431.027 }, { x: 283.2967, y: 417.0696 }, { x: 273.0839, y: 409.2397 },
+  { x: 272.7435, y: 405.4951 }, { x: 276.1477, y: 402.0908 }, { x: 286.7009, y: 396.3036 },
+  { x: 290.608, y: 394.4925 }, { x: 293.5945, y: 393.261 },
+];
+
+const PORION_REF_PO: CoordenadaPunto = { x: 297.14, y: 392.92 };
+const PORION_REF_BA: CoordenadaPunto = { x: 297.9, y: 449.6 };
+const PORION_OUTLINE: CoordenadaPunto[] = [
+  { x: 297.1369, y: 392.9158 }, { x: 303.7752, y: 395.7243 }, { x: 304.7965, y: 402.3626 },
+  { x: 297.9029, y: 409.7669 }, { x: 291.7752, y: 406.1924 }, { x: 290.2433, y: 399.0434 },
+];
+
+const PTERYGOID_REF_PT: CoordenadaPunto = { x: 295.27, y: 384.32 };
+const PTERYGOID_REF_PNS: CoordenadaPunto = { x: 298.94, y: 461.53 };
+const PTERYGOID_OUTLINE: CoordenadaPunto[] = [
+  { x: 299.2948, y: 442.3057 }, { x: 300.3078, y: 407.5459 }, { x: 302.1947, y: 395.2946 },
+  { x: 301.4834, y: 384.536 }, { x: 299.1748, y: 380.9927 }, { x: 295.2723, y: 384.3197 },
+  { x: 293.5578, y: 390.631 }, { x: 292.5365, y: 404.2267 }, { x: 296.877, y: 425.9289 },
+  { x: 299.6276, y: 446.3965 }, { x: 299.6855, y: 455.5459 },
+];
+
+/**
+ * Transforma un punto `p` mediante la transformación de similitud 2D
+ * (traslación + rotación + escala isotrópica) que mapea `[aRef, bRef]` -> `[aTgt, bTgt]`.
+ */
+function transformarPunto2P(
+  p: CoordenadaPunto,
+  aRef: CoordenadaPunto,
+  bRef: CoordenadaPunto,
+  aTgt: CoordenadaPunto,
+  bTgt: CoordenadaPunto,
+  mirrorY = false
+): CoordenadaPunto {
+  const vRx = bRef.x - aRef.x;
+  const vRy = bRef.y - aRef.y;
+  const lenRef = Math.hypot(vRx, vRy);
+  const vTx = bTgt.x - aTgt.x;
+  const vTy = bTgt.y - aTgt.y;
+  const lenTgt = Math.hypot(vTx, vTy);
+  if (lenRef < 1e-4 || lenTgt < 1e-4) return p;
+
+  const s = lenTgt / lenRef;
+  const cosR = (vRx * vTx + vRy * vTy) / (lenRef * lenTgt);
+  const sinR = (vRx * vTy - vRy * vTx) / (lenRef * lenTgt);
+
+  const midRefX = (aRef.x + bRef.x) * 0.5;
+  const midRefY = (aRef.y + bRef.y) * 0.5;
+  const midTgtX = (aTgt.x + bTgt.x) * 0.5;
+  const midTgtY = (aTgt.y + bTgt.y) * 0.5;
+
+  let dx = p.x - midRefX;
+  let dy = p.y - midRefY;
+
+  if (mirrorY) {
+    // Reflejar localmente a través del eje aRef -> bRef antes de transformar
+    const ux = vRx / lenRef;
+    const uy = vRy / lenRef;
+    const proj = dx * ux + dy * uy;
+    const perp = -dx * uy + dy * ux;
+    dx = proj * ux + perp * uy;
+    dy = proj * uy - perp * ux;
   }
 
-  try {
-    const dim = 180;
-    const canvas = document.createElement('canvas');
-    canvas.width = dim;
-    canvas.height = dim;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return generarPlantillaCanonica(naturalW, naturalH, false);
+  return {
+    x: midTgtX + s * (cosR * dx - sinR * dy),
+    y: midTgtY + s * (sinR * dx + cosR * dy),
+  };
+}
 
-    ctx.drawImage(img, 0, 0, dim, dim);
-    const { data } = ctx.getImageData(0, 0, dim, dim);
+/**
+ * Parsea un path SVG compuesto por comandos `M`, `C`, `c`, `S`, `s`, `Z`, `z`
+ * y transforma cada vértice y punto de control cúbico con similitud 2D.
+ */
+function transformarPathSvg2P(
+  svgPath: string,
+  aRef: CoordenadaPunto,
+  bRef: CoordenadaPunto,
+  aTgt: CoordenadaPunto,
+  bTgt: CoordenadaPunto,
+  mirrorY = false
+): string {
+  const tokens = svgPath.match(/[MmCcSsZz]|-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/g);
+  if (!tokens) return '';
 
-    const lum = (x: number, y: number) => {
-      const idx = (y * dim + x) * 4;
-      return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-    };
+  const tr = (x: number, y: number) =>
+    transformarPunto2P({ x, y }, aRef, bRef, aTgt, bTgt, mirrorY);
 
-    // 1. Determinar orientación (mira a la derecha o izquierda)
-    const minX = Math.round(dim * 0.06);
-    const maxX = Math.round(dim * 0.94);
+  const cmds: string[] = [];
+  let i = 0;
+  let curX = 0;
+  let curY = 0;
+  let startX = 0;
+  let startY = 0;
+  let prevCp2X = 0;
+  let prevCp2Y = 0;
+  let prevCmd = '';
+  let activeCmd = 'M';
 
-    let xLeftSum = 0;
-    let xRightSum = 0;
-    for (let y = Math.round(dim * 0.25); y <= Math.round(dim * 0.72); y++) {
-      for (let x = minX; x < dim / 2; x++) xLeftSum += lum(x, y);
-      for (let x = Math.floor(dim / 2); x <= maxX; x++) xRightSum += lum(x, y);
-    }
-
-    // La mitad con el cráneo posterior tiene mayor densidad promedio; el perfil mira al lado opuesto.
-    const miraDerecha = xLeftSum >= xRightSum;
-
-    // 2. Umbral adaptativo de tejido blando vs aire de fondo
-    let bgSamples = 0;
-    let bgSum = 0;
-    const edgeCols = miraDerecha
-      ? [maxX - 4, maxX - 3, maxX - 2]
-      : [minX + 2, minX + 3, minX + 4];
-    for (let y = Math.round(dim * 0.2); y <= Math.round(dim * 0.8); y++) {
-      for (const cx of edgeCols) {
-        const l = lum(cx, y);
-        if (l < 90) {
-          bgSum += l;
-          bgSamples++;
-        }
+  while (i < tokens.length) {
+    const tok = tokens[i];
+    if (/^[MmCcSsZz]$/.test(tok)) {
+      activeCmd = tok;
+      i++;
+      if (activeCmd === 'z' || activeCmd === 'Z') {
+        cmds.push('Z');
+        curX = startX;
+        curY = startY;
+        prevCmd = activeCmd;
+        continue;
       }
     }
-    const bgLum = bgSamples > 10 ? bgSum / bgSamples : 18;
-    const umbralTejido = Math.min(85, Math.max(26, bgLum + 22));
 
-    // 3. Rastrear borde anterior por fila en [0.16h .. 0.86h]
-    const perfil: { y: number; x: number }[] = [];
-    for (let y = Math.round(dim * 0.16); y <= Math.round(dim * 0.86); y++) {
-      let bordeX: number | null = null;
-      if (miraDerecha) {
-        for (let x = maxX; x >= minX + Math.round(dim * 0.35); x--) {
-          if (lum(x, y) >= umbralTejido && lum(x - 1, y) >= umbralTejido) {
-            bordeX = x;
-            break;
-          }
-        }
-      } else {
-        for (let x = minX; x <= maxX - Math.round(dim * 0.35); x++) {
-          if (lum(x, y) >= umbralTejido && lum(x + 1, y) >= umbralTejido) {
-            bordeX = x;
-            break;
-          }
-        }
-      }
-      if (bordeX !== null) perfil.push({ y, x: bordeX });
+    if (activeCmd === 'M' || activeCmd === 'm') {
+      const rx = Number(tokens[i++]);
+      const ry = Number(tokens[i++]);
+      const absX = activeCmd === 'M' ? rx : curX + rx;
+      const absY = activeCmd === 'M' ? ry : curY + ry;
+      const p = tr(absX, absY);
+      cmds.push(`M ${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
+      curX = absX;
+      curY = absY;
+      startX = absX;
+      startY = absY;
+      prevCmd = activeCmd;
+      activeCmd = activeCmd === 'M' ? 'C' : 'c';
+    } else if (activeCmd === 'C' || activeCmd === 'c') {
+      if (i + 5 >= tokens.length) break;
+      const x1 = Number(tokens[i++]);
+      const y1 = Number(tokens[i++]);
+      const x2 = Number(tokens[i++]);
+      const y2 = Number(tokens[i++]);
+      const x = Number(tokens[i++]);
+      const y = Number(tokens[i++]);
+      const isRel = activeCmd === 'c';
+      const ax1 = isRel ? curX + x1 : x1;
+      const ay1 = isRel ? curY + y1 : y1;
+      const ax2 = isRel ? curX + x2 : x2;
+      const ay2 = isRel ? curY + y2 : y2;
+      const ax = isRel ? curX + x : x;
+      const ay = isRel ? curY + y : y;
+      const p1 = tr(ax1, ay1);
+      const p2 = tr(ax2, ay2);
+      const p = tr(ax, ay);
+      cmds.push(
+        `C ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}, ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
+      );
+      prevCp2X = ax2;
+      prevCp2Y = ay2;
+      curX = ax;
+      curY = ay;
+      prevCmd = activeCmd;
+    } else if (activeCmd === 'S' || activeCmd === 's') {
+      if (i + 3 >= tokens.length) break;
+      const x2 = Number(tokens[i++]);
+      const y2 = Number(tokens[i++]);
+      const x = Number(tokens[i++]);
+      const y = Number(tokens[i++]);
+      const isRel = activeCmd === 's';
+      const hasPrevCubic = /^[CcSs]$/.test(prevCmd);
+      const ax1 = hasPrevCubic ? 2 * curX - prevCp2X : curX;
+      const ay1 = hasPrevCubic ? 2 * curY - prevCp2Y : curY;
+      const ax2 = isRel ? curX + x2 : x2;
+      const ay2 = isRel ? curY + y2 : y2;
+      const ax = isRel ? curX + x : x;
+      const ay = isRel ? curY + y : y;
+      const p1 = tr(ax1, ay1);
+      const p2 = tr(ax2, ay2);
+      const p = tr(ax, ay);
+      cmds.push(
+        `C ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}, ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
+      );
+      prevCp2X = ax2;
+      prevCp2Y = ay2;
+      curX = ax;
+      curY = ay;
+      prevCmd = activeCmd;
+    } else {
+      i++;
     }
+  }
 
-    if (perfil.length < 25) {
-      return generarPlantillaCanonica(naturalW, naturalH, false);
-    }
+  return cmds.join(' ');
+}
 
-    // 4. Localizar punta nasal (Pn): punto más adelantado en franja media [0.32..0.58]
-    const bandaNasal = perfil.filter((p) => p.y >= dim * 0.32 && p.y <= dim * 0.58);
-    if (!bandaNasal.length) {
-      return generarPlantillaCanonica(naturalW, naturalH, false);
-    }
-    const pn = bandaNasal.reduce((best, p) =>
-      miraDerecha ? (p.x > best.x ? p : best) : p.x < best.x ? p : best
+/** Convierte una secuencia de puntos en una curva Bézier cúbica suave (Catmull-Rom abierta o cerrada). */
+function curvaSuaveSvg(pts: CoordenadaPunto[], tension = 0.5, cerrada = false): string {
+  if (pts.length < 2) return '';
+  if (pts.length === 2) {
+    return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+  }
+
+  const cmds = [`M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`];
+  const n = pts.length;
+  const segmentos = cerrada ? n : n - 1;
+
+  for (let i = 0; i < segmentos; i++) {
+    const p0 = cerrada ? pts[(i - 1 + n) % n] : pts[Math.max(0, i - 1)];
+    const p1 = pts[i % n];
+    const p2 = pts[(i + 1) % n];
+    const p3 = cerrada ? pts[(i + 2) % n] : pts[Math.min(n - 1, i + 2)];
+
+    const cp1x = p1.x + ((p2.x - p0.x) / 6) * (tension * 2);
+    const cp1y = p1.y + ((p2.y - p0.y) / 6) * (tension * 2);
+    const cp2x = p2.x - ((p3.x - p1.x) / 6) * (tension * 2);
+    const cp2y = p2.y - ((p3.y - p1.y) / 6) * (tension * 2);
+
+    cmds.push(
+      `C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`
     );
-
-    // 5. Localizar Nasion blando (concavidad por encima de Pn en [0.18..pn.y - 6])
-    const bandaNa = perfil.filter((p) => p.y >= dim * 0.16 && p.y <= pn.y - 6);
-    const naBlando = bandaNa.length
-      ? bandaNa.reduce((best, p) =>
-          miraDerecha ? (p.x < best.x ? p : best) : p.x > best.x ? p : best
-        )
-      : { x: pn.x - (miraDerecha ? 22 : -22), y: Math.round(dim * 0.28) };
-
-    // 6. Localizar mentón inferior (Me): franja [pn.y + 28 .. 0.86*dim]
-    const bandaMenton = perfil.filter((p) => p.y >= pn.y + 24 && p.y <= dim * 0.86);
-    const mentonBorde = bandaMenton.length
-      ? bandaMenton[Math.min(bandaMenton.length - 1, Math.floor(bandaMenton.length * 0.88))]
-      : { x: naBlando.x - (miraDerecha ? 6 : -6), y: Math.round(dim * 0.78) };
-
-    // Convertir de coordenadas [0..dim] a píxeles reales de la imagen
-    const toImg = (pt: { x: number; y: number }): CoordenadaPunto => ({
-      x: (pt.x / dim) * naturalW,
-      y: (pt.y / dim) * naturalH,
-    });
-
-    const pnImg = toImg(pn);
-    const naBImg = toImg(naBlando);
-    const meBImg = toImg(mentonBorde);
-
-    const dir = miraDerecha ? 1 : -1;
-    const altFacial = meBImg.y - naBImg.y;
-    const anchoNasal = Math.abs(pnImg.x - naBImg.x);
-
-    // Validar proporciones fisiológicas antes de usar las anclas detectadas
-    if (
-      altFacial < naturalH * 0.28 ||
-      altFacial > naturalH * 0.75 ||
-      anchoNasal < naturalW * 0.03 ||
-      anchoNasal > naturalW * 0.25
-    ) {
-      return generarPlantillaCanonica(naturalW, naturalH, false);
-    }
-
-    // Estimar Nasion óseo (~6% de altFacial detrás de Na'), Me óseo (~5% arriba de Me'),
-    // y Sella (~58% de altFacial detrás de Na y ~7% debajo de Na).
-    const nAncla: CoordenadaPunto = {
-      x: naBImg.x - dir * altFacial * 0.05,
-      y: naBImg.y,
-    };
-    const meAncla: CoordenadaPunto = {
-      x: meBImg.x - dir * altFacial * 0.08,
-      y: meBImg.y - altFacial * 0.04,
-    };
-    const sAncla: CoordenadaPunto = {
-      x: nAncla.x - dir * altFacial * 0.58,
-      y: nAncla.y + altFacial * 0.075,
-    };
-
-    const alineados = alinearPlantillaASNaMe({}, naturalW, naturalH, {
-      S: sAncla,
-      N: nAncla,
-      Me: meAncla,
-    });
-    // Ajustar punta nasal directamente al pico detectado
-    alineados.Pn = {
-      x: Math.max(0, Math.min(naturalW, Math.round(pnImg.x))),
-      y: Math.max(0, Math.min(naturalH, Math.round(pnImg.y))),
-    };
-    return alineados;
-  } catch {
-    return generarPlantillaCanonica(naturalW, naturalH, false);
   }
+  if (cerrada) cmds.push('Z');
+  return cmds.join(' ');
+}
+
+/**
+ * Genera los contornos anatómicos curvos y siluetas dentarias vectoriales estilo WebCeph
+ * a partir de los 41 hitos cefalométricos marcados.
+ */
+export function generarContornosAnatomicosSvg(
+  puntos: PuntosCefalometricosMap
+): ContornoAnatomicoSvg[] {
+  const contornos: ContornoAnatomicoSvg[] = [];
+  const mirror = sentidoPerfil(puntos) === -1;
+  const W = WEBCEPH_CANONICAL_PX;
+  const azulWebCeph = '#2563eb';
+  const map2P = (
+    pRef: CoordenadaPunto,
+    idA: string,
+    idB: string
+  ): CoordenadaPunto | null => {
+    const tA = puntos[idA];
+    const tB = puntos[idB];
+    const rA = W[idA];
+    const rB = W[idB];
+    if (!tA || !tB || !rA || !rB) return null;
+    return transformarPunto2P(pRef, rA, rB, tA, tB, mirror);
+  };
+
+  // 1. Esfenoides / Silla turca y Clivus (S -> Ba)
+  if (puntos.S && puntos.Ba) {
+    const pts = SPHENOID_OUTLINE.map((p) =>
+      transformarPunto2P(p, SPHENOID_REF_S, SPHENOID_REF_BA, puntos.S, puntos.Ba, mirror)
+    );
+    contornos.push({
+      id: 'esfenoides_silla',
+      d: curvaSuaveSvg(pts, 0.5),
+      color: azulWebCeph,
+      grosor: 1.5,
+    });
+  }
+
+  // 2. Base craneal anterior (S -> SOr o S -> Na)
+  if (puntos.S && (puntos.SOr || puntos.N)) {
+    const rB = puntos.SOr ? ACB_REF_SOR : ACB_REF_NA;
+    const tB = puntos.SOr || puntos.N;
+    const pts2 = ACB_OUTLINE_2.map((p) =>
+      transformarPunto2P(p, ACB_REF_S, rB, puntos.S, tB, mirror)
+    );
+    const pts3 = ACB_OUTLINE_3.map((p) =>
+      transformarPunto2P(p, ACB_REF_S, rB, puntos.S, tB, mirror)
+    );
+    contornos.push({
+      id: 'base_craneal_ant_2',
+      d: curvaSuaveSvg(pts2, 0.5),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+    contornos.push({
+      id: 'base_craneal_ant_3',
+      d: curvaSuaveSvg(pts3, 0.5),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
+  // 3. Reborde orbitario (SOr -> Or)
+  if (puntos.Or && (puntos.SOr || puntos.N)) {
+    const rA = puntos.SOr ? ORBIT_REF_SOR : ORBIT_REF_NA;
+    const tA = puntos.SOr || puntos.N;
+    const pts = ORBIT_OUTLINE_1.map((p) =>
+      transformarPunto2P(p, rA, ORBIT_REF_OR, tA, puntos.Or, mirror)
+    );
+    contornos.push({
+      id: 'orbita',
+      d: curvaSuaveSvg(pts, 0.5),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
+  // 4. Hueso nasal (N -> NasalBridgePoint derivado)
+  if (puntos.N && (puntos.Pn || puntos.ANS)) {
+    const bridge =
+      map2P({ x: 823, y: 203 }, 'N', puntos.Pn ? 'Pn' : 'ANS') ?? {
+        x: puntos.N.x + 30,
+        y: puntos.N.y + 45,
+      };
+    const pts = NASAL_BONE_OUTLINE.map((p) =>
+      transformarPunto2P(p, NASAL_REF_NA, NASAL_REF_NB, puntos.N, bridge, mirror)
+    );
+    contornos.push({
+      id: 'hueso_nasal',
+      d: curvaSuaveSvg(pts, 0.5),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
+  // 5. Porion (contorno cerrado Po -> Ba)
+  if (puntos.Po && puntos.Ba) {
+    const pts = PORION_OUTLINE.map((p) =>
+      transformarPunto2P(p, PORION_REF_PO, PORION_REF_BA, puntos.Po, puntos.Ba, mirror)
+    );
+    contornos.push({
+      id: 'porion',
+      d: curvaSuaveSvg(pts, 0.5, true),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
+  // 6. Fisura pterigomaxilar (Pt -> PNS)
+  if (puntos.Pt && puntos.PNS) {
+    const pts = PTERYGOID_OUTLINE.map((p) =>
+      transformarPunto2P(p, PTERYGOID_REF_PT, PTERYGOID_REF_PNS, puntos.Pt, puntos.PNS, mirror)
+    );
+    contornos.push({
+      id: 'fisura_pterigomaxilar',
+      d: curvaSuaveSvg(pts, 0.5),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
+  // 7. Maxilar superior y bóveda palatina (WebCeph maxilla)
+  if (puntos.ANS && puntos.PNS && puntos.A) {
+    const m1 = map2P({ x: 795, y: 328 }, 'ANS', 'A');
+    const m2 = map2P({ x: 787, y: 315 }, 'ANS', 'PNS');
+    const m3 = map2P({ x: 759, y: 306 }, 'ANS', 'PNS');
+    const m4 = map2P({ x: 716, y: 330 }, 'ANS', 'PNS');
+    const m5 = map2P({ x: 682, y: 337 }, 'ANS', 'PNS');
+    const m6 = map2P({ x: 632, y: 343 }, 'ANS', 'PNS');
+    const m7 = map2P({ x: 633, y: 350 }, 'ANS', 'PNS');
+    const m8 = map2P({ x: 686, y: 349 }, 'ANS', 'PNS');
+    const m9 = map2P({ x: 734, y: 359 }, 'ANS', 'PNS');
+    const ancAlvB = puntos.U1I ? 'U1I' : 'ANS';
+    const sd = map2P({ x: 813, y: 387 }, 'A', ancAlvB);
+    const m10 = map2P({ x: 762, y: 382 }, 'A', ancAlvB);
+    const m11 = map2P({ x: 790, y: 405 }, 'A', ancAlvB);
+
+    const maxPts = [
+      sd,
+      puntos.A,
+      m1,
+      puntos.ANS,
+      m2,
+      m3,
+      m4,
+      m5,
+      m6,
+      puntos.PNS,
+      m7,
+      m8,
+      m9,
+      m10,
+      m11,
+    ].filter((p): p is CoordenadaPunto => Boolean(p));
+
+    if (maxPts.length >= 4) {
+      contornos.push({
+        id: 'maxilar',
+        d: curvaSuaveSvg(maxPts, 0.45),
+        color: azulWebCeph,
+        grosor: 1.6,
+      });
+    }
+  }
+
+  // 8. Sínfisis mentoniana (WebCeph symphysis)
+  if (puntos.B && puntos.Pog && puntos.Me) {
+    const idPt = map2P({ x: 798, y: 463 }, 'B', puntos.L1I ? 'L1I' : 'Pog');
+    const so1 = map2P({ x: 731, y: 558 }, 'B', 'Me');
+    const so2 = map2P({ x: 730, y: 526 }, 'B', 'Me');
+    const so3 = map2P({ x: 750, y: 492 }, 'B', 'Me');
+    const so4 = map2P({ x: 780, y: 453 }, 'B', 'Me');
+    const symPts = [
+      idPt,
+      puntos.B,
+      puntos.PM,
+      puntos.Pog,
+      puntos.Gn,
+      puntos.Me,
+      so1,
+      so2,
+      so3,
+      so4,
+    ].filter((p): p is CoordenadaPunto => Boolean(p));
+
+    if (symPts.length >= 4) {
+      contornos.push({
+        id: 'sinfisis',
+        d: curvaSuaveSvg(symPts, 0.5),
+        color: azulWebCeph,
+        grosor: 1.6,
+      });
+    }
+  }
+
+  // 9. Cuerpo, ángulo, rama y cóndilo mandibular (WebCeph mandible)
+  if (puntos.Me && puntos.Go && (puntos.Co || puntos.Ar)) {
+    const mo1 = map2P({ x: 696, y: 560 }, 'Me', 'Go');
+    const mo2 = map2P({ x: 617, y: 517 }, 'Me', 'Go');
+    const an = puntos.R4 ?? map2P({ x: 563, y: 492 }, 'Me', 'Go');
+    const corpusLeft = map2P({ x: 526, y: 485 }, 'Me', 'Go');
+    const postTopId = puntos.Ar ? 'Ar' : 'Co';
+    const ramusDown = map2P({ x: 476, y: 422 }, 'Go', postTopId);
+    const mo3 = puntos.R2 ?? map2P({ x: 477, y: 346 }, 'Go', postTopId);
+    const condAncB = puntos.Co ? 'Co' : 'Ar';
+    const mo4 = map2P({ x: 473, y: 289 }, 'Go', condAncB);
+    const mo5 = map2P({ x: 504, y: 281 }, 'Go', condAncB);
+    const mo6 = map2P({ x: 522, y: 314 }, 'Go', condAncB);
+
+    const mandPts = [
+      puntos.Me,
+      mo1,
+      mo2,
+      an,
+      corpusLeft,
+      puntos.Go,
+      ramusDown,
+      mo3,
+      puntos.Ar,
+      mo4,
+      puntos.Co,
+      mo5,
+      mo6,
+      puntos.R3,
+    ].filter((p): p is CoordenadaPunto => Boolean(p));
+
+    if (mandPts.length >= 4) {
+      contornos.push({
+        id: 'mandibula',
+        d: curvaSuaveSvg(mandPts, 0.5),
+        color: azulWebCeph,
+        grosor: 1.65,
+      });
+    }
+  }
+
+  // 9b. Borde anterior de la rama (Co -> R3 -> R1)
+  const ramaAntPts = [puntos.Co, puntos.R3, puntos.R1].filter((p): p is CoordenadaPunto =>
+    Boolean(p)
+  );
+  if (ramaAntPts.length >= 2) {
+    contornos.push({
+      id: 'rama_anterior',
+      d: curvaSuaveSvg(ramaAntPts, 0.45),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
+  // 10. Tejido blando superior e inferior (WebCeph upper & lower soft tissue)
+  if (puntos.Pn && puntos.Sn) {
+    const nasalBridge = puntos.Na_b ? map2P({ x: 823, y: 203 }, 'Na_b', 'Pn') : null;
+    const dorsumNose = puntos.Na_b ? map2P({ x: 855, y: 239 }, 'Na_b', 'Pn') : null;
+    const columella = map2P({ x: 860, y: 308 }, 'Pn', 'Sn');
+    const stms = puntos.UL && puntos.Em ? map2P({ x: 844, y: 406 }, 'UL', 'Em') : puntos.Em;
+    const upperEmb =
+      puntos.UL && puntos.Em ? map2P({ x: 822, y: 409 }, 'UL', 'Em') : null;
+
+    const supPts = [
+      puntos.G_b,
+      puntos.Na_b,
+      nasalBridge,
+      dorsumNose,
+      puntos.Pn,
+      columella,
+      puntos.Sn,
+      puntos.A_b,
+      puntos.UL,
+      stms,
+      upperEmb,
+    ].filter((p): p is CoordenadaPunto => Boolean(p));
+
+    if (supPts.length >= 3) {
+      contornos.push({
+        id: 'perfil_blando',
+        d: curvaSuaveSvg(supPts, 0.55),
+        color: azulWebCeph,
+        grosor: 1.7,
+      });
+    }
+  } else {
+    const fallbackPerfil = [
+      puntos.G_b,
+      puntos.Na_b,
+      puntos.Pn,
+      puntos.Sn,
+      puntos.A_b,
+      puntos.UL,
+      puntos.Em,
+      puntos.LL,
+      puntos.B_b,
+      puntos.Pog_b,
+      puntos.Me_b,
+    ].filter((p): p is CoordenadaPunto => Boolean(p));
+    if (fallbackPerfil.length >= 3) {
+      contornos.push({
+        id: 'perfil_blando',
+        d: curvaSuaveSvg(fallbackPerfil, 0.55),
+        color: azulWebCeph,
+        grosor: 1.7,
+      });
+    }
+  }
+
+  if (puntos.LL && puntos.Pog_b && puntos.Me_b) {
+    const lowerEmb = puntos.Em
+      ? map2P({ x: 820, y: 415 }, 'Em', 'LL')
+      : null;
+    const stmi = puntos.Em ? map2P({ x: 845, y: 410 }, 'Em', 'LL') : null;
+    const stGn = map2P({ x: 802, y: 580 }, 'Pog_b', 'Me_b');
+    const subMand = map2P({ x: 695, y: 615 }, 'Pog_b', 'Me_b');
+    const neckC = map2P({ x: 656, y: 640 }, 'Pog_b', 'Me_b');
+
+    const infPts = [
+      lowerEmb,
+      stmi,
+      puntos.LL,
+      puntos.B_b,
+      puntos.Pog_b,
+      stGn,
+      puntos.Me_b,
+      subMand,
+      neckC,
+    ].filter((p): p is CoordenadaPunto => Boolean(p));
+
+    if (infPts.length >= 3) {
+      contornos.push({
+        id: 'perfil_blando_inf',
+        d: curvaSuaveSvg(infPts, 0.55),
+        color: azulWebCeph,
+        grosor: 1.7,
+      });
+    }
+  }
+
+  // 11. Siluetas dentarias vectoriales reales de WebCeph (2P similarity transform)
+  if (puntos.U1I && puntos.U1A) {
+    const d = transformarPathSvg2P(
+      U1_SVG_PATH,
+      U1_REF_TIP,
+      U1_REF_APEX,
+      puntos.U1I,
+      puntos.U1A,
+      mirror
+    );
+    if (d) {
+      contornos.push({
+        id: 'incisivo_sup',
+        d,
+        color: azulWebCeph,
+        grosor: 1.5,
+      });
+    }
+  }
+
+  if (puntos.L1I && puntos.L1A) {
+    const d = transformarPathSvg2P(
+      L1_SVG_PATH,
+      L1_REF_TIP,
+      L1_REF_APEX,
+      puntos.L1I,
+      puntos.L1A,
+      mirror
+    );
+    if (d) {
+      contornos.push({
+        id: 'incisivo_inf',
+        d,
+        color: azulWebCeph,
+        grosor: 1.5,
+      });
+    }
+  }
+
+  if (puntos.U6C && puntos.U6D) {
+    const d = transformarPathSvg2P(
+      U6_SVG_PATH,
+      U6_REF_MESIAL,
+      U6_REF_DISTAL,
+      puntos.U6C,
+      puntos.U6D,
+      mirror
+    );
+    if (d) {
+      contornos.push({
+        id: 'molar_sup',
+        d,
+        color: azulWebCeph,
+        grosor: 1.4,
+      });
+    }
+  }
+
+  if (puntos.L6C && puntos.L6D) {
+    const d = transformarPathSvg2P(
+      L6_SVG_PATH,
+      L6_REF_MESIAL,
+      L6_REF_DISTAL,
+      puntos.L6C,
+      puntos.L6D,
+      mirror
+    );
+    if (d) {
+      contornos.push({
+        id: 'molar_inf',
+        d,
+        color: azulWebCeph,
+        grosor: 1.4,
+      });
+    }
+  }
+
+  return contornos;
 }
