@@ -16,6 +16,12 @@ import {
   generarPlantillaWebCeph,
 } from '@/lib/cefalometria-calculos';
 import {
+  detectarPuntosConIA,
+  generarInformeClinicoIA,
+  guardarGeminiApiKey,
+  obtenerGeminiApiKey,
+} from '@/lib/cefalometria-ia';
+import {
   EstudioCefalometrico,
   PuntosCefalometricosMap,
   CalibracionRegla,
@@ -27,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import {
   ZoomIn,
   ZoomOut,
@@ -50,6 +57,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Search,
+  Sparkles,
+  KeyRound,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { esRutaDeposito, useUrlImagenCefalometria } from '@/api/cefalometria';
@@ -163,10 +173,16 @@ export function CefalometriaEditor({
   const [anclarSNaMe, setAnclarSNaMe] = useState<boolean>(false);
   const [puntosAjustadosManual, setPuntosAjustadosManual] = useState<Set<string>>(() => new Set());
 
-  // Paneles
+  // Paneles e IA
   const [tabDerecho, setTabDerecho] = useState<'herramientas' | 'puntos' | 'analisis' | 'modelos'>('herramientas');
   const [panelDerechoAbierto, setPanelDerechoAbierto] = useState(true);
   const [guardadoStatus, setGuardadoStatus] = useState<'guardado' | 'guardando' | 'cambios'>('guardado');
+  const [procesandoIA, setProcesandoIA] = useState(false);
+  const [metodoDeteccionIA, setMetodoDeteccionIA] = useState<'gemini-vision' | 'vision-local' | null>(null);
+  const [mostrarConfigIA, setMostrarConfigIA] = useState(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>(() => obtenerGeminiApiKey());
+  const [informeIA, setInformeIA] = useState<string>(estudio.notas || '');
+  const [generandoInformeIA, setGenerandoInformeIA] = useState(false);
 
   // Dimensiones de la imagen
   const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number }>({
@@ -240,6 +256,8 @@ export function CefalometriaEditor({
     setZoom(1);
     setFiltroTipoPunto('todos');
     setGuardadoStatus('guardado');
+    setInformeIA(estudio.notas || '');
+    setMetodoDeteccionIA(null);
     setPuntoActivoId(secuenciaRicketts.find((id) => !(estudio.puntos || {})[id]) ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estudio.id]);
@@ -595,6 +613,57 @@ export function CefalometriaEditor({
     toast.success('Cefalometría digitalizada. Arrastre cualquier punto para ajustarlo manualmente.');
   };
 
+  // Autodigitalización asistida por IA híbrida (Gemini Vision + respaldo anatómico local)
+  const handleAutodigitalizarIA = async () => {
+    if (!srcImagen) {
+      toast.warning('Cargue primero una radiografía para digitalizar.');
+      return;
+    }
+    setProcesandoIA(true);
+    try {
+      setModoCalibracion(false);
+      setModoMoverVista(false);
+      setMostrarContornos(true);
+      const res = await detectarPuntosConIA(
+        imgRef.current,
+        imgDimensions.width,
+        imgDimensions.height,
+        esFrontal
+      );
+      setPuntos(res.puntos);
+      setMetodoDeteccionIA(res.metodo);
+      setPuntosAjustadosManual(new Set());
+      setPuntoActivoId('');
+      setGuardadoStatus('cambios');
+      toast.success(res.detalle);
+    } catch {
+      toast.error('No se pudo ejecutar la detección IA. Se mantuvo el trazado actual.');
+    } finally {
+      setProcesandoIA(false);
+    }
+  };
+
+  const handleGenerarInformeIA = async () => {
+    setGenerandoInformeIA(true);
+    try {
+      const res = await generarInformeClinicoIA(
+        mediciones,
+        sintesisRicketts,
+        pacienteNombre,
+        calibracion
+      );
+      setInformeIA(res.texto);
+      setGuardadoStatus('cambios');
+      toast.success(
+        res.metodo === 'gemini'
+          ? 'Diagnóstico redactado con Gemini AI. Recuerde guardar el trazado.'
+          : 'Diagnóstico clínico generado a partir de las mediciones cefalométricas.'
+      );
+    } finally {
+      setGenerandoInformeIA(false);
+    }
+  };
+
   // Guardar estudio
   const handleGuardar = async () => {
     setGuardadoStatus('guardando');
@@ -605,6 +674,7 @@ export function CefalometriaEditor({
         puntos,
         calibracion,
         mediciones,
+        notas: informeIA,
         progreso: estudio.progreso ?? 'digitalizacion',
         updated_at: new Date().toISOString(),
       };
@@ -828,6 +898,22 @@ export function CefalometriaEditor({
             title="Iniciar o retomar el trazado cefalométrico guiado"
           >
             <PenLine className="w-3.5 h-3.5" /> Digitalización
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!srcImagen || procesandoIA}
+            onClick={handleAutodigitalizarIA}
+            className="border-fuchsia-500/70 bg-fuchsia-950/40 text-fuchsia-200 hover:bg-fuchsia-900/60 hover:text-white gap-1.5 h-8 font-medium"
+            title="Detectar hitos automáticamente con IA híbrida (Gemini Vision + respaldo anatómico local)"
+          >
+            {procesandoIA ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-fuchsia-300" />
+            )}
+            Autodigitalizar IA
           </Button>
 
           {!esFrontal && (
@@ -1586,6 +1672,76 @@ export function CefalometriaEditor({
                     </Button>
                   </div>
 
+                  {/* Módulo de IA Híbrida (Gemini Vision + Visión Local) */}
+                  <div className="bg-slate-800/60 p-3 rounded-xl border border-fuchsia-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-fuchsia-200 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-fuchsia-400" /> Inteligencia Artificial
+                      </span>
+                      {metodoDeteccionIA && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-fuchsia-500/40 text-fuchsia-200 bg-fuchsia-950/40"
+                        >
+                          {metodoDeteccionIA === 'gemini-vision' ? 'Gemini Vision' : 'Visión Local'}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!srcImagen || procesandoIA}
+                      onClick={handleAutodigitalizarIA}
+                      className="w-full h-8 text-[11px] border-fuchsia-500/50 bg-fuchsia-950/40 hover:bg-fuchsia-900/60 text-fuchsia-100 gap-1.5"
+                    >
+                      {procesandoIA ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      Autodigitalizar con IA
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarConfigIA((v) => !v)}
+                      className="text-[10px] text-slate-400 hover:text-fuchsia-200 flex items-center gap-1"
+                    >
+                      <KeyRound className="w-3 h-3" />
+                      {mostrarConfigIA ? 'Ocultar clave Gemini Vision' : 'Configurar clave Gemini Vision (opcional)'}
+                    </button>
+                    {mostrarConfigIA && (
+                      <div className="space-y-1.5 pt-1 border-t border-slate-700/60">
+                        <Input
+                          type="password"
+                          placeholder="AIza... (API Key de Google AI Studio)"
+                          value={geminiKeyInput}
+                          onChange={(e) => setGeminiKeyInput(e.target.value)}
+                          className="h-7 bg-slate-900 border-slate-700 text-[11px]"
+                        />
+                        <div className="flex gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              guardarGeminiApiKey(geminiKeyInput);
+                              toast.success(
+                                geminiKeyInput.trim()
+                                  ? 'Clave de Gemini guardada localmente en este navegador.'
+                                  : 'Clave de Gemini eliminada.'
+                              );
+                            }}
+                            className="h-6 px-2 text-[10px] border-slate-600 bg-slate-900 text-slate-200"
+                          >
+                            Guardar clave
+                          </Button>
+                          <span className="text-[10px] text-slate-500 self-center">
+                            Sin clave usa detector local.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {!esFrontal && (
                     <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/70 space-y-2.5">
                       <div className="flex items-center justify-between gap-2">
@@ -1954,6 +2110,39 @@ export function CefalometriaEditor({
                       </Badge>
                     </div>
                   )}
+
+                  {/* Redacción de Informe Clínico y Plan de Tratamiento con IA */}
+                  <div className="p-3 rounded-xl bg-slate-800/70 border border-fuchsia-500/30 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-fuchsia-200 text-xs flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-fuchsia-400" /> Informe Clínico (IA)
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={generandoInformeIA || mediciones.length === 0}
+                        onClick={handleGenerarInformeIA}
+                        className="h-7 px-2 text-[10px] border-fuchsia-500/60 bg-fuchsia-950/50 text-fuchsia-100 hover:bg-fuchsia-900/60 gap-1"
+                      >
+                        {generandoInformeIA ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3 h-3" />
+                        )}
+                        Redactar Diagnóstico con IA
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={informeIA}
+                      onChange={(e) => {
+                        setInformeIA(e.target.value);
+                        setGuardadoStatus('cambios');
+                      }}
+                      placeholder="Pulse «Redactar Diagnóstico con IA» para generar la síntesis clínica editable o escriba sus observaciones..."
+                      rows={5}
+                      className="bg-slate-950/70 border-slate-700 text-[11px] leading-relaxed text-slate-200 resize-y"
+                    />
+                  </div>
 
                   {(['Ricketts', 'Ricketts Frontal', 'McNamara', 'Steiner', 'Tweed', 'Wits'] as const).map((grupo) => {
                     const delGrupo = mediciones

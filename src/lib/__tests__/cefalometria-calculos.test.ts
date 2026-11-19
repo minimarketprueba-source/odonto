@@ -11,6 +11,10 @@ import {
   generarContornosAnatomicosSvg,
   generarPlantillaCanonica,
 } from '../cefalometria-calculos';
+import {
+  generarInformeClinicoExpertoLocal,
+  validarYCompletarPuntosIA,
+} from '../cefalometria-ia';
 import type { CoordenadaPunto, PuntosCefalometricosMap } from '@/types/cefalometria';
 
 // Coordenadas de imagen: x hacia la derecha, y hacia ABAJO, como en la pantalla.
@@ -417,5 +421,33 @@ describe('análisis de Ricketts', () => {
       expect(ids).toContain(esperado);
     }
     expect(contornos.every((c) => c.d.startsWith('M '))).toBe(true);
+  });
+
+  it('valida puntos devueltos por IA, descarta atípicos y genera informe clínico experto', () => {
+    const validados = validarYCompletarPuntosIA(
+      {
+        S: { x: 507, y: 180 },
+        N: { x: 763, y: 127 },
+        Me: { x: 752, y: 574 },
+        A: { x: 795, y: 345 }, // dentro de tolerancia anatómica
+        Pog: { x: 40, y: 40 }, // valor atípico en esquina superior izquierda -> debe descartarse
+      },
+      1005,
+      803,
+      false
+    );
+
+    expect(validados.A).toEqual({ x: 795, y: 345 });
+    expect(validados.Pog.x).toBeGreaterThan(700);
+    expect(Object.keys(validados).length).toBeGreaterThanOrEqual(40);
+
+    const cal = { distanciaRealMm: 30, pixelesPorMm: 3.77 };
+    const med = calcularAnalisisCefalometrico(validados, cal);
+    const sint = calcularSintesisRicketts(med);
+    const informe = generarInformeClinicoExpertoLocal(med, sint, cal);
+
+    expect(informe).toContain('BIOTIPO Y PATRÓN ESQUELÉTICO');
+    expect(informe).toContain('ANÁLISIS DENTO-ALVEOLAR');
+    expect(informe).toContain('ORIENTACIÓN TERAPÉUTICA SUGERIDA');
   });
 });
