@@ -453,46 +453,75 @@ describe('análisis de Ricketts', () => {
   });
 
   it('detecta el contorno facial y cortical ósea desplazados e ignora cadena metálica lateral', () => {
-    const dim = 200;
-    const data = new Uint8ClampedArray(dim * dim * 4);
-    for (let y = 0; y < dim; y++) {
-      for (let x = 0; x < dim; x++) {
-        let lum = 12; // aire de fondo
-        // Perfil craneofacial sintético desplazado a la izquierda (Sn ≈ 132, Pn ≈ 146, Pog_b ≈ 134)
-        let bordeBlando = -1;
-        if (y >= 40 && y < 74) bordeBlando = 126 + Math.round(((y - 40) / 34) * 20); // dorso nasal hasta Pn=146
-        else if (y >= 74 && y < 90) bordeBlando = 146 - Math.round(((y - 74) / 16) * 14); // Pn -> Sn=132
-        else if (y >= 90 && y < 104) bordeBlando = 132 + Math.round(Math.sin(((y - 90) / 14) * Math.PI) * 5); // labio sup
-        else if (y >= 104 && y < 118) bordeBlando = 131 + Math.round(Math.sin(((y - 104) / 14) * Math.PI) * 5); // labio inf
-        else if (y >= 118 && y < 130) bordeBlando = 126; // surco B'
-        else if (y >= 130 && y <= 165) bordeBlando = 134 - Math.round(((y - 130) / 35) * 8); // Pog' hasta mentón inferior
+    const generarBuffer = (w: number, h: number) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let y = 0; y < h; y++) {
+        const ny = y / h;
+        let blandoNorm = -1;
+        let huesoNorm = -1;
+        if (ny >= 0.14 && ny < 0.28) {
+          blandoNorm = 0.65;
+          huesoNorm = 0.62;
+        } else if (ny >= 0.28 && ny < 0.37) {
+          blandoNorm = 0.65 + ((ny - 0.28) / 0.09) * 0.08; // dorso hasta Pn ≈ 0.73
+          huesoNorm = 0.65;
+        } else if (ny >= 0.37 && ny < 0.44) {
+          blandoNorm = 0.73 - ((ny - 0.37) / 0.07) * 0.06; // Pn -> Sn ≈ 0.67
+          huesoNorm = 0.64;
+        } else if (ny >= 0.44 && ny < 0.51) {
+          blandoNorm = 0.67 + Math.sin(((ny - 0.44) / 0.07) * Math.PI) * 0.03; // UL ≈ 0.70
+          huesoNorm = 0.64;
+        } else if (ny >= 0.51 && ny < 0.58) {
+          blandoNorm = 0.66 + Math.sin(((ny - 0.51) / 0.07) * Math.PI) * 0.035; // LL ≈ 0.695
+          huesoNorm = 0.635;
+        } else if (ny >= 0.58 && ny < 0.64) {
+          blandoNorm = 0.64; // surco B'
+          huesoNorm = 0.60;
+        } else if (ny >= 0.64 && ny <= 0.78) {
+          blandoNorm = 0.67 - ((ny - 0.64) / 0.14) * 0.05; // Pog' ≈ 0.67 -> Me'
+          huesoNorm = 0.625;
+        }
 
-        if (x >= 25 && bordeBlando > 0 && x <= bordeBlando) {
-          lum = x <= bordeBlando - 10 ? 185 : 90; // hueso cortical detrás de tejido blando
+        for (let x = 0; x < w; x++) {
+          const nx = x / w;
+          let lum = 36; // aire de fondo realista (~36)
+          if (blandoNorm > 0 && huesoNorm > 0 && nx >= 0.18 && nx <= blandoNorm + 0.008) {
+            if (Math.abs(nx - blandoNorm) <= 0.006) {
+              lum = 24; // banda oscura de Mach en borde cutáneo
+            } else if (nx <= huesoNorm) {
+              lum = 150; // hueso cortical sólido
+            } else {
+              lum = 48; // tejido blando
+            }
+          }
+          // Cadena metálica vertical de esferas delante del rostro en x ≈ 0.89w
+          if (nx >= 0.885 && nx <= 0.898 && ny >= 0.12 && ny <= 0.88) {
+            lum = 240;
+          }
+          const i = (y * w + x) * 4;
+          data[i] = lum;
+          data[i + 1] = lum;
+          data[i + 2] = lum;
+          data[i + 3] = 255;
         }
-        // Cadena metálica vertical fina (3px de ancho) delante del rostro en x=176..178
-        if (x >= 176 && x <= 178 && y >= 20 && y <= 185) {
-          lum = 240;
-        }
-        const i = (y * dim + x) * 4;
-        data[i] = lum;
-        data[i + 1] = lum;
-        data[i + 2] = lum;
-        data[i + 3] = 255;
       }
-    }
+      return data;
+    };
 
     const origCreate = document.createElement.bind(document);
     const spy = vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
       if (tag === 'canvas') {
-        return {
-          width: dim,
-          height: dim,
+        const fakeCanvas = {
+          width: 240,
+          height: 240,
           getContext: () => ({
             drawImage: () => {},
-            getImageData: () => ({ data }),
+            getImageData: (_sx: number, _sy: number, sw: number, sh: number) => ({
+              data: generarBuffer(sw || fakeCanvas.width, sh || fakeCanvas.height),
+            }),
           }),
-        } as unknown as HTMLCanvasElement;
+        };
+        return fakeCanvas as unknown as HTMLCanvasElement;
       }
       return origCreate(tag);
     }) as typeof document.createElement);
@@ -500,9 +529,9 @@ describe('análisis de Ricketts', () => {
     try {
       const fakeImg = { naturalWidth: 1000, naturalHeight: 800 } as HTMLImageElement;
       const detectados = detectarContornoAnatomicoEnCanvas(fakeImg, false);
-      // En una placa desplazada a la izquierda, Pn debe seguir x ≈ 146/200*1000 = 730 (NO quedarse en 876 ni atraparse en cadena x=885)
+      // En la placa sintética desplazada, Pn ≈ 0.73 * 1000 = 730 (ignora cadena en 890 y no queda estática en 876)
       expect(detectados.Pn.x).toBeGreaterThan(700);
-      expect(detectados.Pn.x).toBeLessThan(770);
+      expect(detectados.Pn.x).toBeLessThan(765);
       expect(detectados.Sn.x).toBeLessThan(detectados.Pn.x);
       expect(detectados.Pog.x).toBeLessThan(detectados.Pog_b.x);
     } finally {

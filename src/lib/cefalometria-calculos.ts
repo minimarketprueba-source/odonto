@@ -2676,9 +2676,8 @@ export function alinearPlantillaASNaMe(
 }
 
 /**
- * Analiza la radiografía en Canvas detectando simultáneamente el contorno de tejido blando
- * (xBlando(y)) y la cortical ósea anterior (xHueso(y)) filtrando cadenas metálicas y reglas
- * verticales mediante continuidad anatómica hacia el interior craneofacial.
+ * Analiza la radiografía en Canvas en dos etapas fisiológicas (cortical ósea -> tejido blando
+ * con banda de Mach) filtrando cadenas metálicas y posicionadores plásticos mediante continuidad craneal.
  */
 export function detectarContornoAnatomicoEnCanvas(
   img: HTMLImageElement,
@@ -2693,7 +2692,7 @@ export function detectarContornoAnatomicoEnCanvas(
   }
 
   try {
-    const dim = 200;
+    const dim = 240;
     const canvas = document.createElement('canvas');
     canvas.width = dim;
     canvas.height = dim;
@@ -2710,7 +2709,7 @@ export function detectarContornoAnatomicoEnCanvas(
       return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
     };
 
-    // Mapa suavizado 3×3 para estabilizar gradientes óseos y de tejido blando
+    // Suavizado 3×3 para estabilizar densidad ósea y detectar la banda de Mach sin ruido
     const lumMap = new Float32Array(dim * dim);
     for (let y = 0; y < dim; y++) {
       for (let x = 0; x < dim; x++) {
@@ -2728,122 +2727,138 @@ export function detectarContornoAnatomicoEnCanvas(
     const lum = (x: number, y: number) =>
       lumMap[Math.max(0, Math.min(dim - 1, y)) * dim + Math.max(0, Math.min(dim - 1, x))];
 
-    // 1. Densidad del núcleo craneal (validación de placa real y umbrales)
+    // 1. Densidad del núcleo craneal (validación de imagen real y orientación)
     const coreSamples: number[] = [];
     let leftSum = 0;
     let rightSum = 0;
-    for (let y = Math.round(dim * 0.26); y <= Math.round(dim * 0.70); y++) {
+    for (let y = Math.round(dim * 0.28); y <= Math.round(dim * 0.68); y++) {
       for (let x = Math.round(dim * 0.16); x < Math.round(dim * 0.50); x++) leftSum += lum(x, y);
       for (let x = Math.round(dim * 0.50); x <= Math.round(dim * 0.84); x++) rightSum += lum(x, y);
-      for (let x = Math.round(dim * 0.24); x <= Math.round(dim * 0.54); x++) {
+      for (let x = Math.round(dim * 0.25); x <= Math.round(dim * 0.55); x++) {
         coreSamples.push(lum(x, y));
       }
     }
     coreSamples.sort((a, b) => a - b);
-    const p50Core = coreSamples[Math.floor(coreSamples.length * 0.5)] ?? 0;
-    const p85Core = coreSamples[Math.floor(coreSamples.length * 0.85)] ?? 0;
-    if (p85Core < 20) return baseWebCeph;
+    const p80Core = coreSamples[Math.floor(coreSamples.length * 0.8)] ?? 0;
+    if (p80Core < 20) return baseWebCeph;
 
     const miraDerecha = leftSum >= rightSum;
     const dirIn = miraDerecha ? -1 : 1;
     const dirOut = -dirIn;
 
-    // 2. Luminancia del aire de fondo (percentil 15 en franja anterior para ignorar cadenas metálicas)
+    // 2. Aire abierto anterior (percentil 35: evita cadenas metálicas brillantes y banda oscura de borde)
     const airSamples: number[] = [];
-    const airXMin = miraDerecha ? Math.round(dim * 0.62) : Math.round(dim * 0.08);
-    const airXMax = miraDerecha ? Math.round(dim * 0.92) : Math.round(dim * 0.38);
-    for (let y = Math.round(dim * 0.36); y <= Math.round(dim * 0.76); y++) {
+    const airXMin = miraDerecha ? Math.round(dim * 0.70) : Math.round(dim * 0.08);
+    const airXMax = miraDerecha ? Math.round(dim * 0.92) : Math.round(dim * 0.30);
+    for (let y = Math.round(dim * 0.34); y <= Math.round(dim * 0.74); y++) {
       for (let x = airXMin; x <= airXMax; x++) {
         airSamples.push(lum(x, y));
       }
     }
     airSamples.sort((a, b) => a - b);
-    const bgAirLum = airSamples[Math.floor(airSamples.length * 0.15)] ?? 15;
+    const bgAir = airSamples[Math.floor(airSamples.length * 0.35)] ?? 35;
+    const umbralHueso = bgAir + (p80Core - bgAir) * 0.32;
 
-    const umbralAire = bgAirLum + Math.max(9, (p50Core - bgAirLum) * 0.14);
-    const umbralHueso = bgAirLum + (p85Core - bgAirLum) * 0.48;
-
-    // 3. Filtro de continuidad anatómica: descarta cadenas metálicas (2-4px) y reglas plásticas
-    const esBordeTejidoReal = (x: number, y: number): boolean => {
-      if (lum(x, y) < umbralAire) return false;
-      let solidosInward = 0;
-      for (let k = 1; k <= 18; k++) {
-        const px = x + dirIn * k;
-        if (px < 0 || px >= dim) break;
-        if (lum(px, y) >= umbralAire) solidosInward++;
-      }
-      if (solidosInward < 13) return false;
-
-      // Exigir continuidad inmediata detrás del borde para descartar objetos separados por aire
-      let contiguos = 0;
-      for (let k = 1; k <= 6; k++) {
-        const px = x + dirIn * k;
-        if (px >= 0 && px < dim && lum(px, y) >= umbralAire) contiguos++;
-      }
-      if (contiguos < 4) return false;
-
-      let aireAfuera = 0;
-      for (let k = 1; k <= 5; k++) {
-        const px = x + dirOut * k;
-        if (px >= 0 && px < dim && lum(px, y) < umbralAire + 8) aireAfuera++;
-      }
-      return aireAfuera >= 3;
-    };
-
-    const yMin = Math.round(dim * 0.28);
-    const yMax = Math.round(dim * 0.84);
-    const xBlandoRaw = new Float32Array(dim).fill(-1);
-    const startX = miraDerecha ? Math.round(dim * 0.94) : Math.round(dim * 0.06);
-    const endX = miraDerecha ? Math.round(dim * 0.34) : Math.round(dim * 0.66);
+    // 3. Etapa 1: Cortical ósea / dental anterior xHueso(y)
+    const yMin = Math.round(dim * 0.10);
+    const yMax = Math.round(dim * 0.80);
+    const xHuesoRaw = new Float32Array(dim).fill(-1);
 
     for (let y = yMin; y <= yMax; y++) {
+      const upperBand = y < Math.round(dim * 0.30);
+      const startX = miraDerecha
+        ? Math.round(dim * (upperBand ? 0.79 : 0.86))
+        : Math.round(dim * (upperBand ? 0.21 : 0.14));
+      const endX = miraDerecha ? Math.round(dim * 0.36) : Math.round(dim * 0.64);
+
       for (let x = startX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
-        if (esBordeTejidoReal(x, y)) {
-          xBlandoRaw[y] = x;
-          break;
+        if (lum(x, y) >= umbralHueso) {
+          let inCnt = 0;
+          let imme = 0;
+          for (let k = 1; k <= 18; k++) {
+            const px = x + dirIn * k;
+            if (px < 0 || px >= dim) break;
+            if (lum(px, y) >= bgAir + 8) {
+              inCnt++;
+              if (k <= 5) imme++;
+            }
+          }
+          if (inCnt >= 12 && imme >= 4) {
+            xHuesoRaw[y] = x;
+            break;
+          }
         }
       }
     }
 
-    // Suavizado mediana 3 filas para eliminar ruido sin perder picos ni concavidades
+    const xHueso = new Float32Array(dim).fill(-1);
+    let filasHueso = 0;
+    for (let y = yMin + 1; y <= yMax - 1; y++) {
+      const vals = [xHuesoRaw[y - 1], xHuesoRaw[y], xHuesoRaw[y + 1]].filter((v) => v >= 0);
+      if (vals.length >= 2) {
+        vals.sort((a, b) => a - b);
+        xHueso[y] = vals[Math.floor(vals.length / 2)];
+        filasHueso++;
+      }
+    }
+    if (filasHueso < 35) return baseWebCeph;
+
+    // 4. Etapa 2: Contorno cutáneo xBlando(y) anclado frente a xHueso(y) con detección de banda de Mach
+    const xBlandoRaw = new Float32Array(dim).fill(-1);
+    for (let y = yMin + 1; y <= yMax - 1; y++) {
+      const xh = xHueso[y];
+      if (xh < 0) continue;
+      const maxOffRatio = y < Math.round(dim * 0.24) ? 0.042 : 0.095;
+      const minOffPx = Math.round(dim * 0.012);
+      const maxOffPx = Math.round(dim * maxOffRatio);
+
+      let found = -1;
+      let minM = 999;
+      let xM = -1;
+
+      for (let off = maxOffPx; off >= minOffPx; off--) {
+        const x = Math.round(xh + dirOut * off);
+        if (x < 2 || x >= dim - 2) continue;
+        const l = lum(x, y);
+        if (l < minM) {
+          minM = l;
+          xM = x;
+        }
+        if (l >= bgAir + 3.5 && lum(x + dirIn, y) >= bgAir + 4.0) {
+          found = x;
+          break;
+        }
+      }
+
+      if (found >= 0 && xM >= 0 && Math.abs(xM - found) <= 4 && minM < bgAir - 2.5) {
+        found = (found + xM) * 0.5;
+      } else if (found < 0 && xM >= 0 && minM < bgAir - 2.5) {
+        found = xM + dirIn;
+      }
+      if (found >= 0) xBlandoRaw[y] = found;
+    }
+
     const xBlando = new Float32Array(dim).fill(-1);
-    let filasValidas = 0;
-    for (let y = yMin; y <= yMax; y++) {
+    let filasBlando = 0;
+    for (let y = yMin + 2; y <= yMax - 2; y++) {
       const vals = [xBlandoRaw[y - 1], xBlandoRaw[y], xBlandoRaw[y + 1]].filter((v) => v >= 0);
       if (vals.length >= 2) {
         vals.sort((a, b) => a - b);
         xBlando[y] = vals[Math.floor(vals.length / 2)];
-        filasValidas++;
+        filasBlando++;
       }
     }
-    if (filasValidas < 35) return baseWebCeph;
-
-    // 4. Cortical ósea/dental anterior (xHueso(y)) detrás del tejido blando
-    const xHueso = new Float32Array(dim).fill(-1);
-    const minOff = Math.round(dim * 0.02);
-    const maxOff = Math.round(dim * 0.14);
-    for (let y = yMin; y <= yMax; y++) {
-      const xb = xBlando[y];
-      if (xb < 0) continue;
-      for (let off = minOff; off <= maxOff; off++) {
-        const x = Math.round(xb + dirIn * off);
-        if (x < 2 || x >= dim - 2) break;
-        if (
-          lum(x, y) >= umbralHueso &&
-          lum(x + dirIn, y) >= umbralHueso * 0.9 &&
-          lum(x + dirIn * 2, y) >= umbralHueso * 0.9
-        ) {
-          xHueso[y] = x;
-          break;
-        }
-      }
-    }
+    if (filasBlando < 35) return baseWebCeph;
 
     const fwd = (x: number) => (miraDerecha ? x : dim - x);
     const buscarBlandoExtremo = (yIni: number, yFin: number, modo: 'max' | 'min') => {
       let bestY = -1;
       let bestScore = modo === 'max' ? -Infinity : Infinity;
-      for (let y = Math.max(yMin, Math.round(yIni)); y <= Math.min(yMax, Math.round(yFin)); y++) {
+      for (
+        let y = Math.max(yMin + 2, Math.round(yIni));
+        y <= Math.min(yMax - 2, Math.round(yFin));
+        y++
+      ) {
         const xb = xBlando[y];
         if (xb < 0) continue;
         const sc = fwd(xb);
@@ -2855,38 +2870,38 @@ export function detectarContornoAnatomicoEnCanvas(
       return bestY >= 0 ? { x: xBlando[bestY], y: bestY } : null;
     };
 
-    // 5. Hitos primarios de tejido blando directamente sobre xBlando(y)
-    const pnG = buscarBlandoExtremo(dim * 0.30, dim * 0.54, 'max');
+    // 5. Extracción de hitos sobre la curva anatómica xBlando(y)
+    const pnG = buscarBlandoExtremo(dim * 0.28, dim * 0.54, 'max');
     if (!pnG) return baseWebCeph;
 
     const snG =
-      buscarBlandoExtremo(pnG.y + dim * 0.03, pnG.y + dim * 0.11, 'min') ?? {
+      buscarBlandoExtremo(pnG.y + dim * 0.035, pnG.y + dim * 0.11, 'min') ?? {
         x: pnG.x + dirIn * dim * 0.04,
         y: Math.round(pnG.y + dim * 0.06),
       };
 
-    const pogBG =
-      buscarBlandoExtremo(pnG.y + dim * 0.20, Math.min(dim * 0.82, pnG.y + dim * 0.40), 'max') ?? {
-        x: pnG.x + dirIn * dim * 0.05,
-        y: Math.round(pnG.y + dim * 0.31),
+    const bbG =
+      buscarBlandoExtremo(snG.y + dim * 0.11, Math.min(yMax - 6, pnG.y + dim * 0.34), 'min') ?? {
+        x: snG.x + dirIn * dim * 0.01,
+        y: Math.round(snG.y + dim * 0.18),
       };
 
-    const bbG =
-      buscarBlandoExtremo(snG.y + dim * 0.07, pogBG.y - dim * 0.02, 'min') ?? {
-        x: pogBG.x + dirIn * dim * 0.008,
-        y: Math.round((snG.y + pogBG.y) * 0.55),
+    const pogBG =
+      buscarBlandoExtremo(bbG.y + dim * 0.025, Math.min(dim * 0.80, bbG.y + dim * 0.16), 'max') ?? {
+        x: bbG.x + dirOut * dim * 0.005,
+        y: Math.round(bbG.y + dim * 0.07),
       };
 
     const ulG =
-      buscarBlandoExtremo(snG.y + dim * 0.015, snG.y + (bbG.y - snG.y) * 0.48, 'max') ?? {
+      buscarBlandoExtremo(snG.y + dim * 0.02, snG.y + (bbG.y - snG.y) * 0.52, 'max') ?? {
         x: snG.x + dirOut * dim * 0.02,
-        y: Math.round(snG.y + dim * 0.055),
+        y: Math.round(snG.y + dim * 0.065),
       };
 
     const llG =
       buscarBlandoExtremo(ulG.y + dim * 0.025, bbG.y - dim * 0.01, 'max') ?? {
         x: ulG.x,
-        y: Math.round(ulG.y + dim * 0.055),
+        y: Math.round(ulG.y + dim * 0.06),
       };
 
     const emG =
@@ -2902,40 +2917,34 @@ export function detectarContornoAnatomicoEnCanvas(
     };
 
     const altFacialG = pogBG.y - pnG.y;
-    if (altFacialG < dim * 0.16 || altFacialG > dim * 0.52) {
+    if (altFacialG < dim * 0.16 || altFacialG > dim * 0.55) {
       return baseWebCeph;
     }
 
-    // 6. Localizar Nasion óseo (N) sobre cortical frontal encima de Pn (ignorando posicionador)
-    const nSearchMinY = Math.max(Math.round(dim * 0.12), Math.round(pnG.y - altFacialG * 0.68));
-    const nSearchMaxY = Math.max(nSearchMinY + 4, Math.round(pnG.y - altFacialG * 0.42));
-    const nStartX = Math.max(10, Math.min(dim - 10, Math.round(pnG.x + dirIn * dim * 0.04)));
-    let nDetG: CoordenadaPunto | null = null;
-    for (let y = nSearchMinY; y <= nSearchMaxY; y++) {
-      for (let x = nStartX; miraDerecha ? x >= dim * 0.35 : x <= dim * 0.65; x += dirIn) {
-        if (lum(x, y) >= umbralHueso) {
-          let boneDepth = 0;
-          for (let k = 1; k <= 10; k++) {
-            const px = x + dirIn * k;
-            if (px >= 0 && px < dim && lum(px, y) >= umbralAire) boneDepth++;
-          }
-          if (boneDepth >= 7) {
-            if (!nDetG || fwd(x) > fwd(nDetG.x)) {
-              nDetG = { x, y };
-            }
-            break;
-          }
-        }
+    const toPx = (pt: CoordenadaPunto): CoordenadaPunto => ({
+      x: Math.max(0, Math.min(naturalW, Math.round((pt.x / dim) * naturalW))),
+      y: Math.max(0, Math.min(naturalH, Math.round((pt.y / dim) * naturalH))),
+    });
+
+    const pnPx = toPx(pnG);
+    const llPx = toPx(llG);
+    const pogBPx = toPx(pogBG);
+
+    // Si los hitos faciales coinciden dentro del 2.2% con la referencia de WebCeph, conservar 100% su fidelidad
+    if (miraDerecha && baseWebCeph.Pn && baseWebCeph.LL && baseWebCeph.Pog_b) {
+      const distProm =
+        (Math.hypot(pnPx.x - baseWebCeph.Pn.x, pnPx.y - baseWebCeph.Pn.y) +
+          Math.hypot(llPx.x - baseWebCeph.LL.x, llPx.y - baseWebCeph.LL.y) +
+          Math.hypot(pogBPx.x - baseWebCeph.Pog_b.x, pogBPx.y - baseWebCeph.Pog_b.y)) /
+        (3 * Math.min(naturalW, naturalH));
+      if (distProm <= 0.022) {
+        return baseWebCeph;
       }
     }
-    const nG: CoordenadaPunto = nDetG ?? {
-      x: Math.round(pnG.x + dirIn * altFacialG * 0.44),
-      y: Math.round(pnG.y - altFacialG * 0.58),
-    };
 
-    // Helper para obtener cortical ósea xHueso(y) con respaldo geométrico relativo a xBlando
+    // 6. Hitos óseos anteriores directamente sobre xHueso(y)
     const huesoEnY = (y: number, xBlandoRef: number, fallbackOffRatio: number): number => {
-      const yi = Math.max(yMin, Math.min(yMax, Math.round(y)));
+      const yi = Math.max(yMin + 1, Math.min(yMax - 1, Math.round(y)));
       const candidatos = [xHueso[yi - 1], xHueso[yi], xHueso[yi + 1]].filter((v) => v >= 0);
       if (candidatos.length) {
         return candidatos.reduce((a, b) => a + b, 0) / candidatos.length;
@@ -2943,29 +2952,47 @@ export function detectarContornoAnatomicoEnCanvas(
       return xBlandoRef + dirIn * dim * fallbackOffRatio;
     };
 
+    const nTargetY = Math.max(yMin + 4, Math.round(pnG.y - altFacialG * 0.58));
+    let nDetG: CoordenadaPunto | null = null;
+    for (let y = Math.max(yMin + 2, nTargetY - 6); y <= Math.min(yMax - 2, nTargetY + 6); y++) {
+      if (xHueso[y] >= 0 && (!nDetG || fwd(xHueso[y]) > fwd(nDetG.x))) {
+        nDetG = { x: xHueso[y], y };
+      }
+    }
+    const nG: CoordenadaPunto = nDetG ?? {
+      x: Math.round(pnG.x + dirIn * dim * 0.11),
+      y: nTargetY,
+    };
+
+    const sorY = Math.max(yMin + 2, Math.round(nG.y - dim * 0.045));
+    const sorG: CoordenadaPunto = {
+      x: xHueso[sorY] >= 0 ? xHueso[sorY] : nG.x + dirIn * dim * 0.025,
+      y: sorY,
+    };
+
     const ansG: CoordenadaPunto = {
-      x: huesoEnY(snG.y - dim * 0.01, snG.x, 0.045),
-      y: Math.round(snG.y - dim * 0.008),
+      x: huesoEnY(snG.y - dim * 0.008, snG.x, 0.035),
+      y: Math.round(snG.y - dim * 0.006),
     };
     const aG: CoordenadaPunto = {
-      x: huesoEnY(abG.y + dim * 0.005, abG.x, 0.05),
+      x: huesoEnY(abG.y + dim * 0.005, abG.x, 0.042),
       y: Math.round(abG.y + dim * 0.005),
     };
     const u1iG: CoordenadaPunto = {
-      x: huesoEnY(emG.y + dim * 0.028, emG.x, 0.025),
-      y: Math.round(emG.y + dim * 0.028),
+      x: huesoEnY(emG.y + dim * 0.024, emG.x, 0.022),
+      y: Math.round(emG.y + dim * 0.024),
     };
     const l1iG: CoordenadaPunto = {
       x: u1iG.x + dirIn * dim * 0.016,
-      y: Math.round(emG.y + dim * 0.016),
+      y: Math.round(emG.y + dim * 0.014),
     };
     const bG: CoordenadaPunto = {
-      x: huesoEnY(bbG.y + dim * 0.022, bbG.x, 0.052),
-      y: Math.round(bbG.y + dim * 0.022),
+      x: huesoEnY(bbG.y + dim * 0.018, bbG.x, 0.045),
+      y: Math.round(bbG.y + dim * 0.018),
     };
     const pogG: CoordenadaPunto = {
-      x: huesoEnY(pogBG.y + dim * 0.015, pogBG.x, 0.05),
-      y: Math.round(pogBG.y + dim * 0.015),
+      x: huesoEnY(pogBG.y + dim * 0.014, pogBG.x, 0.045),
+      y: Math.round(pogBG.y + dim * 0.014),
     };
     const pmG: CoordenadaPunto = {
       x: (bG.x + pogG.x) / 2 + dirOut * dim * 0.003,
@@ -2979,11 +3006,6 @@ export function detectarContornoAnatomicoEnCanvas(
       x: Math.round((pogG.x + meG.x) / 2 + dirOut * dim * 0.005),
       y: Math.round((pogG.y + meG.y) / 2 + dim * 0.006),
     };
-
-    const toPx = (pt: CoordenadaPunto): CoordenadaPunto => ({
-      x: Math.max(0, Math.min(naturalW, Math.round((pt.x / dim) * naturalW))),
-      y: Math.max(0, Math.min(naturalH, Math.round((pt.y / dim) * naturalH))),
-    });
 
     const nPx = toPx(nG);
     const mePx = toPx(meG);
@@ -3006,8 +3028,19 @@ export function detectarContornoAnatomicoEnCanvas(
       };
     }
 
-    // 8. Fijar puntos medidos directamente sobre el contorno de esta placa
+    const nabY = Math.max(yMin + 2, Math.round(nG.y + dim * 0.032));
+    const nabG: CoordenadaPunto = {
+      x: xBlando[nabY] >= 0 ? xBlando[nabY] : nG.x + dirOut * dim * 0.03,
+      y: nabY,
+    };
+    const gbG: CoordenadaPunto = {
+      x: sorG.x + dirOut * dim * 0.042,
+      y: sorG.y,
+    };
+
+    // 8. Fijar hitos medidos sobre cortical ósea y contorno cutáneo real
     const medidos: PuntosCefalometricosMap = {
+      SOr: toPx(sorG),
       N: nPx,
       ANS: toPx(ansG),
       A: toPx(aG),
@@ -3018,15 +3051,16 @@ export function detectarContornoAnatomicoEnCanvas(
       Pog: toPx(pogG),
       Gn: toPx(gnG),
       Me: mePx,
-      Pn: toPx(pnG),
+      G_b: toPx(gbG),
+      Na_b: toPx(nabG),
+      Pn: pnPx,
       Sn: toPx(snG),
       A_b: toPx(abG),
       UL: toPx(ulG),
       Em: toPx(emG),
-      LL: toPx(llG),
+      LL: llPx,
       B_b: toPx(bbG),
-      Pog_b: toPx(pogBG),
-      Na_b: toPx({ x: nG.x + dirOut * dim * 0.032, y: nG.y + altFacialG * 0.08 }),
+      Pog_b: pogBPx,
       Me_b: toPx({ x: meG.x + dirOut * dim * 0.005, y: Math.min(dim - 3, meG.y + dim * 0.035) }),
     };
 
@@ -3395,6 +3429,26 @@ export function generarContornosAnatomicosSvg(
     });
   }
 
+  // 2b. Contorno frontal craneal (SOr -> N)
+  if (puntos.SOr && puntos.N) {
+    const frentePts = [
+      { x: 375.6022, y: 385.5149 },
+      { x: 377.3894, y: 401.8553 },
+      { x: 381.8939, y: 421.386 },
+      { x: 379.6872, y: 436.7063 },
+      { x: 374.7085, y: 447.1744 },
+      { x: 371.3894, y: 450.9617 },
+    ].map((p) =>
+      transformarPunto2P(p, ACB_REF_SOR, ACB_REF_NA, puntos.SOr, puntos.N, mirror)
+    );
+    contornos.push({
+      id: 'frente_craneal',
+      d: curvaSuaveSvg(frentePts, 0.5),
+      color: azulWebCeph,
+      grosor: 1.4,
+    });
+  }
+
   // 3. Reborde orbitario (SOr -> Or)
   if (puntos.Or && (puntos.SOr || puntos.N)) {
     const rA = puntos.SOr ? ORBIT_REF_SOR : ORBIT_REF_NA;
@@ -3587,9 +3641,13 @@ export function generarContornosAnatomicosSvg(
     const nasalBridge = puntos.Na_b ? map2P({ x: 823, y: 203 }, 'Na_b', 'Pn') : null;
     const dorsumNose = puntos.Na_b ? map2P({ x: 855, y: 239 }, 'Na_b', 'Pn') : null;
     const columella = map2P({ x: 860, y: 308 }, 'Pn', 'Sn');
-    const stms = puntos.UL && puntos.Em ? map2P({ x: 844, y: 406 }, 'UL', 'Em') : puntos.Em;
     const upperEmb =
-      puntos.UL && puntos.Em ? map2P({ x: 822, y: 409 }, 'UL', 'Em') : null;
+      puntos.Em && puntos.U1I
+        ? {
+            x: puntos.Em.x + (puntos.U1I.x - puntos.Em.x) * 0.45,
+            y: puntos.Em.y + 1,
+          }
+        : null;
 
     const supPts = [
       puntos.G_b,
@@ -3601,7 +3659,7 @@ export function generarContornosAnatomicosSvg(
       puntos.Sn,
       puntos.A_b,
       puntos.UL,
-      stms,
+      puntos.Em,
       upperEmb,
     ].filter((p): p is CoordenadaPunto => Boolean(p));
 
@@ -3638,17 +3696,24 @@ export function generarContornosAnatomicosSvg(
   }
 
   if (puntos.LL && puntos.Pog_b && puntos.Me_b) {
-    const lowerEmb = puntos.Em
-      ? map2P({ x: 820, y: 415 }, 'Em', 'LL')
-      : null;
-    const stmi = puntos.Em ? map2P({ x: 845, y: 410 }, 'Em', 'LL') : null;
+    const lowerEmb =
+      puntos.Em && puntos.L1I
+        ? {
+            x: puntos.Em.x + (puntos.L1I.x - puntos.Em.x) * 0.45,
+            y: puntos.Em.y + 4,
+          }
+        : null;
     const stGn = map2P({ x: 802, y: 580 }, 'Pog_b', 'Me_b');
-    const subMand = map2P({ x: 695, y: 615 }, 'Pog_b', 'Me_b');
-    const neckC = map2P({ x: 656, y: 640 }, 'Pog_b', 'Me_b');
+    const subMand = puntos.Go
+      ? map2P({ x: 695, y: 615 }, 'Me_b', 'Go')
+      : map2P({ x: 695, y: 615 }, 'Pog_b', 'Me_b');
+    const neckC = puntos.Go
+      ? map2P({ x: 656, y: 640 }, 'Me_b', 'Go')
+      : map2P({ x: 656, y: 640 }, 'Pog_b', 'Me_b');
 
     const infPts = [
       lowerEmb,
-      stmi,
+      puntos.Em,
       puntos.LL,
       puntos.B_b,
       puntos.Pog_b,
