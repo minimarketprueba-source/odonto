@@ -3047,18 +3047,115 @@ export function detectarContornoAnatomicoEnCanvas(
     const nPx = toPx(nG);
     const mePx = toPx(meG);
 
-    // 7. Proyectar estructura craneal y posterior desde WEBCEPH_CANONICAL_PX mediante (N, Me)
+    // 6b. Detección del anillo metálico del posicionador auricular (oliva del cefalostato -> Po)
+    const altNMeG = Math.max(dim * 0.20, meG.y - nG.y);
+    const minWH = Math.min(naturalW, naturalH);
+    const poSearchYMin = Math.max(Math.round(dim * 0.18), Math.round(nG.y + altNMeG * 0.16));
+    const poSearchYMax = Math.min(Math.round(dim * 0.68), Math.round(nG.y + altNMeG * 0.52));
+    const poSearchXStart = miraDerecha
+      ? Math.max(Math.round(dim * 0.12), Math.round(nG.x - dim * 0.44))
+      : Math.max(Math.round(dim * 0.12), Math.round(nG.x + dim * 0.15));
+    const poSearchXEnd = miraDerecha
+      ? Math.min(Math.round(dim * 0.88), Math.round(nG.x - dim * 0.15))
+      : Math.min(Math.round(dim * 0.88), Math.round(nG.x + dim * 0.44));
+
+    let bestPoG: CoordenadaPunto | null = null;
+    let bestPoScore = -Infinity;
+    const dirs8 = [
+      [1, 0],
+      [0.707, 0.707],
+      [0, 1],
+      [-0.707, 0.707],
+      [-1, 0],
+      [-0.707, -0.707],
+      [0, -1],
+      [0.707, -0.707],
+    ];
+
+    for (const rG of [3.5, 4.5, 5.5, 6.5]) {
+      const rx = rG * (minWH / naturalW);
+      const ry = rG * (minWH / naturalH);
+      for (let cy = poSearchYMin; cy <= poSearchYMax; cy += 2) {
+        for (let cx = poSearchXStart; cx <= poSearchXEnd; cx += 2) {
+          const centerLum = rawLum(cx, cy);
+          let ringSum = 0;
+          let ringMin = Infinity;
+          let outerSum = 0;
+          for (const [ux, uy] of dirs8) {
+            const rv = rawLum(Math.round(cx + rx * ux), Math.round(cy + ry * uy));
+            ringSum += rv;
+            if (rv < ringMin) ringMin = rv;
+            outerSum += rawLum(
+              Math.round(cx + rx * 1.85 * ux),
+              Math.round(cy + ry * 1.85 * uy)
+            );
+          }
+          const ringMean = ringSum / 8;
+          const outerMean = outerSum / 8;
+          if (
+            ringMin >= p80Core * 0.82 &&
+            ringMean - centerLum >= 12 &&
+            ringMean - outerMean >= 8
+          ) {
+            const score = (ringMean - centerLum) + (ringMean - outerMean) + 0.25 * ringMin;
+            if (score > bestPoScore) {
+              bestPoScore = score;
+              bestPoG = {
+                x: cx,
+                y: cy - ry * 1.15,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // 7. Proyectar estructura craneal y posterior mediante transformación afín (Po, N, Me) si hay Po,
+    //    o similitud 2P (N, Me) como respaldo cuando no existe anillo auricular visible.
     const mirror = !miraDerecha;
+    const poPx = bestPoG ? toPx(bestPoG) : null;
+    const refX = (x: number) => (mirror ? WEBCEPH_REF_WIDTH - x : x);
+    const poRef = { x: refX(WEBCEPH_CANONICAL_PX.Po.x), y: WEBCEPH_CANONICAL_PX.Po.y };
+    const nRef = { x: refX(WEBCEPH_CANONICAL_PX.N.x), y: WEBCEPH_CANONICAL_PX.N.y };
+    const meRef = { x: refX(WEBCEPH_CANONICAL_PX.Me.x), y: WEBCEPH_CANONICAL_PX.Me.y };
+
+    const uRx = nRef.x - poRef.x;
+    const uRy = nRef.y - poRef.y;
+    const vRx = meRef.x - poRef.x;
+    const vRy = meRef.y - poRef.y;
+    const detRef = uRx * vRy - uRy * vRx;
+
+    const usarAfinPoNMe = Boolean(
+      poPx &&
+        Math.abs(detRef) > 1e-3 &&
+        Math.abs((nPx.x - poPx.x) * (mePx.y - poPx.y) - (nPx.y - poPx.y) * (mePx.x - poPx.x)) >
+          Math.hypot(nPx.x - poPx.x, nPx.y - poPx.y) *
+            Math.hypot(mePx.x - poPx.x, mePx.y - poPx.y) *
+            0.15
+    );
+
     const resultado: PuntosCefalometricosMap = {};
     for (const [id, ptRef] of Object.entries(WEBCEPH_CANONICAL_PX)) {
-      const tr = transformarPunto2P(
-        ptRef,
-        WEBCEPH_CANONICAL_PX.N,
-        WEBCEPH_CANONICAL_PX.Me,
-        nPx,
-        mePx,
-        mirror
-      );
+      let tr: CoordenadaPunto;
+      if (usarAfinPoNMe && poPx) {
+        const pRx = refX(ptRef.x) - poRef.x;
+        const pRy = ptRef.y - poRef.y;
+        const alpha = (pRx * vRy - pRy * vRx) / detRef;
+        const beta = (uRx * pRy - uRy * pRx) / detRef;
+        tr = {
+          x: poPx.x + alpha * (nPx.x - poPx.x) + beta * (mePx.x - poPx.x),
+          y: poPx.y + alpha * (nPx.y - poPx.y) + beta * (mePx.y - poPx.y),
+        };
+      } else {
+        tr = transformarPunto2P(
+          ptRef,
+          WEBCEPH_CANONICAL_PX.N,
+          WEBCEPH_CANONICAL_PX.Me,
+          nPx,
+          mePx,
+          mirror
+        );
+      }
       resultado[id] = {
         x: Math.max(0, Math.min(naturalW, Math.round(tr.x))),
         y: Math.max(0, Math.min(naturalH, Math.round(tr.y))),

@@ -538,4 +538,96 @@ describe('análisis de Ricketts', () => {
       spy.mockRestore();
     }
   });
+
+  it('detecta el anillo auricular del cefalostato para anclar Po y evitar deriva posterior de S/Ba/Go', () => {
+    const generarBufferConOliva = (w: number, h: number) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      // Oliva auricular ubicada en nx=0.40, ny=0.41 (más anterior que la proyección 2P N-Me)
+      const olivaX = w * 0.40;
+      const olivaY = h * 0.41;
+      const minWH = Math.min(w, h);
+      const rRing = 4.5 * (minWH / 800);
+
+      for (let y = 0; y < h; y++) {
+        const ny = y / h;
+        let blandoNorm = -1;
+        let huesoNorm = -1;
+        if (ny >= 0.14 && ny < 0.28) {
+          blandoNorm = 0.65;
+          huesoNorm = 0.62;
+        } else if (ny >= 0.28 && ny < 0.37) {
+          blandoNorm = 0.65 + ((ny - 0.28) / 0.09) * 0.08;
+          huesoNorm = 0.64;
+        } else if (ny >= 0.37 && ny < 0.44) {
+          blandoNorm = 0.73 - ((ny - 0.37) / 0.07) * 0.06;
+          huesoNorm = 0.64;
+        } else if (ny >= 0.44 && ny < 0.54) {
+          blandoNorm = 0.69;
+          huesoNorm = 0.64;
+        } else if (ny >= 0.54 && ny <= 0.78) {
+          blandoNorm = 0.66;
+          huesoNorm = 0.625;
+        }
+
+        for (let x = 0; x < w; x++) {
+          const nx = x / w;
+          let lum = 36;
+          if (blandoNorm > 0 && huesoNorm > 0 && nx >= 0.18 && nx <= blandoNorm + 0.008) {
+            if (Math.abs(nx - blandoNorm) <= 0.006) {
+              lum = 24;
+            } else if (nx <= huesoNorm) {
+              lum = 120;
+            } else {
+              lum = 48;
+            }
+          }
+          // Anillo metálico brillante con centro oscuro en (olivaX, olivaY)
+          const distOliva = Math.hypot((x - olivaX) * (minWH / w), (y - olivaY) * (minWH / h));
+          if (Math.abs(distOliva - rRing) <= 1.1) {
+            lum = 235;
+          } else if (distOliva < rRing - 1.1) {
+            lum = 75;
+          }
+
+          const i = (y * w + x) * 4;
+          data[i] = lum;
+          data[i + 1] = lum;
+          data[i + 2] = lum;
+          data[i + 3] = 255;
+        }
+      }
+      return data;
+    };
+
+    const origCreate = document.createElement.bind(document);
+    const spy = vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+      if (tag === 'canvas') {
+        const fakeCanvas = {
+          width: 240,
+          height: 240,
+          getContext: () => ({
+            drawImage: () => {},
+            getImageData: (_sx: number, _sy: number, sw: number, sh: number) => ({
+              data: generarBufferConOliva(sw || fakeCanvas.width, sh || fakeCanvas.height),
+            }),
+          }),
+        };
+        return fakeCanvas as unknown as HTMLCanvasElement;
+      }
+      return origCreate(tag);
+    }) as typeof document.createElement);
+
+    try {
+      const fakeImg = { naturalWidth: 1000, naturalHeight: 800 } as HTMLImageElement;
+      const detectados = detectarContornoAnatomicoEnCanvas(fakeImg, false);
+      // Po debe anclarse sobre la oliva (x ≈ 400, y ≈ 300-330), no derivar a x < 300
+      expect(detectados.Po.x).toBeGreaterThan(365);
+      expect(detectados.Po.x).toBeLessThan(435);
+      expect(detectados.Po.y).toBeGreaterThan(280);
+      expect(detectados.Po.y).toBeLessThan(340);
+      expect(detectados.S.x).toBeGreaterThan(detectados.Po.x);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
