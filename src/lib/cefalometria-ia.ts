@@ -63,11 +63,15 @@ export function validarYCompletarPuntosIA(
   puntosDetectados: PuntosCefalometricosMap,
   imgW: number,
   imgH: number,
-  esFrontal = false
+  esFrontal = false,
+  plantillaRespaldo?: PuntosCefalometricosMap
 ): PuntosCefalometricosMap {
   const w = Math.max(100, imgW || 1005);
   const h = Math.max(100, imgH || 803);
-  const plantillaBase = generarPlantillaWebCeph(w, h, esFrontal);
+  const plantillaBase =
+    plantillaRespaldo && Object.keys(plantillaRespaldo).length > 0
+      ? plantillaRespaldo
+      : generarPlantillaWebCeph(w, h, esFrontal);
 
   const limpios: PuntosCefalometricosMap = {};
   for (const [id, pt] of Object.entries(puntosDetectados || {})) {
@@ -104,9 +108,39 @@ export function validarYCompletarPuntosIA(
     return plantillaBase;
   }
 
-  // Proyectar plantilla WebCeph al triángulo anatómico (S, N, Me) detectado
-  const alineados = alinearPlantillaASNaMe({}, w, h, { S: s, N: n, Me: me });
+  // Proyectar plantilla WebCeph al triángulo anatómico (S, N, Me) detectado y conservar contorno medido localmente como respaldo
+  const baseAlineada = alinearPlantillaASNaMe({}, w, h, { S: s, N: n, Me: me });
+  const alineados: PuntosCefalometricosMap = {
+    ...baseAlineada,
+    ...(plantillaRespaldo || {}),
+  };
   const tolPx = Math.min(w, h) * 0.14;
+  const tolContornoPx = Math.min(w, h) * 0.06;
+  const idsContornoMedido = new Set([
+    'SOr',
+    'N',
+    'Po',
+    'ANS',
+    'A',
+    'U1I',
+    'L1I',
+    'B',
+    'PM',
+    'Pog',
+    'Gn',
+    'Me',
+    'G_b',
+    'Na_b',
+    'Pn',
+    'Sn',
+    'A_b',
+    'UL',
+    'Em',
+    'LL',
+    'B_b',
+    'Pog_b',
+    'Me_b',
+  ]);
   const resultado: PuntosCefalometricosMap = { ...alineados, S: s, N: n, Me: me };
 
   for (const [id, pt] of Object.entries(limpios)) {
@@ -116,8 +150,19 @@ export function validarYCompletarPuntosIA(
       resultado[id] = pt;
       continue;
     }
-    if (Math.hypot(pt.x - ref.x, pt.y - ref.y) <= tolPx) {
+    const tol = plantillaRespaldo && idsContornoMedido.has(id) ? tolContornoPx : tolPx;
+    if (Math.hypot(pt.x - ref.x, pt.y - ref.y) <= tol) {
       resultado[id] = pt;
+    }
+  }
+
+  if (plantillaRespaldo) {
+    for (const id of ['N', 'Me'] as const) {
+      const localPt = plantillaRespaldo[id];
+      const iaPt = resultado[id];
+      if (localPt && iaPt && Math.hypot(iaPt.x - localPt.x, iaPt.y - localPt.y) > tolContornoPx) {
+        resultado[id] = localPt;
+      }
     }
   }
 
@@ -180,6 +225,7 @@ export async function detectarPuntosConIA(
   imgH: number,
   esFrontal = false
 ): Promise<ResultadoDeteccionIA> {
+  const puntosLocales = detectarPuntosVisionLocal(img, imgW, imgH, esFrontal);
   const apiKey = obtenerGeminiApiKey();
 
   if (apiKey && img && !esFrontal) {
@@ -233,7 +279,13 @@ export async function detectarPuntosConIA(
                 };
               }
             }
-            const validados = validarYCompletarPuntosIA(pxMap, naturalW, naturalH, false);
+            const validados = validarYCompletarPuntosIA(
+              pxMap,
+              naturalW,
+              naturalH,
+              false,
+              puntosLocales
+            );
             return {
               puntos: validados,
               metodo: 'gemini-vision',
@@ -247,7 +299,6 @@ export async function detectarPuntosConIA(
     }
   }
 
-  const puntosLocales = detectarPuntosVisionLocal(img, imgW, imgH, esFrontal);
   return {
     puntos: puntosLocales,
     metodo: 'vision-local',

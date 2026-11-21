@@ -2746,48 +2746,48 @@ export function detectarContornoAnatomicoEnCanvas(
     const dirIn = miraDerecha ? -1 : 1;
     const dirOut = -dirIn;
 
-    // 2. Aire abierto anterior (percentil 35: evita cadenas metálicas brillantes y banda oscura de borde)
+    // 2. Aire abierto anterior (percentil 18 filtrando bordes negros para resistir rostros adelantados)
     const airSamples: number[] = [];
-    const airXMin = miraDerecha ? Math.round(dim * 0.70) : Math.round(dim * 0.08);
-    const airXMax = miraDerecha ? Math.round(dim * 0.92) : Math.round(dim * 0.30);
+    const airXMin = miraDerecha ? Math.round(dim * 0.68) : Math.round(dim * 0.04);
+    const airXMax = miraDerecha ? Math.round(dim * 0.96) : Math.round(dim * 0.32);
     for (let y = Math.round(dim * 0.34); y <= Math.round(dim * 0.74); y++) {
       for (let x = airXMin; x <= airXMax; x++) {
-        airSamples.push(lum(x, y));
+        const v = lum(x, y);
+        if (v > 12) airSamples.push(v);
       }
     }
     airSamples.sort((a, b) => a - b);
-    const bgAir = airSamples[Math.floor(airSamples.length * 0.35)] ?? 35;
-    const umbralHueso = bgAir + (p80Core - bgAir) * 0.32;
-
-    // 3. Etapa 1: Cortical ósea / dental anterior xHueso(y)
-    const yMin = Math.round(dim * 0.10);
-    const yMax = Math.round(dim * 0.80);
-    const xHuesoRaw = new Float32Array(dim).fill(-1);
+    const bgAir = airSamples.length
+      ? (airSamples[Math.floor(airSamples.length * 0.18)] ?? 35)
+      : 35;
+    const umbralHueso = bgAir + (p80Core - bgAir) * 0.34;
     const umbralContiguo = (bgAir + umbralHueso) * 0.5;
 
-    for (let y = yMin; y <= yMax; y++) {
-      const upperBand = y < Math.round(dim * 0.30);
-      const startX = miraDerecha
-        ? Math.round(dim * (upperBand ? 0.79 : 0.86))
-        : Math.round(dim * (upperBand ? 0.21 : 0.14));
-      const endX = miraDerecha ? Math.round(dim * 0.36) : Math.round(dim * 0.64);
+    // 3. Etapa 1: Cortical ósea / dental anterior xHueso(y) en dos pasos (medio-inferior -> superior)
+    const yMin = Math.round(dim * 0.10);
+    const yMax = Math.round(dim * 0.88);
+    const xHuesoRaw = new Float32Array(dim).fill(-1);
+    const fwd = (x: number) => (miraDerecha ? x : dim - x);
+    const endX = miraDerecha ? Math.round(dim * 0.36) : Math.round(dim * 0.64);
+    const yMidSplit = Math.round(dim * 0.40);
 
-      for (let x = startX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
+    // Paso 3A: Tercio medio e inferior con masa craneal profunda para ignorar cadenas metálicas
+    const lowerStartX = miraDerecha ? Math.round(dim * 0.93) : Math.round(dim * 0.07);
+    for (let y = yMidSplit; y <= yMax; y++) {
+      for (let x = lowerStartX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
         if (lum(x, y) >= umbralHueso) {
           let inCnt = 0;
           let imme = 0;
-          for (let k = 1; k <= 18; k++) {
+          let deepCnt = 0;
+          for (let k = 1; k <= 24; k++) {
             const px = x + dirIn * k;
             if (px < 0 || px >= dim) break;
             const lv = lum(px, y);
-            if (lv >= bgAir + 8) {
-              inCnt++;
-            }
-            if (k <= 5 && lv >= umbralContiguo) {
-              imme++;
-            }
+            if (k <= 18 && lv >= bgAir + 8) inCnt++;
+            if (k <= 5 && lv >= umbralContiguo) imme++;
+            if (k >= 6 && k <= 24 && lv >= bgAir + 10) deepCnt++;
           }
-          if (inCnt >= 12 && imme >= 4) {
+          if (inCnt >= 12 && imme >= 4 && deepCnt >= 11) {
             xHuesoRaw[y] = x;
             break;
           }
@@ -2795,58 +2795,127 @@ export function detectarContornoAnatomicoEnCanvas(
       }
     }
 
+    // Anclaje medio-facial (xMaxilaMed) para delimitar frente/hueso nasal sin golpear el posicionador plástico
+    const midVals: number[] = [];
+    for (let y = Math.round(dim * 0.45); y <= Math.round(dim * 0.68); y++) {
+      if (xHuesoRaw[y] >= 0) midVals.push(xHuesoRaw[y]);
+    }
+    midVals.sort((a, b) => a - b);
+    const xMaxilaMed = midVals.length
+      ? midVals[Math.floor(midVals.length * 0.5)]
+      : miraDerecha
+      ? dim * 0.76
+      : dim * 0.24;
+
+    // Paso 3B: Tercio superior arrancando justo por delante de xMaxilaMed
+    const upperStartX = miraDerecha
+      ? Math.min(Math.round(dim * 0.90), Math.round(xMaxilaMed + 1))
+      : Math.max(Math.round(dim * 0.10), Math.round(xMaxilaMed - 1));
+    for (let y = yMin; y < yMidSplit; y++) {
+      for (let x = upperStartX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
+        if (lum(x, y) >= umbralHueso) {
+          let inCnt = 0;
+          let imme = 0;
+          let deepCnt = 0;
+          for (let k = 1; k <= 22; k++) {
+            const px = x + dirIn * k;
+            if (px < 0 || px >= dim) break;
+            const lv = lum(px, y);
+            if (k <= 18 && lv >= bgAir + 8) inCnt++;
+            if (k <= 5 && lv >= umbralContiguo) imme++;
+            if (k >= 6 && k <= 22 && lv >= bgAir + 10) deepCnt++;
+          }
+          if (inCnt >= 12 && imme >= 4 && deepCnt >= 9) {
+            xHuesoRaw[y] = x;
+            break;
+          }
+        }
+      }
+    }
+
+    // Límite inferior mentoniano (paso submentoniano debajo de Me)
+    let yChinMax = Math.round(dim * 0.82);
+    const esDetrasDeMaxila = (v: number) =>
+      v < 0 || fwd(v) < fwd(xMaxilaMed) - dim * 0.085;
+    for (let y = Math.round(dim * 0.64); y <= yMax - 2; y++) {
+      if (esDetrasDeMaxila(xHuesoRaw[y]) && esDetrasDeMaxila(xHuesoRaw[y + 1])) {
+        yChinMax = y - 1;
+        break;
+      }
+    }
+    yChinMax = Math.max(yMin + 12, Math.min(yMax - 1, yChinMax));
+
     const xHueso = new Float32Array(dim).fill(-1);
     let filasHueso = 0;
-    for (let y = yMin + 1; y <= yMax - 1; y++) {
+    const piriYMin = Math.round(dim * 0.32);
+    const piriYMax = Math.round(dim * 0.52);
+    for (let y = yMin + 1; y <= yChinMax; y++) {
       const vals = [xHuesoRaw[y - 1], xHuesoRaw[y], xHuesoRaw[y + 1]].filter((v) => v >= 0);
       if (vals.length >= 2) {
         vals.sort((a, b) => a - b);
-        xHueso[y] = vals[Math.floor(vals.length / 2)];
+        let v = vals[Math.floor(vals.length / 2)];
+        // Puente sobre la apertura piriforme para no encoger la ventana nasal
+        if (y >= piriYMin && y <= piriYMax && fwd(v) < fwd(xMaxilaMed) - 7) {
+          v = xMaxilaMed + dirIn * 5;
+        }
+        xHueso[y] = v;
         filasHueso++;
       }
     }
     if (filasHueso < 35) return baseWebCeph;
 
-    // 4. Etapa 2: Contorno cutáneo xBlando(y) anclado frente a xHueso(y) con detección de banda de Mach
+    // 4. Etapa 2: Contorno cutáneo xBlando(y) por caída de gradiente hacia la banda de Mach
     const xBlandoRaw = new Float32Array(dim).fill(-1);
-    for (let y = yMin + 1; y <= yMax - 1; y++) {
+    const maxSoftLum = bgAir + (umbralHueso - bgAir) * 0.35;
+    const absLimitX = miraDerecha
+      ? Math.min(Math.round(dim * 0.945), Math.round(xMaxilaMed + dim * 0.125))
+      : Math.max(Math.round(dim * 0.055), Math.round(xMaxilaMed - dim * 0.125));
+
+    for (let y = yMin + 1; y <= yChinMax; y++) {
       const xh = xHueso[y];
       if (xh < 0) continue;
-      const maxOffRatio = y < Math.round(dim * 0.24) ? 0.042 : 0.095;
-      const minOffPx = Math.round(dim * 0.012);
-      const maxOffPx = Math.round(dim * maxOffRatio);
+      const rOff =
+        y < Math.round(dim * 0.36) ? 0.060 : y <= Math.round(dim * 0.50) ? 0.140 : 0.095;
+      const minOffPx = Math.round(dim * 0.018);
+      const maxOffPx = Math.round(dim * rOff);
 
-      let found = -1;
-      let minM = 999;
-      let xM = -1;
-
-      for (let off = maxOffPx; off >= minOffPx; off--) {
+      let bestX = -1;
+      let bestScore = -1;
+      for (let off = minOffPx; off <= maxOffPx; off++) {
         const x = Math.round(xh + dirOut * off);
-        if (x < 2 || x >= dim - 2) continue;
-        const l = lum(x, y);
-        if (l < minM) {
-          minM = l;
-          xM = x;
-        }
-        if (l >= bgAir + 3.5 && lum(x + dirIn, y) >= bgAir + 4.0) {
-          found = x;
-          break;
-        }
-      }
+        if (x < 2 || x >= dim - 2 || fwd(x) >= fwd(absLimitX)) break;
+        const lEdge = Math.min(lum(x, y), rawLum(x, y), rawLum(x + dirOut, y));
+        if (lEdge > maxSoftLum) continue;
 
-      if (found >= 0 && xM >= 0 && Math.abs(xM - found) <= 4 && minM < bgAir - 2.5) {
-        found = (found + xM) * 0.5;
-      } else if (found < 0 && xM >= 0 && minM < bgAir - 2.5) {
-        found = xM + dirIn;
+        const lIn1 = Math.min(umbralHueso, lum(x + dirIn, y));
+        const lIn2 = Math.min(umbralHueso, lum(x + dirIn * 2, y));
+        const lIn3 = Math.min(umbralHueso, lum(x + dirIn * 3, y));
+        const lIn = Math.max(lIn1, lIn2, lIn3);
+        const drop = lIn - lEdge;
+        if (drop < 2.8) continue;
+
+        const lOut = (lum(x + dirOut * 2, y) + lum(x + dirOut * 3, y)) * 0.5;
+        const machDip = Math.max(0, lOut - lEdge);
+        const score = drop + 1.8 * machDip + off * 0.22;
+        if (score > bestScore) {
+          bestScore = score;
+          bestX = x;
+        }
       }
-      if (found >= 0) xBlandoRaw[y] = found;
+      if (bestX >= 0) xBlandoRaw[y] = bestX;
     }
 
     const xBlando = new Float32Array(dim).fill(-1);
     let filasBlando = 0;
-    for (let y = yMin + 2; y <= yMax - 2; y++) {
-      const vals = [xBlandoRaw[y - 1], xBlandoRaw[y], xBlandoRaw[y + 1]].filter((v) => v >= 0);
-      if (vals.length >= 2) {
+    for (let y = yMin + 2; y <= yChinMax - 1; y++) {
+      const vals = [
+        xBlandoRaw[y - 2],
+        xBlandoRaw[y - 1],
+        xBlandoRaw[y],
+        xBlandoRaw[y + 1],
+        xBlandoRaw[y + 2],
+      ].filter((v) => v >= 0);
+      if (vals.length >= 3) {
         vals.sort((a, b) => a - b);
         xBlando[y] = vals[Math.floor(vals.length / 2)];
         filasBlando++;
@@ -2854,13 +2923,12 @@ export function detectarContornoAnatomicoEnCanvas(
     }
     if (filasBlando < 35) return baseWebCeph;
 
-    const fwd = (x: number) => (miraDerecha ? x : dim - x);
     const buscarBlandoExtremo = (yIni: number, yFin: number, modo: 'max' | 'min') => {
       let bestY = -1;
       let bestScore = modo === 'max' ? -Infinity : Infinity;
       for (
         let y = Math.max(yMin + 2, Math.round(yIni));
-        y <= Math.min(yMax - 2, Math.round(yFin));
+        y <= Math.min(yChinMax - 1, Math.round(yFin));
         y++
       ) {
         const xb = xBlando[y];
@@ -2875,23 +2943,34 @@ export function detectarContornoAnatomicoEnCanvas(
     };
 
     // 5. Extracción de hitos sobre la curva anatómica xBlando(y)
-    const pnG = buscarBlandoExtremo(dim * 0.28, dim * 0.54, 'max');
+    const pnG = buscarBlandoExtremo(dim * 0.34, dim * 0.50, 'max');
     if (!pnG) return baseWebCeph;
 
     const snG =
-      buscarBlandoExtremo(pnG.y + dim * 0.035, pnG.y + dim * 0.11, 'min') ?? {
+      buscarBlandoExtremo(pnG.y + dim * 0.018, pnG.y + dim * 0.09, 'min') ?? {
         x: pnG.x + dirIn * dim * 0.04,
-        y: Math.round(pnG.y + dim * 0.06),
+        y: Math.round(pnG.y + dim * 0.055),
       };
+    if (fwd(snG.x) > fwd(pnG.x) - dim * 0.025) {
+      snG.x = pnG.x + dirIn * dim * 0.032;
+    }
 
     const bbG =
-      buscarBlandoExtremo(snG.y + dim * 0.11, Math.min(yMax - 6, pnG.y + dim * 0.34), 'min') ?? {
+      buscarBlandoExtremo(
+        snG.y + dim * 0.10,
+        Math.min(yChinMax - 6, pnG.y + dim * 0.30),
+        'min'
+      ) ?? {
         x: snG.x + dirIn * dim * 0.01,
         y: Math.round(snG.y + dim * 0.18),
       };
 
     const pogBG =
-      buscarBlandoExtremo(bbG.y + dim * 0.025, Math.min(dim * 0.80, bbG.y + dim * 0.16), 'max') ?? {
+      buscarBlandoExtremo(
+        bbG.y + 4,
+        Math.max(bbG.y + 6, yChinMax - 1),
+        'max'
+      ) ?? {
         x: bbG.x + dirOut * dim * 0.005,
         y: Math.round(bbG.y + dim * 0.07),
       };
@@ -2903,7 +2982,7 @@ export function detectarContornoAnatomicoEnCanvas(
       };
 
     const llG =
-      buscarBlandoExtremo(ulG.y + dim * 0.025, bbG.y - dim * 0.01, 'max') ?? {
+      buscarBlandoExtremo(ulG.y + dim * 0.02, bbG.y - dim * 0.01, 'max') ?? {
         x: ulG.x,
         y: Math.round(ulG.y + dim * 0.06),
       };
@@ -2921,7 +3000,7 @@ export function detectarContornoAnatomicoEnCanvas(
     };
 
     const altFacialG = pogBG.y - pnG.y;
-    if (altFacialG < dim * 0.16 || altFacialG > dim * 0.55) {
+    if (altFacialG < dim * 0.14 || altFacialG > dim * 0.60) {
       return baseWebCeph;
     }
 
@@ -2933,18 +3012,6 @@ export function detectarContornoAnatomicoEnCanvas(
     const pnPx = toPx(pnG);
     const llPx = toPx(llG);
     const pogBPx = toPx(pogBG);
-
-    // Si los hitos faciales coinciden dentro del 2.2% con la referencia de WebCeph, conservar 100% su fidelidad
-    if (miraDerecha && baseWebCeph.Pn && baseWebCeph.LL && baseWebCeph.Pog_b) {
-      const distProm =
-        (Math.hypot(pnPx.x - baseWebCeph.Pn.x, pnPx.y - baseWebCeph.Pn.y) +
-          Math.hypot(llPx.x - baseWebCeph.LL.x, llPx.y - baseWebCeph.LL.y) +
-          Math.hypot(pogBPx.x - baseWebCeph.Pog_b.x, pogBPx.y - baseWebCeph.Pog_b.y)) /
-        (3 * Math.min(naturalW, naturalH));
-      if (distProm <= 0.022) {
-        return baseWebCeph;
-      }
-    }
 
     // 6. Hitos óseos anteriores directamente sobre xHueso(y)
     const huesoEnY = (y: number, xBlandoRef: number, fallbackOffRatio: number): number => {
@@ -3050,7 +3117,7 @@ export function detectarContornoAnatomicoEnCanvas(
     // 6b. Detección del anillo metálico del posicionador auricular (oliva del cefalostato -> Po)
     const altNMeG = Math.max(dim * 0.20, meG.y - nG.y);
     const minWH = Math.min(naturalW, naturalH);
-    const poSearchYMin = Math.max(Math.round(dim * 0.18), Math.round(nG.y + altNMeG * 0.16));
+    const poSearchYMin = Math.max(Math.round(dim * 0.18), Math.round(nG.y + altNMeG * 0.08));
     const poSearchYMax = Math.min(Math.round(dim * 0.68), Math.round(nG.y + altNMeG * 0.52));
     const poSearchXStart = miraDerecha
       ? Math.max(Math.round(dim * 0.12), Math.round(nG.x - dim * 0.44))
@@ -3092,12 +3159,9 @@ export function detectarContornoAnatomicoEnCanvas(
           }
           const ringMean = ringSum / 8;
           const outerMean = outerSum / 8;
-          if (
-            ringMin >= p80Core * 0.82 &&
-            ringMean - centerLum >= 12 &&
-            ringMean - outerMean >= 8
-          ) {
-            const score = (ringMean - centerLum) + (ringMean - outerMean) + 0.25 * ringMin;
+          if (ringMin >= p80Core * 0.80 && ringMean - centerLum >= 14) {
+            const score =
+              (ringMean - centerLum) * 1.5 + Math.max(0, ringMean - outerMean) + 0.25 * ringMin;
             if (score > bestPoScore) {
               bestPoScore = score;
               bestPoG = {
