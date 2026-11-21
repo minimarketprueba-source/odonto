@@ -2763,16 +2763,35 @@ export function detectarContornoAnatomicoEnCanvas(
     const umbralHueso = bgAir + (p80Core - bgAir) * 0.34;
     const umbralContiguo = (bgAir + umbralHueso) * 0.5;
 
+    // 2b. Detección automática de cadena metálica lateral vertical (solo si existe con aire detrás)
+    let chainLimitX = miraDerecha ? Math.round(dim * 0.985) : Math.round(dim * 0.015);
+    const chainStart = miraDerecha ? Math.round(dim * 0.86) : Math.round(dim * 0.14);
+    const chainEnd = miraDerecha ? Math.round(dim * 0.97) : Math.round(dim * 0.03);
+    for (let x = chainStart; miraDerecha ? x <= chainEnd : x >= chainEnd; x += dirOut) {
+      let brightRows = 0;
+      for (let y = Math.round(dim * 0.15); y <= Math.round(dim * 0.82); y += 2) {
+        if (rawLum(x, y) >= umbralHueso && lum(x + dirIn * 5, y) <= bgAir + 12) {
+          brightRows++;
+        }
+      }
+      if (brightRows >= 14) {
+        chainLimitX = x + dirIn * 4;
+        break;
+      }
+    }
+
     // 3. Etapa 1: Cortical ósea / dental anterior xHueso(y) en dos pasos (medio-inferior -> superior)
-    const yMin = Math.round(dim * 0.10);
-    const yMax = Math.round(dim * 0.88);
+    const yMin = Math.round(dim * 0.08);
+    const yMax = Math.round(dim * 0.93);
     const xHuesoRaw = new Float32Array(dim).fill(-1);
     const fwd = (x: number) => (miraDerecha ? x : dim - x);
     const endX = miraDerecha ? Math.round(dim * 0.36) : Math.round(dim * 0.64);
-    const yMidSplit = Math.round(dim * 0.40);
+    const yMidSplit = Math.round(dim * 0.48);
 
     // Paso 3A: Tercio medio e inferior con masa craneal profunda para ignorar cadenas metálicas
-    const lowerStartX = miraDerecha ? Math.round(dim * 0.93) : Math.round(dim * 0.07);
+    const lowerStartX = miraDerecha
+      ? Math.min(chainLimitX, Math.round(dim * 0.94))
+      : Math.max(chainLimitX, Math.round(dim * 0.06));
     for (let y = yMidSplit; y <= yMax; y++) {
       for (let x = lowerStartX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
         if (lum(x, y) >= umbralHueso) {
@@ -2795,9 +2814,9 @@ export function detectarContornoAnatomicoEnCanvas(
       }
     }
 
-    // Anclaje medio-facial (xMaxilaMed) para delimitar frente/hueso nasal sin golpear el posicionador plástico
+    // Anclaje medio-facial (xMaxilaMed) libre de posicionador nasal en todas las placas
     const midVals: number[] = [];
-    for (let y = Math.round(dim * 0.45); y <= Math.round(dim * 0.68); y++) {
+    for (let y = Math.round(dim * 0.50); y <= Math.round(dim * 0.75); y++) {
       if (xHuesoRaw[y] >= 0) midVals.push(xHuesoRaw[y]);
     }
     midVals.sort((a, b) => a - b);
@@ -2809,8 +2828,8 @@ export function detectarContornoAnatomicoEnCanvas(
 
     // Paso 3B: Tercio superior arrancando justo por delante de xMaxilaMed
     const upperStartX = miraDerecha
-      ? Math.min(Math.round(dim * 0.90), Math.round(xMaxilaMed + 1))
-      : Math.max(Math.round(dim * 0.10), Math.round(xMaxilaMed - 1));
+      ? Math.min(chainLimitX, Math.round(xMaxilaMed + 1))
+      : Math.max(chainLimitX, Math.round(xMaxilaMed - 1));
     for (let y = yMin; y < yMidSplit; y++) {
       for (let x = upperStartX; miraDerecha ? x >= endX : x <= endX; x += dirIn) {
         if (lum(x, y) >= umbralHueso) {
@@ -2834,10 +2853,10 @@ export function detectarContornoAnatomicoEnCanvas(
     }
 
     // Límite inferior mentoniano (paso submentoniano debajo de Me)
-    let yChinMax = Math.round(dim * 0.82);
+    let yChinMax = Math.round(dim * 0.88);
     const esDetrasDeMaxila = (v: number) =>
-      v < 0 || fwd(v) < fwd(xMaxilaMed) - dim * 0.085;
-    for (let y = Math.round(dim * 0.64); y <= yMax - 2; y++) {
+      v < 0 || fwd(v) < fwd(xMaxilaMed) - dim * 0.12;
+    for (let y = Math.round(dim * 0.68); y <= yMax - 2; y++) {
       if (esDetrasDeMaxila(xHuesoRaw[y]) && esDetrasDeMaxila(xHuesoRaw[y + 1])) {
         yChinMax = y - 1;
         break;
@@ -2845,10 +2864,12 @@ export function detectarContornoAnatomicoEnCanvas(
     }
     yChinMax = Math.max(yMin + 12, Math.min(yMax - 1, yChinMax));
 
+    const piriYMin = Math.max(yMin + 4, Math.round(yChinMax - dim * 0.39));
+    const piriYMax = Math.max(piriYMin + 8, Math.round(yChinMax - dim * 0.25));
+    const foreheadYMax = Math.max(yMin + 4, Math.round(yChinMax - dim * 0.43));
+
     const xHueso = new Float32Array(dim).fill(-1);
     let filasHueso = 0;
-    const piriYMin = Math.round(dim * 0.32);
-    const piriYMax = Math.round(dim * 0.52);
     for (let y = yMin + 1; y <= yChinMax; y++) {
       const vals = [xHuesoRaw[y - 1], xHuesoRaw[y], xHuesoRaw[y + 1]].filter((v) => v >= 0);
       if (vals.length >= 2) {
@@ -2866,16 +2887,16 @@ export function detectarContornoAnatomicoEnCanvas(
 
     // 4. Etapa 2: Contorno cutáneo xBlando(y) por caída de gradiente hacia la banda de Mach
     const xBlandoRaw = new Float32Array(dim).fill(-1);
-    const maxSoftLum = bgAir + (umbralHueso - bgAir) * 0.35;
+    const maxSoftLum = bgAir + (umbralHueso - bgAir) * 0.36;
     const absLimitX = miraDerecha
-      ? Math.min(Math.round(dim * 0.945), Math.round(xMaxilaMed + dim * 0.125))
-      : Math.max(Math.round(dim * 0.055), Math.round(xMaxilaMed - dim * 0.125));
+      ? Math.min(chainLimitX, Math.round(xMaxilaMed + dim * 0.145))
+      : Math.max(chainLimitX, Math.round(xMaxilaMed - dim * 0.145));
 
     for (let y = yMin + 1; y <= yChinMax; y++) {
       const xh = xHueso[y];
       if (xh < 0) continue;
       const rOff =
-        y < Math.round(dim * 0.36) ? 0.060 : y <= Math.round(dim * 0.50) ? 0.140 : 0.095;
+        y < foreheadYMax ? 0.060 : y >= piriYMin && y <= piriYMax ? 0.145 : 0.095;
       const minOffPx = Math.round(dim * 0.018);
       const maxOffPx = Math.round(dim * rOff);
 
@@ -2896,7 +2917,7 @@ export function detectarContornoAnatomicoEnCanvas(
 
         const lOut = (lum(x + dirOut * 2, y) + lum(x + dirOut * 3, y)) * 0.5;
         const machDip = Math.max(0, lOut - lEdge);
-        const score = drop + 1.8 * machDip + off * 0.22;
+        const score = drop + 1.8 * machDip + off * 0.25;
         if (score > bestScore) {
           bestScore = score;
           bestX = x;
@@ -2942,14 +2963,18 @@ export function detectarContornoAnatomicoEnCanvas(
       return bestY >= 0 ? { x: xBlando[bestY], y: bestY } : null;
     };
 
-    // 5. Extracción de hitos sobre la curva anatómica xBlando(y)
-    const pnG = buscarBlandoExtremo(dim * 0.34, dim * 0.50, 'max');
+    // 5. Extracción de hitos sobre la curva anatómica xBlando(y) autocalibrada respecto a yChinMax
+    const pnY0 = Math.max(Math.round(dim * 0.32), Math.round(yChinMax - dim * 0.415));
+    const pnY1 = Math.min(Math.round(dim * 0.58), Math.round(yChinMax - dim * 0.28));
+    const pnG = buscarBlandoExtremo(pnY0, pnY1, 'max');
     if (!pnG) return baseWebCeph;
 
+    const altInfG = Math.max(Math.round(dim * 0.24), yChinMax - pnG.y);
+
     const snG =
-      buscarBlandoExtremo(pnG.y + dim * 0.018, pnG.y + dim * 0.09, 'min') ?? {
+      buscarBlandoExtremo(pnG.y + altInfG * 0.10, pnG.y + altInfG * 0.24, 'min') ?? {
         x: pnG.x + dirIn * dim * 0.04,
-        y: Math.round(pnG.y + dim * 0.055),
+        y: Math.round(pnG.y + altInfG * 0.16),
       };
     if (fwd(snG.x) > fwd(pnG.x) - dim * 0.025) {
       snG.x = pnG.x + dirIn * dim * 0.032;
@@ -2957,12 +2982,12 @@ export function detectarContornoAnatomicoEnCanvas(
 
     const bbG =
       buscarBlandoExtremo(
-        snG.y + dim * 0.10,
-        Math.min(yChinMax - 6, pnG.y + dim * 0.30),
+        pnG.y + altInfG * 0.55,
+        Math.min(yChinMax - 6, pnG.y + altInfG * 0.78),
         'min'
       ) ?? {
         x: snG.x + dirIn * dim * 0.01,
-        y: Math.round(snG.y + dim * 0.18),
+        y: Math.round(pnG.y + altInfG * 0.68),
       };
 
     const pogBG =
@@ -2976,13 +3001,13 @@ export function detectarContornoAnatomicoEnCanvas(
       };
 
     const ulG =
-      buscarBlandoExtremo(snG.y + dim * 0.02, snG.y + (bbG.y - snG.y) * 0.52, 'max') ?? {
+      buscarBlandoExtremo(snG.y + 4, snG.y + (bbG.y - snG.y) * 0.50, 'max') ?? {
         x: snG.x + dirOut * dim * 0.02,
         y: Math.round(snG.y + dim * 0.065),
       };
 
     const llG =
-      buscarBlandoExtremo(ulG.y + dim * 0.02, bbG.y - dim * 0.01, 'max') ?? {
+      buscarBlandoExtremo(ulG.y + 4, bbG.y - 2, 'max') ?? {
         x: ulG.x,
         y: Math.round(ulG.y + dim * 0.06),
       };
@@ -3104,7 +3129,7 @@ export function detectarContornoAnatomicoEnCanvas(
     };
     const meG: CoordenadaPunto = {
       x: Math.round(pogG.x + dirIn * dim * 0.026),
-      y: Math.round(pogG.y + dim * 0.028),
+      y: Math.max(Math.round(pogG.y + dim * 0.028), Math.min(yChinMax, Math.round(pogG.y + dim * 0.055))),
     };
     const gnG: CoordenadaPunto = {
       x: Math.round((pogG.x + meG.x) / 2 + dirOut * dim * 0.005),
