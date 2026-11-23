@@ -2996,15 +2996,36 @@ export function detectarContornoAnatomicoEnCanvas(
         y: Math.round(pnG.y + altInfG * 0.68),
       };
 
-    const pogBG =
-      buscarBlandoExtremo(
-        bbG.y + 4,
-        Math.max(bbG.y + 6, yChinMax - 1),
-        'max'
-      ) ?? {
-        x: bbG.x + dirOut * dim * 0.005,
-        y: Math.round(bbG.y + dim * 0.07),
-      };
+    const pogYMin = Math.max(yMin + 2, bbG.y + 4);
+    const pogYMax = Math.min(yChinMax - 1, Math.max(bbG.y + 6, yChinMax - 1));
+    let maxPogFwd = -Infinity;
+    let maxPogX = -1;
+    for (let y = pogYMin; y <= pogYMax; y++) {
+      if (xBlando[y] < 0) continue;
+      const f = fwd(xBlando[y]);
+      if (f > maxPogFwd) {
+        maxPogFwd = f;
+        maxPogX = xBlando[y];
+      }
+    }
+    const filasPog: number[] = [];
+    if (maxPogX >= 0) {
+      for (let y = pogYMin; y <= pogYMax; y++) {
+        if (xBlando[y] >= 0 && fwd(xBlando[y]) >= maxPogFwd - 1.0) {
+          filasPog.push(y);
+        }
+      }
+    }
+    const pogBG: CoordenadaPunto =
+      filasPog.length > 0 && maxPogX >= 0
+        ? {
+            x: maxPogX,
+            y: filasPog[Math.floor(filasPog.length * 0.5)],
+          }
+        : {
+            x: bbG.x + dirOut * dim * 0.005,
+            y: Math.round(bbG.y + dim * 0.07),
+          };
 
     const altLabios = Math.max(12, bbG.y - snG.y);
 
@@ -3280,6 +3301,25 @@ export function detectarContornoAnatomicoEnCanvas(
       y: sorG.y,
     };
 
+    // Borde submentoniano vertical real para Me'
+    const meBX = Math.max(2, Math.min(dim - 3, Math.round(meG.x + dirOut * dim * 0.016)));
+    const meBYMin = Math.max(yMin + 4, Math.round(meG.y + 2));
+    const meBYMax = Math.min(dim - 4, Math.round(meG.y + dim * 0.075));
+    let meBY = Math.min(dim - 3, Math.round(meG.y + dim * 0.035));
+    let bestMeBScore = -Infinity;
+    for (let y = meBYMin; y <= meBYMax; y++) {
+      const lEdge = Math.min(lum(meBX, y), rawLum(meBX, y));
+      const lAbove = Math.max(lum(meBX, y - 2), lum(meBX, y - 3));
+      const lBelow = (lum(meBX, y + 2) + lum(meBX, y + 3)) * 0.5;
+      const drop = lAbove - lEdge;
+      const machDip = Math.max(0, lBelow - lEdge);
+      const sc = drop + 1.6 * machDip;
+      if (lEdge <= maxSoftLum && drop >= 6.0 && sc > bestMeBScore) {
+        bestMeBScore = sc;
+        meBY = y;
+      }
+    }
+
     // 8. Fijar hitos medidos sobre cortical ósea y contorno cutáneo real
     const medidos: PuntosCefalometricosMap = {
       SOr: toPx(sorG),
@@ -3303,7 +3343,7 @@ export function detectarContornoAnatomicoEnCanvas(
       LL: llPx,
       B_b: toPx(bbG),
       Pog_b: pogBPx,
-      Me_b: toPx({ x: meG.x + dirOut * dim * 0.005, y: Math.min(dim - 3, meG.y + dim * 0.035) }),
+      Me_b: toPx({ x: meBX, y: meBY }),
     };
 
     return { ...resultado, ...medidos };
@@ -3950,7 +3990,7 @@ export function generarContornosAnatomicosSvg(
             y: puntos.Em.y + 4,
           }
         : null;
-    const stGn = map2P({ x: 802, y: 580 }, 'Pog_b', 'Me_b');
+    const stGn = map2P({ x: 807, y: 583 }, 'Pog_b', 'Me_b');
     const subMand = puntos.Go
       ? map2P({ x: 695, y: 615 }, 'Me_b', 'Go')
       : map2P({ x: 695, y: 615 }, 'Pog_b', 'Me_b');
