@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       port: Number(env.VITE_PORT ?? 5173),
       headers: {
-        'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' data:; frame-src 'self' https://*.supabase.co;",
+        'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' data:; frame-src 'self' https://*.supabase.co;",
       },
       ...(useDevTunnel
         ? {

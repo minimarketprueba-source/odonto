@@ -95,7 +95,45 @@ export function CefalometriaEditor({
   const { data: urlFirmada, isError: errorImagen } = useUrlImagenCefalometria(
     esRutaDeposito(imagenUrl) ? imagenUrl : null
   );
-  const srcImagen = esRutaDeposito(imagenUrl) ? urlFirmada : imagenUrl;
+  const srcImagenRemota = esRutaDeposito(imagenUrl) ? urlFirmada : imagenUrl;
+  const [srcImagenSegura, setSrcImagenSegura] = useState<string | undefined>(() =>
+    srcImagenRemota && !/^https?:\/\//i.test(srcImagenRemota) ? srcImagenRemota : undefined
+  );
+
+  // Convertir URLs remotas firmadas (Supabase Storage) a blob: same-origin para
+  // evitar que la caché CORS del navegador contamine el <canvas> al leer píxeles en Vercel.
+  useEffect(() => {
+    if (!srcImagenRemota) {
+      setSrcImagenSegura(undefined);
+      return;
+    }
+    if (!/^https?:\/\//i.test(srcImagenRemota)) {
+      setSrcImagenSegura(srcImagenRemota);
+      return;
+    }
+    let cancelado = false;
+    let objectUrl: string | null = null;
+    setSrcImagenSegura(undefined);
+    fetch(srcImagenRemota, { mode: 'cors', cache: 'no-store' })
+      .then((resp) => {
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.blob();
+      })
+      .then((blob) => {
+        if (cancelado) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrcImagenSegura(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelado) setSrcImagenSegura(srcImagenRemota);
+      });
+    return () => {
+      cancelado = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [srcImagenRemota]);
+
+  const srcImagen = srcImagenSegura;
 
   // Estado de los puntos anatómicos
   const [puntos, setPuntos] = useState<PuntosCefalometricosMap>(estudio.puntos || {});
@@ -2469,6 +2507,7 @@ export function CefalometriaEditor({
                         >
                           <image
                             href={srcImagen}
+                            crossOrigin="anonymous"
                             x={0}
                             y={0}
                             width={imgDimensions.width}

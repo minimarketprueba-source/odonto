@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CefalometriaEditor } from '../CefalometriaEditor';
 import type { EstudioCefalometrico } from '@/types/cefalometria';
@@ -77,5 +77,61 @@ describe('CefalometriaEditor', () => {
 
     expect(getByRole('button', { name: /Cambiar imagen/i })).toBeInTheDocument();
     expect(getByRole('button', { name: /Limpiar trazado/i })).toBeInTheDocument();
+  });
+
+  it('convierte URLs remotas de imagen a blob: same-origin para evitar tainting de canvas y las revoca al desmontar', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['img'], { type: 'image/jpeg' }),
+    } as Response);
+    const origCreateObjectURL = URL.createObjectURL;
+    const origRevokeObjectURL = URL.revokeObjectURL;
+    const createSpy = vi.fn().mockReturnValue('blob:https://odonto-pied.vercel.app/mock-xray');
+    const revokeSpy = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: createSpy,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      writable: true,
+      value: revokeSpy,
+    });
+
+    try {
+      const estudioRemoto: EstudioCefalometrico = {
+        ...estudio,
+        id: 'estudio-remoto',
+        imagen_url: 'https://ejemplo.supabase.co/storage/v1/object/sign/cefalometria/placa.jpg',
+      };
+      const { container, unmount } = render(
+        <CefalometriaEditor estudio={estudioRemoto} onGuardar={vi.fn()} />
+      );
+
+      await waitFor(() => {
+        const imagen = container.querySelector('img') as HTMLImageElement | null;
+        expect(imagen?.getAttribute('src')).toBe('blob:https://odonto-pied.vercel.app/mock-xray');
+      });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        estudioRemoto.imagen_url,
+        expect.objectContaining({ mode: 'cors', cache: 'no-store' })
+      );
+
+      unmount();
+      expect(revokeSpy).toHaveBeenCalledWith('blob:https://odonto-pied.vercel.app/mock-xray');
+    } finally {
+      fetchSpy.mockRestore();
+      Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        writable: true,
+        value: origCreateObjectURL,
+      });
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        writable: true,
+        value: origRevokeObjectURL,
+      });
+    }
   });
 });

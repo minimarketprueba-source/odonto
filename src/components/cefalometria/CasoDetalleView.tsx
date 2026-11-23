@@ -190,7 +190,7 @@ export function ImagenGuardada({ refImagen, alt, className }: { refImagen: strin
     return <div className="flex h-full w-full items-center justify-center text-[10px] text-rose-500">Error al abrir</div>
   }
   if (!url) return <div className="h-full w-full animate-pulse bg-slate-200 dark:bg-slate-800" />
-  return <img src={url} alt={alt} className={className} />
+  return <img src={url} crossOrigin="anonymous" alt={alt} className={className} />
 }
 
 export function CasoDetalleView({
