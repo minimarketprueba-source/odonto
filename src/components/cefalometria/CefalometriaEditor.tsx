@@ -61,6 +61,8 @@ import {
   Sparkles,
   KeyRound,
   Loader2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { esRutaDeposito, useUrlImagenCefalometria } from '@/api/cefalometria';
@@ -165,6 +167,7 @@ export function CefalometriaEditor({
   const [mostrarContornos, setMostrarContornos] = useState(true);
   const [mostrarLineas, setMostrarLineas] = useState(false);
   const [lupaVisible, setLupaVisible] = useState(true);
+  const [ocultarEdicion, setOcultarEdicion] = useState(false);
   const [cursorImgPos, setCursorImgPos] = useState<CoordenadaPunto | null>(null);
   const [filtroTipoPunto, setFiltroTipoPunto] = useState<'todos' | 'esqueletico' | 'dental' | 'blando'>('todos');
 
@@ -285,6 +288,10 @@ export function CefalometriaEditor({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && ocultarEdicion) {
+        setOcultarEdicion(false);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         const tag = (e.target as HTMLElement | null)?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -296,7 +303,7 @@ export function CefalometriaEditor({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [historialPuntos.length, deshacerUltimoPunto]);
+  }, [historialPuntos.length, deshacerUltimoPunto, ocultarEdicion]);
 
   // Listener nativo no-pasivo para zoom con Ctrl/Cmd + rueda sin advertencia de navegador
   useEffect(() => {
@@ -567,21 +574,59 @@ export function CefalometriaEditor({
     e.target.value = '';
   };
 
-  // Eliminar todos los puntos del trazado
+  const persistirTrazado = async (
+    nuevosPuntos: PuntosCefalometricosMap,
+    nuevaCalibracion: CalibracionRegla = calibracion,
+    nuevasNotas: string = informeIA
+  ) => {
+    setGuardadoStatus('guardando');
+    const nuevasMediciones = esFrontal
+      ? calcularAnalisisFrontalRicketts(nuevosPuntos, nuevaCalibracion)
+      : calcularAnalisisCefalometrico(nuevosPuntos, nuevaCalibracion);
+    const actualizado: EstudioCefalometrico = {
+      ...estudio,
+      imagen_url: imagenUrl,
+      puntos: nuevosPuntos,
+      calibracion: nuevaCalibracion,
+      mediciones: nuevasMediciones,
+      notas: nuevasNotas,
+      progreso: estudio.progreso ?? 'digitalizacion',
+      updated_at: new Date().toISOString(),
+    };
+    const guardado = await onGuardar(actualizado);
+    // La imagen recién elegida ya se subió: de acá en más se usa su ruta.
+    if (guardado) setImagenUrl(guardado.imagen_url);
+    setGuardadoStatus('guardado');
+  };
+
+  // Eliminar todos los puntos del trazado anterior y guardar el estado limpio
   const handleLimpiarTrazado = async () => {
     const { isConfirmed } = await showSwal({
       icon: 'warning',
       title: '¿Eliminar todo el trazado?',
-      text: 'Se eliminarán todos los puntos y la calibración. Esta acción no se puede deshacer.',
+      text: 'Se eliminarán todos los puntos anteriores y la calibración.',
       showCancelButton: true,
       confirmButtonText: 'Eliminar trazado',
       cancelButtonText: 'Cancelar',
     });
     if (!isConfirmed) return;
+    const calLimpia: CalibracionRegla = { distanciaRealMm: 10 };
     setPuntos({});
-    setCalibracion({ distanciaRealMm: 10 });
-    setGuardadoStatus('cambios');
-    toast.info('Trazado eliminado. Recuerde guardar.');
+    setHistorialPuntos([]);
+    setPuntosAjustadosManual(new Set());
+    setMetodoDeteccionIA(null);
+    setCalibracion(calLimpia);
+    setDistanciaInput('10');
+    setPuntoActivoId(secuenciaRicketts[0] ?? '');
+    try {
+      await persistirTrazado({}, calLimpia);
+      toast.info('Trazado anterior eliminado y guardado.');
+    } catch (error) {
+      setGuardadoStatus('cambios');
+      toast.error(
+        error instanceof Error ? error.message : 'No se pudo guardar la limpieza del trazado.'
+      );
+    }
   };
 
   const handleIniciarDigitalizacion = () => {
@@ -619,7 +664,7 @@ export function CefalometriaEditor({
     toast.success('Cefalometría digitalizada. Arrastre cualquier punto para ajustarlo manualmente.');
   };
 
-  // Autodigitalización asistida por IA híbrida (Gemini Vision + respaldo anatómico local)
+  // Autodigitalización asistida por IA híbrida: reemplaza el trazado anterior y guarda automáticamente
   const handleAutodigitalizarIA = async () => {
     if (!srcImagen) {
       toast.warning('Cargue primero una radiografía para digitalizar.');
@@ -636,12 +681,18 @@ export function CefalometriaEditor({
         imgDimensions.height,
         esFrontal
       );
-      setPuntos(res.puntos);
-      setMetodoDeteccionIA(res.metodo);
+      setHistorialPuntos([]);
       setPuntosAjustadosManual(new Set());
       setPuntoActivoId('');
-      setGuardadoStatus('cambios');
-      toast.success(res.detalle);
+      setPuntos(res.puntos);
+      setMetodoDeteccionIA(res.metodo);
+      try {
+        await persistirTrazado(res.puntos);
+        toast.success(`${res.detalle} Trazado guardado automáticamente.`);
+      } catch {
+        setGuardadoStatus('cambios');
+        toast.warning(`${res.detalle} No se pudo guardar automáticamente; presione Guardar Trazado.`);
+      }
     } catch {
       toast.error('No se pudo ejecutar la detección IA. Se mantuvo el trazado actual.');
     } finally {
@@ -672,22 +723,8 @@ export function CefalometriaEditor({
 
   // Guardar estudio
   const handleGuardar = async () => {
-    setGuardadoStatus('guardando');
     try {
-      const actualizado: EstudioCefalometrico = {
-        ...estudio,
-        imagen_url: imagenUrl,
-        puntos,
-        calibracion,
-        mediciones,
-        notas: informeIA,
-        progreso: estudio.progreso ?? 'digitalizacion',
-        updated_at: new Date().toISOString(),
-      };
-      const guardado = await onGuardar(actualizado);
-      // La imagen recién elegida ya se subió: de acá en más se usa su ruta.
-      if (guardado) setImagenUrl(guardado.imagen_url);
-      setGuardadoStatus('guardado');
+      await persistirTrazado(puntos, calibracion, informeIA);
       toast.success('Trazado cefalométrico guardado con éxito.');
     } catch (error) {
       setGuardadoStatus('cambios');
@@ -837,7 +874,13 @@ export function CefalometriaEditor({
   }, [filtroTipoPunto, catalogoPuntos]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4.5rem)] bg-slate-950 text-slate-100 overflow-hidden select-none">
+    <div
+      className={
+        ocultarEdicion
+          ? 'fixed inset-0 z-50 flex flex-col h-screen w-screen bg-black text-slate-100 overflow-hidden select-none'
+          : 'flex flex-col h-[calc(100vh-4.5rem)] bg-slate-950 text-slate-100 overflow-hidden select-none'
+      }
+    >
       {/* Input oculto para reemplazar la imagen de radiografía */}
       <input
         ref={fileInputImagenRef}
@@ -847,166 +890,209 @@ export function CefalometriaEditor({
         onChange={handleCambiarImagen}
       />
 
-      {/* Barra superior de herramientas estilo WebCeph */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-xs">
-        <div className="flex items-center gap-3">
-          {onVolver && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleVolver}
-              className="text-slate-300 hover:text-white hover:bg-slate-800 h-8 gap-1.5"
-            >
-              <ChevronLeft className="w-4 h-4" /> Volver a Registros
-            </Button>
-          )}
-          <div className="h-4 w-px bg-slate-700" />
-          <div>
-            <span className="font-semibold text-white text-sm">
-              {pacienteNombre}
-            </span>
-            <span className="text-slate-400 ml-2">
-              • {estudio.titulo || 'Teleradiografía Lateral'} ({estudio.fecha})
-            </span>
+      {/* Barra superior de herramientas en dos filas limpias (oculta en modo Solo Rayos X) */}
+      {!ocultarEdicion && (
+        <div className="bg-slate-900 border-b border-slate-800 text-xs">
+          {/* Fila 1: Cabecera principal y acciones clínicas */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {onVolver && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleVolver}
+                  className="text-slate-300 hover:text-white hover:bg-slate-800 h-8 gap-1.5 px-2.5 flex-shrink-0"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Volver a Registros
+                </Button>
+              )}
+              <div className="h-4 w-px bg-slate-700 flex-shrink-0" />
+              <div className="min-w-0 truncate">
+                <span className="font-semibold text-white text-sm">{pacienteNombre}</span>
+                <span className="text-slate-400 ml-2">
+                  • {estudio.titulo || 'Teleradiografía Lateral'} ({estudio.fecha})
+                </span>
+              </div>
+              {guardadoStatus === 'guardado' ? (
+                <Badge className="bg-emerald-950 text-emerald-300 border-emerald-800 gap-1 font-normal py-1 flex-shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Guardado
+                </Badge>
+              ) : guardadoStatus === 'guardando' ? (
+                <Badge className="bg-blue-950 text-blue-300 border-blue-800 animate-pulse font-normal py-1 flex-shrink-0">
+                  Guardando...
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-950 text-amber-300 border-amber-800 font-normal py-1 flex-shrink-0">
+                  Cambios sin guardar
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                size="sm"
+                onClick={handleGuardar}
+                disabled={guardadoStatus === 'guardando'}
+                className="bg-primary hover:bg-primary/90 text-white gap-1.5 h-8 font-medium shadow-md"
+              >
+                <Save className="w-3.5 h-3.5" /> Guardar Trazado
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!srcImagen || procesandoIA}
+                onClick={handleAutodigitalizarIA}
+                className="border-fuchsia-500/70 bg-fuchsia-950/40 text-fuchsia-200 hover:bg-fuchsia-900/60 hover:text-white gap-1.5 h-8 font-medium"
+                title="Detectar hitos automáticamente con IA híbrida, reemplazar el trazado anterior y guardar"
+              >
+                {procesandoIA ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-fuchsia-300" />
+                )}
+                Autodigitalizar IA
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleIniciarDigitalizacion}
+                className="border-cyan-600/80 bg-cyan-950/50 text-cyan-200 hover:bg-cyan-900/70 hover:text-white gap-1.5 h-8 font-medium"
+                title="Iniciar o retomar el trazado cefalométrico guiado"
+              >
+                <PenLine className="w-3.5 h-3.5" /> Digitalización
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImprimir}
+                className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 h-8 gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" /> Imprimir Informe
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOcultarEdicion(true)}
+                className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-100 h-8 gap-1.5"
+                title="Ocultar edición y ver rayos X en pantalla completa"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-cyan-300" /> Solo Rayos X
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setPanelDerechoAbierto(!panelDerechoAbierto)}
+                className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8"
+                title={panelDerechoAbierto ? 'Ocultar panel lateral' : 'Mostrar panel lateral'}
+              >
+                {panelDerechoAbierto ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+
+          {/* Fila 2: Subbarra de capas visuales y gestión de archivo (siempre visible y organizada) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-slate-950/60 border-t border-slate-800/80">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {!esFrontal && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMostrarContornos((v) => !v)}
+                  className={`h-7 px-2.5 text-[11px] ${
+                    mostrarContornos
+                      ? 'border-blue-500/80 bg-blue-950/60 text-blue-200 hover:bg-blue-900/70'
+                      : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+                  }`}
+                  title="Mostrar u ocultar contornos anatómicos azules estilo WebCeph"
+                >
+                  Contornos
+                </Button>
+              )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMostrarLineas((v) => !v)}
+                className={`h-7 px-2.5 text-[11px] ${
+                  mostrarLineas
+                    ? 'border-emerald-500/80 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-900/70'
+                    : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+                }`}
+                title="Mostrar u ocultar planos y líneas de medición cefalométrica"
+              >
+                Planos
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setGuiaVisible((v) => !v)}
+                className={`h-7 px-2.5 text-[11px] ${
+                  guiaVisible
+                    ? 'border-cyan-500/70 bg-cyan-950/50 text-cyan-200 hover:bg-cyan-900/60'
+                    : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+                }`}
+                title="Mostrar u ocultar asistente de guía Ricketts"
+              >
+                Guía
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLupaVisible((v) => !v)}
+                className={`h-7 px-2.5 text-[11px] ${
+                  lupaVisible
+                    ? 'border-cyan-500/70 bg-cyan-950/50 text-cyan-200 hover:bg-cyan-900/60'
+                    : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
+                }`}
+                title="Mostrar u ocultar lupa de precisión"
+              >
+                Lupa
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputImagenRef.current?.click()}
+                className="border-slate-700 bg-slate-800/70 text-slate-200 hover:text-white hover:bg-slate-700 h-7 px-2.5 text-[11px] gap-1.5"
+                title="Cargar nueva radiografía (reemplaza la actual)"
+              >
+                <Upload className="w-3.5 h-3.5" /> Cambiar imagen
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLimpiarTrazado}
+                className="border-amber-600/60 bg-amber-950/40 text-amber-300 hover:text-amber-200 hover:bg-amber-900/50 h-7 px-2.5 text-[11px] gap-1.5"
+                title="Eliminar todos los puntos del trazado anterior"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Limpiar trazado
+              </Button>
+
+              {onEliminar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onEliminar}
+                  className="border-red-700/60 bg-red-950/30 text-red-300 hover:text-red-200 hover:bg-red-900/50 h-7 px-2.5 text-[11px] gap-1.5"
+                  title="Eliminar este registro cefalométrico permanentemente"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Eliminar registro
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Acciones principales */}
-        <div className="flex items-center gap-2">
-          {guardadoStatus === 'guardado' ? (
-            <Badge className="bg-emerald-950 text-emerald-300 border-emerald-800 gap-1 font-normal py-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Guardado
-            </Badge>
-          ) : guardadoStatus === 'guardando' ? (
-            <Badge className="bg-blue-950 text-blue-300 border-blue-800 animate-pulse font-normal py-1">
-              Guardando...
-            </Badge>
-          ) : (
-            <Badge className="bg-amber-950 text-amber-300 border-amber-800 font-normal py-1">
-              Cambios sin guardar
-            </Badge>
-          )}
-
-          <Button
-            size="sm"
-            onClick={handleGuardar}
-            disabled={guardadoStatus === 'guardando'}
-            className="bg-primary hover:bg-primary/90 text-white gap-1.5 h-8 font-medium shadow-md"
-          >
-            <Save className="w-3.5 h-3.5" /> Guardar Trazado
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleIniciarDigitalizacion}
-            className="border-cyan-600/80 bg-cyan-950/50 text-cyan-200 hover:bg-cyan-900/70 hover:text-white gap-1.5 h-8 font-medium"
-            title="Iniciar o retomar el trazado cefalométrico guiado"
-          >
-            <PenLine className="w-3.5 h-3.5" /> Digitalización
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!srcImagen || procesandoIA}
-            onClick={handleAutodigitalizarIA}
-            className="border-fuchsia-500/70 bg-fuchsia-950/40 text-fuchsia-200 hover:bg-fuchsia-900/60 hover:text-white gap-1.5 h-8 font-medium"
-            title="Detectar hitos automáticamente con IA híbrida (Gemini Vision + respaldo anatómico local)"
-          >
-            {procesandoIA ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5 text-fuchsia-300" />
-            )}
-            Autodigitalizar IA
-          </Button>
-
-          {!esFrontal && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setMostrarContornos((v) => !v)}
-              className={`h-8 gap-1.5 text-xs ${
-                mostrarContornos
-                  ? 'border-blue-500/80 bg-blue-950/60 text-blue-200 hover:bg-blue-900/70'
-                  : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
-              }`}
-              title="Mostrar u ocultar contornos anatómicos azules estilo WebCeph"
-            >
-              Contornos
-            </Button>
-          )}
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setMostrarLineas((v) => !v)}
-            className={`h-8 gap-1.5 text-xs ${
-              mostrarLineas
-                ? 'border-emerald-500/80 bg-emerald-950/60 text-emerald-200 hover:bg-emerald-900/70'
-                : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:bg-slate-700'
-            }`}
-            title="Mostrar u ocultar planos y líneas de medición cefalométrica"
-          >
-            Planos
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleImprimir}
-            className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 h-8 gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5" /> Imprimir Informe
-          </Button>
-
-          {/* Botones de cambio de imagen, limpieza y eliminación */}
-          <div className="h-4 w-px bg-slate-700" />
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputImagenRef.current?.click()}
-            className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 gap-1.5"
-            title="Cargar nueva radiografía (reemplaza la actual)"
-          >
-            <Upload className="w-3.5 h-3.5" /> Cambiar imagen
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLimpiarTrazado}
-            className="text-amber-400 hover:text-amber-300 hover:bg-slate-800 h-8 gap-1.5"
-            title="Eliminar todos los puntos del trazado"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Limpiar trazado
-          </Button>
-
-          {onEliminar && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onEliminar}
-              className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 gap-1.5"
-              title="Eliminar este registro cefalométrico permanentemente"
-            >
-              <Trash2 className="w-3.5 h-3.5" /> Eliminar registro
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setPanelDerechoAbierto(!panelDerechoAbierto)}
-            className="text-slate-400 hover:text-white hover:bg-slate-800 h-8 w-8"
-            title={panelDerechoAbierto ? 'Ocultar panel lateral' : 'Mostrar panel lateral'}
-          >
-            {panelDerechoAbierto ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </Button>
-        </div>
-      </div>
+      )}
 
       {/* Área central dividida: Lienzo (izq) y Panel de Herramientas (der) */}
       <div className="flex flex-1 overflow-hidden relative">
@@ -1024,7 +1110,69 @@ export function CefalometriaEditor({
             isPanning ? 'cursor-grabbing' : modoMoverVista ? 'cursor-grab' : 'cursor-crosshair'
           }`}
         >
-          {/* Controles flotantes sobre el visor */}
+          {/* Barra flotante mínima en modo Solo Rayos X para restaurar controles */}
+          {ocultarEdicion && (
+            <div className="absolute top-3 right-3 z-50 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-2xl">
+              {!esFrontal && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMostrarContornos((v) => !v)}
+                  className={`h-7 px-2.5 text-[11px] ${
+                    mostrarContornos
+                      ? 'border-blue-500/80 bg-blue-950/60 text-blue-200'
+                      : 'border-slate-700 bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  Contornos
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMostrarLineas((v) => !v)}
+                className={`h-7 px-2.5 text-[11px] ${
+                  mostrarLineas
+                    ? 'border-emerald-500/80 bg-emerald-950/60 text-emerald-200'
+                    : 'border-slate-700 bg-slate-800 text-slate-400'
+                }`}
+              >
+                Planos
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.2).toFixed(2))))}
+                className="h-7 w-7 text-slate-200 hover:bg-slate-800"
+                title="Alejar (Zoom Out)"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </Button>
+              <span className="px-1 text-[11px] font-medium text-slate-300">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setZoom((z) => Math.min(3.5, Number((z + 0.2).toFixed(2))))}
+                className="h-7 w-7 text-slate-200 hover:bg-slate-800"
+                title="Acercar (Zoom In)"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setOcultarEdicion(false)}
+                className="h-7 px-2.5 text-[11px] bg-primary hover:bg-primary/90 text-white gap-1.5 font-medium"
+                title="Mostrar edición (Esc)"
+              >
+                <Minimize2 className="w-3.5 h-3.5" /> Mostrar edición
+              </Button>
+            </div>
+          )}
+
+          {/* Controles flotantes sobre el visor (ocultos en modo Solo Rayos X) */}
+          {!ocultarEdicion && (
           <div className="absolute top-4 left-4 z-30 flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-xl">
             <Button
               variant="ghost"
@@ -1171,6 +1319,7 @@ export function CefalometriaEditor({
               <div />
             </div>
           </div>
+          )}
 
           {/* Cartel del punto bajo el mouse */}
           {hoverPunto && !arrastrandoPuntoId && (() => {
@@ -1194,7 +1343,7 @@ export function CefalometriaEditor({
           })()}
 
           {/* Asistente: qué punto toca, qué es y dónde buscarlo */}
-          {!modoCalibracion && srcImagen && guiaVisible && (() => {
+          {!ocultarEdicion && !modoCalibracion && srcImagen && guiaVisible && (() => {
             const def = catalogoPuntos.find((p) => p.id === puntoActivoId);
             const hechos = secuencia.filter((id) => puntos[id]).length;
             const posicion = def ? secuencia.indexOf(def.id) : -1;
@@ -1315,18 +1464,34 @@ export function CefalometriaEditor({
             ref={scrollContainerRef}
             className="w-full h-full overflow-auto flex"
           >
-            <div className="m-auto p-6 flex-shrink-0">
+            <div className={ocultarEdicion ? 'm-auto p-2 flex-shrink-0' : 'm-auto p-6 flex-shrink-0'}>
               <div
                 style={
                   srcImagen
-                    ? {
-                        width: Math.round(Math.min(imgDimensions.width, 850) * zoom),
-                        height: Math.round(
-                          Math.min(imgDimensions.width, 850) *
-                            (imgDimensions.height / Math.max(imgDimensions.width, 1)) *
-                            zoom
-                        ),
-                      }
+                    ? (() => {
+                        const baseW = ocultarEdicion
+                          ? typeof window !== 'undefined'
+                            ? Math.max(
+                                320,
+                                Math.min(
+                                  window.innerWidth - 32,
+                                  Math.round(
+                                    (window.innerHeight - 32) *
+                                      (imgDimensions.width / Math.max(imgDimensions.height, 1))
+                                  )
+                                )
+                              )
+                            : Math.min(imgDimensions.width, 1200)
+                          : Math.min(imgDimensions.width, 850);
+                        return {
+                          width: Math.round(baseW * zoom),
+                          height: Math.round(
+                            baseW *
+                              (imgDimensions.height / Math.max(imgDimensions.width, 1)) *
+                              zoom
+                          ),
+                        };
+                      })()
                     : undefined
                 }
                 className="relative inline-block"
@@ -1603,7 +1768,7 @@ export function CefalometriaEditor({
         </div>
 
         {/* PANEL LATERAL DERECHO ESTILO WEBCEPH */}
-        {panelDerechoAbierto && (
+        {panelDerechoAbierto && !ocultarEdicion && (
           <div className="w-80 lg:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl z-20">
             {/* Selector de Pestañas del Panel */}
             <div className="flex border-b border-slate-800 text-xs font-semibold">

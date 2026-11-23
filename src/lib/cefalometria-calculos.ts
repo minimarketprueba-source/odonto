@@ -3006,22 +3006,32 @@ export function detectarContornoAnatomicoEnCanvas(
         y: Math.round(bbG.y + dim * 0.07),
       };
 
-    const ulG =
-      buscarBlandoExtremo(snG.y + 4, snG.y + (bbG.y - snG.y) * 0.50, 'max') ?? {
-        x: snG.x + dirOut * dim * 0.02,
-        y: Math.round(snG.y + dim * 0.065),
-      };
+    const altLabios = Math.max(12, bbG.y - snG.y);
 
-    const llG =
-      buscarBlandoExtremo(ulG.y + 4, bbG.y - 2, 'max') ?? {
-        x: ulG.x,
-        y: Math.round(ulG.y + dim * 0.06),
+    const ulG =
+      buscarBlandoExtremo(snG.y + altLabios * 0.14, snG.y + altLabios * 0.44, 'max') ?? {
+        x: snG.x + dirOut * dim * 0.02,
+        y: Math.round(snG.y + altLabios * 0.30),
       };
 
     const emG =
-      buscarBlandoExtremo(ulG.y + 1, llG.y - 1, 'min') ?? {
-        x: (ulG.x + llG.x) / 2 + dirIn * dim * 0.015,
-        y: Math.round((ulG.y + llG.y) / 2),
+      buscarBlandoExtremo(
+        Math.max(ulG.y + 3, snG.y + altLabios * 0.42),
+        snG.y + altLabios * 0.64,
+        'min'
+      ) ?? {
+        x: ulG.x + dirIn * dim * 0.014,
+        y: Math.round(snG.y + altLabios * 0.52),
+      };
+
+    const llG =
+      buscarBlandoExtremo(
+        Math.max(emG.y + 3, snG.y + altLabios * 0.58),
+        bbG.y - Math.max(3, Math.round(altLabios * 0.14)),
+        'max'
+      ) ?? {
+        x: ulG.x,
+        y: Math.round(snG.y + altLabios * 0.72),
       };
 
     const abY = Math.round((snG.y + ulG.y) / 2);
@@ -3058,6 +3068,9 @@ export function detectarContornoAnatomicoEnCanvas(
       x: huesoEnY(snG.y - dim * 0.008, snG.x, 0.035),
       y: Math.round(snG.y - dim * 0.006),
     };
+    if (fwd(snG.x) < fwd(ansG.x) + dim * 0.024) {
+      snG.x = ansG.x + dirOut * dim * 0.028;
+    }
 
     const buscarCorticalDetrasDeAns = (y: number): number => {
       const startX = Math.max(

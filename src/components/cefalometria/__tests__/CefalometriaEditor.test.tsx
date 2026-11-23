@@ -57,4 +57,25 @@ describe('CefalometriaEditor', () => {
     expect(canvasWrapper.style.width).toBe('800px');
     expect(canvasWrapper.style.height).toBe('800px');
   });
+
+  it('reorganiza Cambiar imagen y Limpiar trazado en la barra y alterna el modo Solo Rayos X', () => {
+    const { getByRole, queryByRole } = render(
+      <CefalometriaEditor estudio={estudio} onGuardar={vi.fn()} />
+    );
+
+    expect(getByRole('button', { name: /Cambiar imagen/i })).toBeInTheDocument();
+    expect(getByRole('button', { name: /Limpiar trazado/i })).toBeInTheDocument();
+
+    const btnSoloRayosX = getByRole('button', { name: /Solo Rayos X/i });
+    fireEvent.click(btnSoloRayosX);
+
+    expect(queryByRole('button', { name: /Cambiar imagen/i })).toBeNull();
+    expect(queryByRole('button', { name: /Limpiar trazado/i })).toBeNull();
+
+    const btnMostrarEdicion = getByRole('button', { name: /Mostrar edición/i });
+    fireEvent.click(btnMostrarEdicion);
+
+    expect(getByRole('button', { name: /Cambiar imagen/i })).toBeInTheDocument();
+    expect(getByRole('button', { name: /Limpiar trazado/i })).toBeInTheDocument();
+  });
 });
