@@ -2889,14 +2889,23 @@ export function detectarContornoAnatomicoEnCanvas(
     const xBlandoRaw = new Float32Array(dim).fill(-1);
     const maxSoftLum = bgAir + (umbralHueso - bgAir) * 0.36;
     const absLimitX = miraDerecha
-      ? Math.min(chainLimitX, Math.round(xMaxilaMed + dim * 0.145))
-      : Math.max(chainLimitX, Math.round(xMaxilaMed - dim * 0.145));
+      ? Math.min(chainLimitX, Math.round(xMaxilaMed + dim * 0.155))
+      : Math.max(chainLimitX, Math.round(xMaxilaMed - dim * 0.155));
+    const noseEndY = piriYMax + Math.round(dim * 0.02);
 
     for (let y = yMin + 1; y <= yChinMax; y++) {
       const xh = xHueso[y];
       if (xh < 0) continue;
-      const rOff =
-        y < foreheadYMax ? 0.060 : y >= piriYMin && y <= piriYMax ? 0.145 : 0.095;
+      let rOff: number;
+      if (y < foreheadYMax) {
+        rOff = 0.06;
+      } else if (y < piriYMin) {
+        rOff = 0.06 + 0.09 * ((y - foreheadYMax) / Math.max(1, piriYMin - foreheadYMax));
+      } else if (y <= noseEndY) {
+        rOff = 0.15;
+      } else {
+        rOff = 0.11;
+      }
       const minOffPx = Math.round(dim * 0.018);
       const maxOffPx = Math.round(dim * rOff);
 
@@ -2950,35 +2959,57 @@ export function detectarContornoAnatomicoEnCanvas(
     }
     if (filasBlando < 35) return baseWebCeph;
 
-    const buscarBlandoExtremo = (yIni: number, yFin: number, modo: 'max' | 'min') => {
-      let bestY = -1;
+    const buscarBlandoExtremo = (
+      yIni: number,
+      yFin: number,
+      modo: 'max' | 'min',
+      toleranciaMeseta = 1.0,
+      fraccionMeseta = 0.5
+    ): CoordenadaPunto | null => {
+      const y0 = Math.max(yMin + 2, Math.round(yIni));
+      const y1 = Math.min(yChinMax - 1, Math.round(yFin));
       let bestScore = modo === 'max' ? -Infinity : Infinity;
-      for (
-        let y = Math.max(yMin + 2, Math.round(yIni));
-        y <= Math.min(yChinMax - 1, Math.round(yFin));
-        y++
-      ) {
+      let bestX = -1;
+      for (let y = y0; y <= y1; y++) {
         const xb = xBlando[y];
         if (xb < 0) continue;
         const sc = fwd(xb);
         if (modo === 'max' ? sc > bestScore : sc < bestScore) {
           bestScore = sc;
-          bestY = y;
+          bestX = xb;
         }
       }
-      return bestY >= 0 ? { x: xBlando[bestY], y: bestY } : null;
+      if (bestX < 0) return null;
+      const filas: number[] = [];
+      for (let y = y0; y <= y1; y++) {
+        const xb = xBlando[y];
+        if (xb < 0) continue;
+        const sc = fwd(xb);
+        if (
+          modo === 'max'
+            ? sc >= bestScore - toleranciaMeseta
+            : sc <= bestScore + toleranciaMeseta
+        ) {
+          filas.push(y);
+        }
+      }
+      const idx = Math.min(
+        filas.length - 1,
+        Math.max(0, Math.floor(filas.length * fraccionMeseta))
+      );
+      return { x: bestX, y: filas[idx] };
     };
 
     // 5. Extracción de hitos sobre la curva anatómica xBlando(y) autocalibrada respecto a yChinMax
     const pnY0 = Math.max(Math.round(dim * 0.32), Math.round(yChinMax - dim * 0.415));
     const pnY1 = Math.min(Math.round(dim * 0.58), Math.round(yChinMax - dim * 0.28));
-    const pnG = buscarBlandoExtremo(pnY0, pnY1, 'max');
+    const pnG = buscarBlandoExtremo(pnY0, pnY1, 'max', 1.0, 0.5);
     if (!pnG) return baseWebCeph;
 
     const altInfG = Math.max(Math.round(dim * 0.24), yChinMax - pnG.y);
 
     const snG =
-      buscarBlandoExtremo(pnG.y + altInfG * 0.10, pnG.y + altInfG * 0.24, 'min') ?? {
+      buscarBlandoExtremo(pnG.y + altInfG * 0.11, pnG.y + altInfG * 0.27, 'min', 1.2, 0.65) ?? {
         x: pnG.x + dirIn * dim * 0.04,
         y: Math.round(pnG.y + altInfG * 0.16),
       };
@@ -2990,47 +3021,24 @@ export function detectarContornoAnatomicoEnCanvas(
       buscarBlandoExtremo(
         pnG.y + altInfG * 0.55,
         Math.min(yChinMax - 6, pnG.y + altInfG * 0.78),
-        'min'
+        'min',
+        1.0,
+        0.5
       ) ?? {
         x: snG.x + dirIn * dim * 0.01,
         y: Math.round(pnG.y + altInfG * 0.68),
       };
 
-    const pogYMin = Math.max(yMin + 2, bbG.y + 4);
-    const pogYMax = Math.min(yChinMax - 1, Math.max(bbG.y + 6, yChinMax - 1));
-    let maxPogFwd = -Infinity;
-    let maxPogX = -1;
-    for (let y = pogYMin; y <= pogYMax; y++) {
-      if (xBlando[y] < 0) continue;
-      const f = fwd(xBlando[y]);
-      if (f > maxPogFwd) {
-        maxPogFwd = f;
-        maxPogX = xBlando[y];
-      }
-    }
-    const filasPog: number[] = [];
-    if (maxPogX >= 0) {
-      for (let y = pogYMin; y <= pogYMax; y++) {
-        if (xBlando[y] >= 0 && fwd(xBlando[y]) >= maxPogFwd - 1.0) {
-          filasPog.push(y);
-        }
-      }
-    }
-    const pogBG: CoordenadaPunto =
-      filasPog.length > 0 && maxPogX >= 0
-        ? {
-            x: maxPogX,
-            y: filasPog[Math.floor(filasPog.length * 0.5)],
-          }
-        : {
-            x: bbG.x + dirOut * dim * 0.005,
-            y: Math.round(bbG.y + dim * 0.07),
-          };
+    const pogBG =
+      buscarBlandoExtremo(bbG.y + 4, Math.max(bbG.y + 6, yChinMax - 1), 'max', 1.0, 0.5) ?? {
+        x: bbG.x + dirOut * dim * 0.005,
+        y: Math.round(bbG.y + dim * 0.07),
+      };
 
     const altLabios = Math.max(12, bbG.y - snG.y);
 
     const ulG =
-      buscarBlandoExtremo(snG.y + altLabios * 0.14, snG.y + altLabios * 0.44, 'max') ?? {
+      buscarBlandoExtremo(snG.y + altLabios * 0.16, snG.y + altLabios * 0.48, 'max', 1.0, 0.5) ?? {
         x: snG.x + dirOut * dim * 0.02,
         y: Math.round(snG.y + altLabios * 0.30),
       };
@@ -3038,8 +3046,10 @@ export function detectarContornoAnatomicoEnCanvas(
     const emG =
       buscarBlandoExtremo(
         Math.max(ulG.y + 3, snG.y + altLabios * 0.42),
-        snG.y + altLabios * 0.64,
-        'min'
+        snG.y + altLabios * 0.66,
+        'min',
+        1.0,
+        0.5
       ) ?? {
         x: ulG.x + dirIn * dim * 0.014,
         y: Math.round(snG.y + altLabios * 0.52),
@@ -3048,18 +3058,28 @@ export function detectarContornoAnatomicoEnCanvas(
     const llG =
       buscarBlandoExtremo(
         Math.max(emG.y + 3, snG.y + altLabios * 0.58),
-        bbG.y - Math.max(3, Math.round(altLabios * 0.14)),
-        'max'
+        bbG.y - Math.max(3, Math.round(altLabios * 0.12)),
+        'max',
+        1.0,
+        0.5
       ) ?? {
         x: ulG.x,
         y: Math.round(snG.y + altLabios * 0.72),
       };
 
-    const abY = Math.round((snG.y + ulG.y) / 2);
-    const abG = {
-      x: xBlando[abY] >= 0 ? xBlando[abY] : (snG.x + ulG.x) / 2,
-      y: abY,
-    };
+    const xRefLabio = fwd(ulG.x) <= fwd(llG.x) ? ulG.x : llG.x;
+    if (fwd(emG.x) > fwd(xRefLabio) - 1.5) {
+      emG.x = xRefLabio + dirIn * Math.max(2, Math.round(dim * 0.01));
+    }
+
+    const abYIni = snG.y + Math.max(2, Math.round((ulG.y - snG.y) * 0.22));
+    const abYFin = Math.max(abYIni + 1, Math.round(snG.y + (ulG.y - snG.y) * 0.52));
+    const abYFallback = Math.round(snG.y + (ulG.y - snG.y) * 0.30);
+    const abG: CoordenadaPunto =
+      buscarBlandoExtremo(abYIni, abYFin, 'min', 0.8, 0.45) ?? {
+        x: xBlando[abYFallback] >= 0 ? xBlando[abYFallback] : (snG.x + ulG.x) / 2,
+        y: abYFallback,
+      };
 
     const altFacialG = pogBG.y - pnG.y;
     if (altFacialG < dim * 0.14 || altFacialG > dim * 0.60) {
@@ -3925,35 +3945,37 @@ export function generarContornosAnatomicosSvg(
 
   // 10. Tejido blando superior e inferior (WebCeph upper & lower soft tissue)
   if (puntos.Pn && puntos.Sn) {
-    const nasalBridge = puntos.Na_b ? map2P({ x: 823, y: 203 }, 'Na_b', 'Pn') : null;
-    const dorsumNose = puntos.Na_b ? map2P({ x: 855, y: 239 }, 'Na_b', 'Pn') : null;
-    const columella = map2P({ x: 860, y: 308 }, 'Pn', 'Sn');
-    const upperEmb =
-      puntos.Em && puntos.U1I
-        ? {
-            x: puntos.Em.x + (puntos.U1I.x - puntos.Em.x) * 0.45,
-            y: puntos.Em.y + 1,
-          }
-        : null;
+    const nasalBridge = puntos.Na_b ? map2P({ x: 822, y: 200 }, 'Na_b', 'Pn') : null;
+    const dorsumNose = puntos.Na_b ? map2P({ x: 853, y: 240 }, 'Na_b', 'Pn') : null;
+    const supratip = puntos.Na_b ? map2P({ x: 872, y: 263 }, 'Na_b', 'Pn') : null;
+    const subTip = map2P({ x: 872, y: 293 }, 'Pn', 'Sn');
+    const columella = map2P({ x: 855, y: 313 }, 'Pn', 'Sn');
+    const upperLipSup =
+      puntos.A_b && puntos.UL ? map2P({ x: 845, y: 362 }, 'A_b', 'UL') : null;
+    const upperLipInf =
+      puntos.UL && puntos.Em ? map2P({ x: 855, y: 396 }, 'UL', 'Em') : null;
 
     const supPts = [
       puntos.G_b,
       puntos.Na_b,
       nasalBridge,
       dorsumNose,
+      supratip,
       puntos.Pn,
+      subTip,
       columella,
       puntos.Sn,
       puntos.A_b,
+      upperLipSup,
       puntos.UL,
+      upperLipInf,
       puntos.Em,
-      upperEmb,
     ].filter((p): p is CoordenadaPunto => Boolean(p));
 
     if (supPts.length >= 3) {
       contornos.push({
         id: 'perfil_blando',
-        d: curvaSuaveSvg(supPts, 0.55),
+        d: curvaSuaveSvg(supPts, 0.45),
         color: azulWebCeph,
         grosor: 1.7,
       });
@@ -3983,13 +4005,10 @@ export function generarContornosAnatomicosSvg(
   }
 
   if (puntos.LL && puntos.Pog_b && puntos.Me_b) {
-    const lowerEmb =
-      puntos.Em && puntos.L1I
-        ? {
-            x: puntos.Em.x + (puntos.L1I.x - puntos.Em.x) * 0.45,
-            y: puntos.Em.y + 4,
-          }
-        : null;
+    const lowerLipSup =
+      puntos.Em && puntos.LL ? map2P({ x: 856, y: 419 }, 'Em', 'LL') : null;
+    const lowerLipInf =
+      puntos.LL && puntos.B_b ? map2P({ x: 852, y: 453 }, 'LL', 'B_b') : null;
     const stGn = map2P({ x: 807, y: 583 }, 'Pog_b', 'Me_b');
     const subMand = puntos.Go
       ? map2P({ x: 695, y: 615 }, 'Me_b', 'Go')
@@ -3999,9 +4018,10 @@ export function generarContornosAnatomicosSvg(
       : map2P({ x: 656, y: 640 }, 'Pog_b', 'Me_b');
 
     const infPts = [
-      lowerEmb,
       puntos.Em,
+      lowerLipSup,
       puntos.LL,
+      lowerLipInf,
       puntos.B_b,
       puntos.Pog_b,
       stGn,
@@ -4013,11 +4033,32 @@ export function generarContornosAnatomicosSvg(
     if (infPts.length >= 3) {
       contornos.push({
         id: 'perfil_blando_inf',
-        d: curvaSuaveSvg(infPts, 0.55),
+        d: curvaSuaveSvg(infPts, 0.45),
         color: azulWebCeph,
         grosor: 1.7,
       });
     }
+  }
+
+  const incRef =
+    puntos.U1I && puntos.L1I
+      ? { x: (puntos.U1I.x + puntos.L1I.x) / 2, y: (puntos.U1I.y + puntos.L1I.y) / 2 }
+      : (puntos.U1I ?? puntos.L1I);
+  if (puntos.Em && incRef) {
+    const embMid = {
+      x: puntos.Em.x + (incRef.x - puntos.Em.x) * 0.24,
+      y: puntos.Em.y + 1,
+    };
+    const embEnd = {
+      x: puntos.Em.x + (incRef.x - puntos.Em.x) * 0.46,
+      y: puntos.Em.y + 2.5,
+    };
+    contornos.push({
+      id: 'comisura_labial',
+      d: curvaSuaveSvg([puntos.Em, embMid, embEnd], 0.45),
+      color: azulWebCeph,
+      grosor: 1.55,
+    });
   }
 
   // 11. Siluetas dentarias vectoriales reales de WebCeph (2P similarity transform)

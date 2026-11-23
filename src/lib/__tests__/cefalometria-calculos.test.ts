@@ -418,9 +418,21 @@ describe('análisis de Ricketts', () => {
     const puntos = generarPlantillaCanonica(1000, 800, false);
     const contornos = generarContornosAnatomicosSvg(puntos);
     const ids = contornos.map((c) => c.id);
-    for (const esperado of ['perfil_blando', 'mandibula', 'maxilar', 'incisivo_sup', 'incisivo_inf']) {
+    for (const esperado of [
+      'perfil_blando',
+      'perfil_blando_inf',
+      'comisura_labial',
+      'mandibula',
+      'maxilar',
+      'incisivo_sup',
+      'incisivo_inf',
+    ]) {
       expect(ids).toContain(esperado);
     }
+    const perfilSup = contornos.find((c) => c.id === 'perfil_blando');
+    const perfilInf = contornos.find((c) => c.id === 'perfil_blando_inf');
+    expect((perfilSup?.d.match(/C /g) ?? []).length).toBeGreaterThanOrEqual(8);
+    expect((perfilInf?.d.match(/C /g) ?? []).length).toBeGreaterThanOrEqual(6);
     expect(contornos.every((c) => c.d.startsWith('M '))).toBe(true);
   });
 
@@ -534,6 +546,14 @@ describe('análisis de Ricketts', () => {
       expect(detectados.Pn.x).toBeLessThan(765);
       expect(detectados.Sn.x).toBeLessThan(detectados.Pn.x);
       expect(detectados.Pog.x).toBeLessThan(detectados.Pog_b.x);
+      expect(detectados.Sn.y).toBeGreaterThan(detectados.Pn.y);
+      expect(detectados.A_b.y).toBeGreaterThan(detectados.Sn.y);
+      expect(detectados.UL.y).toBeGreaterThan(detectados.A_b.y);
+      expect(detectados.Em.y).toBeGreaterThan(detectados.UL.y);
+      expect(detectados.LL.y).toBeGreaterThan(detectados.Em.y);
+      expect(detectados.B_b.y).toBeGreaterThan(detectados.LL.y);
+      expect(detectados.UL.x).toBeGreaterThan(detectados.Em.x);
+      expect(detectados.LL.x).toBeGreaterThan(detectados.Em.x);
     } finally {
       spy.mockRestore();
     }
