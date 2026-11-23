@@ -2932,7 +2932,8 @@ export function detectarContornoAnatomicoEnCanvas(
           bestFallbackX = x;
         }
 
-        if (l2 >= bgAir + 5.0 && (drop >= 9.0 || (drop >= 6.0 && machDip >= 2.0))) {
+        const minInteriorLum = y > noseEndY ? bgAir + 3.5 : bgAir + 5.0;
+        if (l2 >= minInteriorLum && (drop >= 9.0 || (drop >= 6.0 && machDip >= 2.0))) {
           outerFound = x;
           break;
         }
@@ -3168,12 +3169,12 @@ export function detectarContornoAnatomicoEnCanvas(
       y: Math.round(abG.y + dim * 0.005),
     };
     const u1iG: CoordenadaPunto = {
-      x: huesoEnY(emG.y + dim * 0.024, emG.x, 0.022),
-      y: Math.round(emG.y + dim * 0.024),
+      x: huesoEnY(emG.y + dim * 0.032, emG.x, 0.022),
+      y: Math.round(emG.y + dim * 0.032),
     };
     const l1iG: CoordenadaPunto = {
       x: u1iG.x + dirIn * dim * 0.016,
-      y: Math.round(emG.y + dim * 0.014),
+      y: Math.round(emG.y + dim * 0.020),
     };
     const bG: CoordenadaPunto = {
       x: huesoEnY(bbG.y + dim * 0.018, bbG.x, 0.045),
@@ -3202,14 +3203,16 @@ export function detectarContornoAnatomicoEnCanvas(
     // 6b. Detección del anillo metálico del posicionador auricular (oliva del cefalostato -> Po)
     const altNMeG = Math.max(dim * 0.20, meG.y - nG.y);
     const minWH = Math.min(naturalW, naturalH);
-    const poSearchYMin = Math.max(Math.round(dim * 0.18), Math.round(nG.y + altNMeG * 0.08));
-    const poSearchYMax = Math.min(Math.round(dim * 0.68), Math.round(nG.y + altNMeG * 0.52));
+    const poSearchYMin = Math.max(Math.round(dim * 0.20), Math.round(nG.y + altNMeG * 0.24));
+    const poSearchYMax = Math.min(Math.round(dim * 0.66), Math.round(nG.y + altNMeG * 0.48));
+    const dxMinG = altNMeG * 0.40 * (naturalH / naturalW);
+    const dxMaxG = altNMeG * 0.90 * (naturalH / naturalW);
     const poSearchXStart = miraDerecha
-      ? Math.max(Math.round(dim * 0.12), Math.round(nG.x - dim * 0.44))
-      : Math.max(Math.round(dim * 0.12), Math.round(nG.x + dim * 0.15));
+      ? Math.max(Math.round(dim * 0.12), Math.round(nG.x - dxMaxG))
+      : Math.max(Math.round(dim * 0.12), Math.round(nG.x + dxMinG));
     const poSearchXEnd = miraDerecha
-      ? Math.min(Math.round(dim * 0.88), Math.round(nG.x - dim * 0.15))
-      : Math.min(Math.round(dim * 0.88), Math.round(nG.x + dim * 0.44));
+      ? Math.min(Math.round(dim * 0.88), Math.round(nG.x - dxMinG))
+      : Math.min(Math.round(dim * 0.88), Math.round(nG.x + dxMaxG));
 
     let bestPoG: CoordenadaPunto | null = null;
     let bestPoScore = -Infinity;
@@ -3227,26 +3230,29 @@ export function detectarContornoAnatomicoEnCanvas(
     for (const rG of [3.5, 4.5, 5.5, 6.5]) {
       const rx = rG * (minWH / naturalW);
       const ry = rG * (minWH / naturalH);
-      for (let cy = poSearchYMin; cy <= poSearchYMax; cy += 2) {
-        for (let cx = poSearchXStart; cx <= poSearchXEnd; cx += 2) {
-          const centerLum = rawLum(cx, cy);
-          let ringSum = 0;
-          let ringMin = Infinity;
+      for (let cy = poSearchYMin; cy <= poSearchYMax; cy += 1) {
+        for (let cx = poSearchXStart; cx <= poSearchXEnd; cx += 1) {
+          const rvs: number[] = [];
+          const ivs: number[] = [rawLum(cx, cy)];
           let outerSum = 0;
           for (const [ux, uy] of dirs8) {
-            const rv = rawLum(Math.round(cx + rx * ux), Math.round(cy + ry * uy));
-            ringSum += rv;
-            if (rv < ringMin) ringMin = rv;
+            rvs.push(rawLum(Math.round(cx + rx * ux), Math.round(cy + ry * uy)));
+            ivs.push(rawLum(Math.round(cx + rx * 0.55 * ux), Math.round(cy + ry * 0.55 * uy)));
             outerSum += rawLum(
               Math.round(cx + rx * 1.85 * ux),
               Math.round(cy + ry * 1.85 * uy)
             );
           }
-          const ringMean = ringSum / 8;
+          const ringMean = rvs.reduce((a, b) => a + b, 0) / 8;
+          rvs.sort((a, b) => a - b);
+          const ringMin2 = rvs[1];
+          ivs.sort((a, b) => a - b);
+          const inLow = (ivs[0] + ivs[1] + ivs[2]) / 3;
           const outerMean = outerSum / 8;
-          if (ringMin >= p80Core * 0.80 && ringMean - centerLum >= 14) {
-            const score =
-              (ringMean - centerLum) * 1.5 + Math.max(0, ringMean - outerMean) + 0.25 * ringMin;
+          const inDiff = ringMean - inLow;
+          const outDiff = ringMean - outerMean;
+          if (ringMin2 >= p80Core * 0.85 && inDiff >= 14 && outDiff >= 18) {
+            const score = outDiff * 2.6 + inDiff * 0.8 + 0.5 * ringMean;
             if (score > bestPoScore) {
               bestPoScore = score;
               bestPoG = {
