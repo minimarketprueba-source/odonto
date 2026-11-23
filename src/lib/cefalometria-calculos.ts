@@ -2885,7 +2885,7 @@ export function detectarContornoAnatomicoEnCanvas(
     }
     if (filasHueso < 35) return baseWebCeph;
 
-    // 4. Etapa 2: Contorno cutáneo xBlando(y) por caída de gradiente hacia la banda de Mach
+    // 4. Etapa 2: Contorno cutáneo xBlando(y) exterior-a-interior con detección de borde y banda de Mach
     const xBlandoRaw = new Float32Array(dim).fill(-1);
     const maxSoftLum = bgAir + (umbralHueso - bgAir) * 0.36;
     const absLimitX = miraDerecha
@@ -2900,30 +2900,36 @@ export function detectarContornoAnatomicoEnCanvas(
       const minOffPx = Math.round(dim * 0.018);
       const maxOffPx = Math.round(dim * rOff);
 
-      let bestX = -1;
-      let bestScore = -1;
-      for (let off = minOffPx; off <= maxOffPx; off++) {
+      let outerFound = -1;
+      let bestFallbackX = -1;
+      let bestFallbackScore = -1;
+      for (let off = maxOffPx; off >= minOffPx; off--) {
         const x = Math.round(xh + dirOut * off);
-        if (x < 2 || x >= dim - 2 || fwd(x) >= fwd(absLimitX)) break;
-        const lEdge = Math.min(lum(x, y), rawLum(x, y), rawLum(x + dirOut, y));
+        if (x < 2 || x >= dim - 3 || fwd(x) >= fwd(absLimitX)) continue;
+        const lEdge = Math.min(lum(x, y), rawLum(x, y));
         if (lEdge > maxSoftLum) continue;
 
-        const lIn1 = Math.min(umbralHueso, lum(x + dirIn, y));
-        const lIn2 = Math.min(umbralHueso, lum(x + dirIn * 2, y));
-        const lIn3 = Math.min(umbralHueso, lum(x + dirIn * 3, y));
-        const lIn = Math.max(lIn1, lIn2, lIn3);
+        const l1 = Math.min(umbralHueso, lum(x + dirIn, y));
+        const l2 = Math.min(umbralHueso, lum(x + dirIn * 2, y));
+        const lIn = Math.max(l1, l2);
         const drop = lIn - lEdge;
         if (drop < 2.8) continue;
 
         const lOut = (lum(x + dirOut * 2, y) + lum(x + dirOut * 3, y)) * 0.5;
         const machDip = Math.max(0, lOut - lEdge);
-        const score = drop + 1.8 * machDip + off * 0.25;
-        if (score > bestScore) {
-          bestScore = score;
-          bestX = x;
+        const sc = drop + 1.8 * machDip;
+        if (sc > bestFallbackScore) {
+          bestFallbackScore = sc;
+          bestFallbackX = x;
+        }
+
+        if (l2 >= bgAir + 5.0 && (drop >= 9.0 || (drop >= 6.0 && machDip >= 2.0))) {
+          outerFound = x;
+          break;
         }
       }
-      if (bestX >= 0) xBlandoRaw[y] = bestX;
+      const xSel = outerFound >= 0 ? outerFound : bestFallbackX;
+      if (xSel >= 0) xBlandoRaw[y] = xSel;
     }
 
     const xBlando = new Float32Array(dim).fill(-1);
@@ -3257,7 +3263,7 @@ export function detectarContornoAnatomicoEnCanvas(
       y: nabY,
     };
     const gbG: CoordenadaPunto = {
-      x: sorG.x + dirOut * dim * 0.042,
+      x: xBlando[sorG.y] >= 0 ? xBlando[sorG.y] : sorG.x + dirOut * dim * 0.042,
       y: sorG.y,
     };
 
