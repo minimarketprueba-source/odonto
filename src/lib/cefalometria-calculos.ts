@@ -2898,9 +2898,9 @@ export function detectarContornoAnatomicoEnCanvas(
       if (xh < 0) continue;
       let rOff: number;
       if (y < foreheadYMax) {
-        rOff = 0.06;
+        rOff = 0.055;
       } else if (y < piriYMin) {
-        rOff = 0.06 + 0.095 * ((y - foreheadYMax) / Math.max(1, piriYMin - foreheadYMax));
+        rOff = 0.055 + 0.10 * ((y - foreheadYMax) / Math.max(1, piriYMin - foreheadYMax));
       } else if (y <= noseEndY) {
         rOff = 0.155;
       } else {
@@ -2938,19 +2938,7 @@ export function detectarContornoAnatomicoEnCanvas(
           Math.max(l2, l3) >= minInteriorLum &&
           (drop >= 8.0 || (drop >= 5.0 && machDip >= 2.0))
         ) {
-          const xOut = x + dirOut;
-          const xOut2 = x + dirOut * 2;
-          if (
-            xOut >= 2 &&
-            xOut < dim - 3 &&
-            fwd(xOut) < fwd(absLimitX) &&
-            rawLum(xOut, y) <= rawLum(x, y) + 1.0 &&
-            rawLum(xOut2, y) > rawLum(xOut, y) + 1.5
-          ) {
-            outerFound = xOut;
-          } else {
-            outerFound = x;
-          }
+          outerFound = x;
           break;
         }
       }
@@ -3970,8 +3958,8 @@ export function generarContornosAnatomicosSvg(
     const nasalBridge = puntos.Na_b ? map2P({ x: 826, y: 200 }, 'Na_b', 'Pn') : null;
     const dorsumNose = puntos.Na_b ? map2P({ x: 855, y: 239 }, 'Na_b', 'Pn') : null;
     const supratip = puntos.Na_b ? map2P({ x: 873, y: 262 }, 'Na_b', 'Pn') : null;
-    const subTip = map2P({ x: 872, y: 293 }, 'Pn', 'Sn');
-    const columella = map2P({ x: 855, y: 313 }, 'Pn', 'Sn');
+    const subTip = map2P({ x: 870, y: 291 }, 'Pn', 'Sn');
+    const columella = map2P({ x: 852, y: 312 }, 'Pn', 'Sn');
     const upperLipSup =
       puntos.A_b && puntos.UL ? map2P({ x: 848, y: 360 }, 'A_b', 'UL') : null;
     const upperLipInf =
