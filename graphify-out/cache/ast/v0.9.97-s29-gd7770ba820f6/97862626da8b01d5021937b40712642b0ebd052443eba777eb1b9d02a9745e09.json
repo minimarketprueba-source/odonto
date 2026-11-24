@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_supabase_migrations_actualizar_aranceles_2026_08_05_sql", "label": "actualizar_aranceles_2026_08_05.sql", "file_type": "code", "source_file": "supabase/migrations/actualizar_aranceles_2026_08_05.sql", "source_location": null}], "edges": []}

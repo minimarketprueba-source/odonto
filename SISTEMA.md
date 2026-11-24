@@ -102,6 +102,10 @@ La producción del período, por día, semana, mes o rango de fechas.
 
 Las comisiones de cada odontólogo sobre su producción, con su estado de pago.
 
+### 📐 Cefalometría
+
+Estudios cefalométricos y de ortodoncia sobre teleradiografías laterales y frontales: autodigitalización automática con IA híbrida y trazado anatómico estilo WebCeph, lupa de precisión, modo de pantalla completa **Solo Rayos X**, calibración por regla e informe clínico imprimible en PDF.
+
 ### ⚙️ Mantenimiento
 
 Solo para administradores:
@@ -221,9 +225,8 @@ Para que quede claro qué esperar:
 - **No tiene sala de espera** ni turnos por pantalla
 - **No maneja stock** de materiales ni insumos
 - **No se conecta con obras sociales** ni seguros
-- **No guarda las radiografías en la nube**: las imágenes quedan en la ficha, no en un archivo aparte
 - **Una sola clínica**: no está pensado para varias sucursales
 
 ---
 
-*Última actualización: 5 de agosto de 2026*
+*Última actualización: 24 de noviembre de 2026*

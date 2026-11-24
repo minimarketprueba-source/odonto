@@ -463,6 +463,14 @@ tabla, la pantalla lo dice. Otras decisiones:
   `src/lib/utils.ts`. `new Date("2026-09-30")` es medianoche UTC y en Paraguay
   se ve como el día ANTERIOR: pagos e imágenes salían con un día menos.
 
+### Actualización cefalométrica estilo WebCeph e IA híbrida (2026-11-23)
+
+- **Contornos anatómicos y siluetas dentarias** (`src/lib/cefalometria-calculos.ts`): `generarContornosAnatomicosSvg` traza contornos curvos estilo WebCeph (perfil blando completo de frente, dorso/suprapunta/punta/subpunta/columela nasal, labios superior e inferior con `comisura_labial` separada y mentón `Pog' -> stGn -> Me'`), base craneal, órbita, maxilar, mandíbula y siluetas vectoriales de incisivos/molares.
+- **Motor de autodigitalización híbrida** (`src/lib/cefalometria-ia.ts` y `detectarContornoAnatomicoEnCanvas` en `cefalometria-calculos.ts`): visión local en dos etapas (cortical ósea `xHueso` + tejido blando con banda de Mach `xBlando`, rechazo de cadenas metálicas, ventanas autocalibradas respecto a `yChinMax`, centroides de meseta para `Pn`, `Sn`, `A'`, `UL`, `Em`, `LL`, `B'`, `Pog'`, escaneo vertical submentoniano para `Me'` y detector de anillo auricular `Po` con transformación afín `(Po, N, Me)`). Si hay clave `VITE_GEMINI_API_KEY` o en `localStorage`, consulta Gemini Vision validando los puntos contra el contorno local como respaldo.
+- **Editor y experiencia de uso** (`src/components/cefalometria/CefalometriaEditor.tsx`): lupa en vivo `2.8×`, autoguardado al ejecutar **Autodigitalizar IA** o **Limpiar trazado**, barra superior organizada en dos filas (`Cambiar imagen`, `Limpiar trazado`, `Eliminar registro`), modo pantalla completa **Solo Rayos X** (`Esc` para salir) y protección de trazados manuales al recargar imagen.
+- **Compatibilidad Vercel / CORS / CSP**: conversión automática de URLs firmadas remotas de Supabase a `blob:` *same-origin* en `CefalometriaEditor.tsx` (con `revokeObjectURL` al desmontar), `crossOrigin="anonymous"` en `CasoDetalleView.tsx` y en la lupa SVG para evitar contaminación del `<canvas>`, y `https://generativelanguage.googleapis.com` habilitado en `connect-src` en `vercel.json` y `vite.config.ts`.
+- **Pruebas**: 26 pruebas en `src/lib/__tests__/cefalometria-calculos.test.ts` + 4 en `src/components/cefalometria/__tests__/CefalometriaEditor.test.tsx`.
+
 ## Los logos
 
 | Archivo | Para qué | Dónde se usa |
