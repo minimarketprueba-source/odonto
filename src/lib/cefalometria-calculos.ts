@@ -2864,9 +2864,9 @@ export function detectarContornoAnatomicoEnCanvas(
     }
     yChinMax = Math.max(yMin + 12, Math.min(yMax - 1, yChinMax));
 
-    const piriYMin = Math.max(yMin + 4, Math.round(yChinMax - dim * 0.39));
+    const foreheadYMax = Math.max(yMin + 4, Math.round(yChinMax - dim * 0.54));
+    const piriYMin = Math.max(foreheadYMax + 6, Math.round(yChinMax - dim * 0.44));
     const piriYMax = Math.max(piriYMin + 8, Math.round(yChinMax - dim * 0.25));
-    const foreheadYMax = Math.max(yMin + 4, Math.round(yChinMax - dim * 0.43));
 
     const xHueso = new Float32Array(dim).fill(-1);
     let filasHueso = 0;
@@ -2900,11 +2900,11 @@ export function detectarContornoAnatomicoEnCanvas(
       if (y < foreheadYMax) {
         rOff = 0.06;
       } else if (y < piriYMin) {
-        rOff = 0.06 + 0.09 * ((y - foreheadYMax) / Math.max(1, piriYMin - foreheadYMax));
+        rOff = 0.06 + 0.095 * ((y - foreheadYMax) / Math.max(1, piriYMin - foreheadYMax));
       } else if (y <= noseEndY) {
-        rOff = 0.15;
+        rOff = 0.155;
       } else {
-        rOff = 0.11;
+        rOff = 0.115;
       }
       const minOffPx = Math.round(dim * 0.018);
       const maxOffPx = Math.round(dim * rOff);
@@ -2920,7 +2920,8 @@ export function detectarContornoAnatomicoEnCanvas(
 
         const l1 = Math.min(umbralHueso, lum(x + dirIn, y));
         const l2 = Math.min(umbralHueso, lum(x + dirIn * 2, y));
-        const lIn = Math.max(l1, l2);
+        const l3 = Math.min(umbralHueso, lum(x + dirIn * 3, y));
+        const lIn = Math.max(l1, l2, l3);
         const drop = lIn - lEdge;
         if (drop < 2.8) continue;
 
@@ -2932,9 +2933,24 @@ export function detectarContornoAnatomicoEnCanvas(
           bestFallbackX = x;
         }
 
-        const minInteriorLum = y > noseEndY ? bgAir + 3.5 : bgAir + 5.0;
-        if (l2 >= minInteriorLum && (drop >= 9.0 || (drop >= 6.0 && machDip >= 2.0))) {
-          outerFound = x;
+        const minInteriorLum = y > noseEndY ? bgAir + 3.0 : bgAir + 4.0;
+        if (
+          Math.max(l2, l3) >= minInteriorLum &&
+          (drop >= 8.0 || (drop >= 5.0 && machDip >= 2.0))
+        ) {
+          const xOut = x + dirOut;
+          const xOut2 = x + dirOut * 2;
+          if (
+            xOut >= 2 &&
+            xOut < dim - 3 &&
+            fwd(xOut) < fwd(absLimitX) &&
+            rawLum(xOut, y) <= rawLum(x, y) + 1.0 &&
+            rawLum(xOut2, y) > rawLum(xOut, y) + 1.5
+          ) {
+            outerFound = xOut;
+          } else {
+            outerFound = x;
+          }
           break;
         }
       }
@@ -3951,13 +3967,13 @@ export function generarContornosAnatomicosSvg(
 
   // 10. Tejido blando superior e inferior (WebCeph upper & lower soft tissue)
   if (puntos.Pn && puntos.Sn) {
-    const nasalBridge = puntos.Na_b ? map2P({ x: 822, y: 200 }, 'Na_b', 'Pn') : null;
-    const dorsumNose = puntos.Na_b ? map2P({ x: 853, y: 240 }, 'Na_b', 'Pn') : null;
-    const supratip = puntos.Na_b ? map2P({ x: 872, y: 263 }, 'Na_b', 'Pn') : null;
+    const nasalBridge = puntos.Na_b ? map2P({ x: 826, y: 200 }, 'Na_b', 'Pn') : null;
+    const dorsumNose = puntos.Na_b ? map2P({ x: 855, y: 239 }, 'Na_b', 'Pn') : null;
+    const supratip = puntos.Na_b ? map2P({ x: 873, y: 262 }, 'Na_b', 'Pn') : null;
     const subTip = map2P({ x: 872, y: 293 }, 'Pn', 'Sn');
     const columella = map2P({ x: 855, y: 313 }, 'Pn', 'Sn');
     const upperLipSup =
-      puntos.A_b && puntos.UL ? map2P({ x: 845, y: 362 }, 'A_b', 'UL') : null;
+      puntos.A_b && puntos.UL ? map2P({ x: 848, y: 360 }, 'A_b', 'UL') : null;
     const upperLipInf =
       puntos.UL && puntos.Em ? map2P({ x: 855, y: 396 }, 'UL', 'Em') : null;
 
@@ -4012,9 +4028,9 @@ export function generarContornosAnatomicosSvg(
 
   if (puntos.LL && puntos.Pog_b && puntos.Me_b) {
     const lowerLipSup =
-      puntos.Em && puntos.LL ? map2P({ x: 856, y: 419 }, 'Em', 'LL') : null;
+      puntos.Em && puntos.LL ? map2P({ x: 857, y: 419 }, 'Em', 'LL') : null;
     const lowerLipInf =
-      puntos.LL && puntos.B_b ? map2P({ x: 852, y: 453 }, 'LL', 'B_b') : null;
+      puntos.LL && puntos.B_b ? map2P({ x: 853, y: 452 }, 'LL', 'B_b') : null;
     const stGn = map2P({ x: 807, y: 583 }, 'Pog_b', 'Me_b');
     const subMand = puntos.Go
       ? map2P({ x: 695, y: 615 }, 'Me_b', 'Go')
